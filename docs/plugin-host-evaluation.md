@@ -93,16 +93,22 @@ byte-for-byte, and its launcher returned Core identity
 Two separately created fresh Codex Desktop worktree tasks then received the
 exact `check-direct-status-version` prompt. Tasks
 `019ff50a-2760-7d61-8854-532b393f7714` and
-`019ff50a-2760-7d61-8854-530b657b358d` both selected `ecp-check`, located the
-installed launcher, reported the same Core identity and authoritative
-`enabled: false` state, and left their Git worktrees clean.
+`019ff50a-2760-7d61-8854-530b657b358d` both selected `ecp-check`. In both
+tasks, however, the Skill locator supplied by the running host still referenced
+the removed `0.3.0-dev+codex.20260812055614` cache and its initial `SKILL.md`
+read failed. Each task recovered by locating the only installed
+`0.3.0-dev+codex.20260812072220` cache, invoked that installed launcher,
+reported the same Core identity and authoritative `enabled: false` state, and
+left its Git worktree clean.
 
 These runs are fresh-host discovery smoke evidence only. Their worktrees were
 derived from the ECP source repository rather than the required disposable
 `greenfield-disabled` fixture, so neither run is counted as an inventory pass.
-The independent 42-run fixture matrix, `ecp-enable`, governed `ecp-change`,
-`ecp-disable`, and uninstall/reinstallation lifecycle remain unverified; no
-inventory case is recorded as passed.
+The stale host Skill locator must also disappear after an application
+restart/refresh before the package can enter the fixture matrix. The independent
+42-run fixture matrix, `ecp-enable`, governed `ecp-change`, `ecp-disable`, and
+uninstall/reinstallation lifecycle remain unverified; no inventory case is
+recorded as passed.
 
 ## Pilot precondition
 
