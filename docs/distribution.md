@@ -77,6 +77,84 @@ Plugin installation is not project enablement. Each canonical Git Workspace
 still defaults to ECP disabled and requires an explicit project-level enable
 request before authority state is created or governed Changes begin.
 
+## Local Plugin operations
+
+The following policy applies to the source-backed `ecp-local` development
+marketplace. It is an operator workflow, not an ordinary project-user workflow,
+and it does not authorize publication, project enablement, authority migration,
+or deletion.
+
+### Install and accept one local build
+
+1. Require a clean canonical Plugin source at the intended Git commit. Confirm
+   that `plugin.json` and `runtime/manifest.json` carry the same new version and
+   that every packaged artifact matches its declared digest, size, and execute
+   bit.
+2. Run the official Plugin validator and Skill validator for all four Skills,
+   plus the copied cache-layout launcher tests. Source-tree success alone is
+   not installation acceptance.
+3. Install or update with `codex plugin add ecp-codex@ecp-local --json`. Treat
+   the returned version and `installedPath` as the candidate installation; do
+   not infer the active copy from the marketplace source path.
+4. Compare the installed copy with the reviewed source, validate the installed
+   Plugin and all four installed Skills, and invoke only the installed shared
+   launcher for `ecp version` and read-only project status.
+5. Restart the desktop app and open a new task. Invoke `$ecp-check` with a short
+   read-only request to report project mode, Core version, and full Core
+   identity. Success requires the expected installed Plugin version, the exact
+   packaged Core identity, and an unchanged project mode. A source/cache check
+   in the task that performed installation does not prove fresh-task pickup.
+
+### Upgrade
+
+1. Do not upgrade through an unreviewed dirty marketplace source. Finish or
+   explicitly cancel ACTIVE Changes when practical; otherwise record that a
+   Core identity or compatibility change may invalidate the current plan and
+   require new Evidence after upgrade.
+2. Apply the mandatory build-and-version order above. Every Core, Skill,
+   launcher, reference, or manifest change receives a new cachebuster and a
+   complete package validation before installation.
+3. Re-run `codex plugin add ecp-codex@ecp-local --json`; never overwrite an
+   installed cache directory in place. Restart into a new task and repeat the
+   read-only installed-copy acceptance.
+4. The upgrade must preserve every Workspace mode and authority history. A new
+   Core identity intentionally prevents old plans or Evidence from being
+   treated as evidence for a different execution identity. If Core reports an
+   unsupported or incompatible authority/config schema, stop fail-closed; do
+   not edit the external state store or invent an implicit migration.
+
+### Failure recovery and rollback
+
+- Never point a Skill at an older cache directory, hand-edit cached files, copy
+  a binary over the installed runtime, or bypass checksum/compatibility errors
+  with an ambient CLI.
+- Revert the faulty source change through normal Git review, allocate a new
+  cachebuster, rebuild all runtime artifacts, run the full package/Skill
+  validation, and install that corrective package as a new version. This is a
+  forward-delivered rollback and remains auditable.
+- Rollback installation must not change project mode or authority state. If an
+  enabled project cannot be inspected with the new package, make no ungoverned
+  repository mutation; reinstall a compatible validated package first. Then
+  derive a fresh plan and Evidence where the execution identity changed.
+- Retaining an older cache directory is not a supported backup or restore
+  mechanism. Authority export/verification is separately explicit and ECP
+  v0.3 still has no authority restore/import operation.
+
+### Uninstall
+
+1. Before removal, explicitly disable ECP in every enabled Workspace that must
+   remain editable without the Plugin. If a Workspace intentionally remains
+   enabled, accept that supported Codex repository mutation is unavailable
+   until a compatible Plugin is reinstalled; uninstall is not a task-level ECP
+   bypass.
+2. Remove only through `codex plugin remove ecp-codex@ecp-local --json`, then
+   restart and verify the Plugin is absent from the installed list. Removing
+   the Plugin does not remove the configured marketplace unless that separate
+   action is explicitly requested.
+3. Uninstall must not delete or rewrite `.ecp`, external authority state,
+   accepted Project Truth, Change history, Evidence, or project source. It must
+   not be reported as project disablement or history erasure.
+
 ## Trust boundary
 
 The sidecar and runtime manifest detect incomplete copies and accidental or
@@ -86,7 +164,7 @@ binary, checksum, and manifest together. The Core binary digest provides exact
 Evidence compatibility identity, not publisher provenance.
 
 The current source package is not signed, notarized, published in the universal
-directory, or verified in a fresh real desktop task. Those remain release
-requirements. Public distribution also needs a supported upgrade/uninstall
-policy and a decision about whether Linux packages belong in the same Plugin or
-separate platform releases.
+directory, or verified in a fresh real desktop task. The local operation policy
+above is specified but has not yet completed a fresh-task upgrade/uninstall
+exercise. Those remain release requirements, along with a decision about
+whether Linux packages belong in the same Plugin or separate platform releases.

@@ -181,6 +181,8 @@ Future enforcement consumers
 
 当前仓库不会自动安装 Plugin，也不会改写用户的全局 Codex 配置。开发者也可以按官方方式用 `codex plugin marketplace add .` 注册本地 marketplace，但这不是普通产品用户工作流。
 
+本地开发版的安装验收、升级、故障回退与卸载规则见 [Plugin distribution operations](docs/distribution.md#local-plugin-operations)。这些管理动作本身都不能改变任何项目的 ECP mode；回退必须以新的 cachebuster 重新构建并验证，不能手工执行旧 cache 中的二进制。
+
 Plugin 源码发生变化后，发布者运行：
 
 ```bash
