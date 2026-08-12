@@ -26,6 +26,6 @@ destination. This digest detects change and corruption; it is not a signature,
 publisher identity, authenticated approval, remote attestation, or proof that
 the exporting machine was trustworthy. A bundle may contain sensitive project
 history and Evidence logs. It must never be automatically committed, uploaded,
-or shared. v0.2 provides export and offline verification only; it does not
-provide restore, import, merge, redaction, encryption, retention scheduling, or
-garbage collection.
+or shared. The current v0.3 candidate provides export and offline verification
+only; it does not provide restore, import, merge, redaction, encryption,
+retention scheduling, or garbage collection.

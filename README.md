@@ -164,6 +164,7 @@ Future enforcement consumers
 - [SPEC.md](SPEC.md)
 - [docs/project-pack.md](docs/project-pack.md)
 - [docs/verification-matrix.md](docs/verification-matrix.md)
+- [docs/plugin-host-evaluation.md](docs/plugin-host-evaluation.md)
 - [docs/real-project-pilot.md](docs/real-project-pilot.md)
 - [docs/ci-consumer-contract.md](docs/ci-consumer-contract.md)
 - [docs/distribution.md](docs/distribution.md)
@@ -240,6 +241,8 @@ go vet ./...
   ]
 }
 ```
+
+示例中的 `300` 秒不是推荐默认值。实际 Gate 必须先在代表性本地主机上测量 exact command 的冷/正常缓存耗时，并按 [Project Pack Gate 时间预算](docs/project-pack.md#gate-时间预算) 留出明确抖动余量；不能依赖缓存命中或重试掩盖过小超时。
 
 v0.3 会拒绝声明需要网络或产生外部副作用的 Gate。这个字段检查不能阻止一个谎报为 `false` 的项目命令自行联网或产生副作用；未隔离 Runner 仍是不可信代码执行。
 

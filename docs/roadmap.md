@@ -61,7 +61,7 @@ Phase 1 原计划的 Runner 纵深强化不再整体先行。除阻断真实 Pro
 
 目标：把当前 Assurance Kernel 扩展为 North Star 的最小完整语义闭环。
 
-状态：本地 Core/CLI、自包含四 Skill Codex Plugin runtime、自举 Project Pack 与自动化安全回归已实现；Plugin 尚未签名/公开发布或在新鲜 desktop task 中验收，真实独立项目接手/长期迭代试点和受保护 CI consumer 也尚未完成，因此本阶段还不能被描述为已通过产品退出标准。
+状态：本地 Core/CLI、自包含四 Skill Codex Plugin runtime、自举 Project Pack 与自动化安全回归已实现，已安装副本的 launcher/version/status/显式 `ecp-check` 只读 smoke 已验证；完整 fresh-task host-routing matrix、升级/卸载、签名/公开发布、真实独立项目接手/长期迭代试点和受保护 CI consumer 尚未完成，因此本阶段还不能被描述为已通过产品退出标准。
 
 - 严格、版本化且项目独立的 Project Truth schema；
 - Capability、Invariant、Component、Decision、Contract reference 和 Unknown；
@@ -82,9 +82,10 @@ Phase 1 原计划的 Runner 纵深强化不再整体先行。除阻断真实 Pro
 
 ## Phase 1B — Real Project Pilot
 
-状态：下一阶段。先在当前 ECP 仓库形成可复核 Project Pack 示例，再选择一个独立真实产品仓库做跨 task/newcomer 试点；试点数据不能由 ECP 自己的测试代替。
+状态：下一阶段。先在独立可丢弃 Workspaces 完成四 Skill 的 fresh-task host-routing matrix，再同时选择一个真正的新项目和一个持续开发的旧项目做跨 task/newcomer 双轨试点；试点数据不能由 ECP 自己的测试或静态 Skill 文本检查代替。
 
-- 在一个真实、持续开发的项目上覆盖普通功能、业务规则、数据契约、架构变化和回归修复；
+- 新旧两个项目都完整覆盖基线恢复、普通 Change、语义 Change、新人接手和故障演练，每个至少八个真实 Change，合计至少二十个；
+- 在新项目验证诚实 seed/established Truth 与 Unknown 保留，在旧项目验证历史合同恢复、dirty diff 保护和兼容边界；
 - 测量实际捕获的问题、错误阻断、交互负担、知识 freshness 和跨 task 接手效果；
 - 证明 Project Pack 没有退化成重复代码文档或泛化 AI 摘要；
 - 只有试点证明复利价值后，才恢复 Runner、MCP、签名或多项目表面的扩大投入。

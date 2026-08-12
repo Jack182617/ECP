@@ -35,7 +35,7 @@ The authoritative scenario wording remains in `SPEC.md` section 12.
 | 11 | One ACTIVE Change per Workspace | `TestSingleActiveChangeAndScopePrefixBoundary` | A |
 | 12 | Shell metacharacters remain literal argv | `TestGateArgvMetacharactersRemainLiteral` | A |
 | 13 | Traversal, outside cwd, and followed source symlinks are rejected | `TestPathAndSymlinkBoundaries` | A |
-| 14 | Skills never set Verdict, only forward exact confirmed preconditions, and do not equate local PASS with release | `TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries`; bundled Skill set | A+S |
+| 14 | Skills never set Verdict, only forward exact confirmed preconditions, and do not equate local PASS with release | `TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries`; `TestPluginHostRoutingEvaluationInventory`; bundled Skill set | A+S |
 | 15 | Existing Project Pack is not implicitly accepted; Draft Project ID cannot replace binding | `TestExistingConfigRequiresExplicitRegistration`; `TestDraftProjectIDCannotReplaceAuthorityIdentity` | A |
 | 16 | Config semantics and digest come from one stable byte epoch | `TestConfigReadRejectsMixedEpoch` | A |
 | 17 | Dirty submodule checkout changes stale Evidence | `TestSubmoduleCheckoutChangesSourceFingerprint` | A |
@@ -58,8 +58,8 @@ The authoritative scenario wording remains in `SPEC.md` section 12.
 | 34 | Enabled drift remains enabled+BLOCKED/INDETERMINATE and can disable authority-only | `TestEnabledProjectNeverFallsBackOnConfigDriftAndCanStillDisable`; `TestProjectModeCommandsDefaultDisabledAndFailClosedOnDrift` | A |
 | 35 | Disable token is stale after mutation; active cancellation+disable is atomic; repeated disable is idempotent | `TestDisableAtomicallyCancelsObservedChangeAndPreservesEvidenceAndSource`; `TestEnabledProjectNeverFallsBackOnConfigDriftAndCanStillDisable` | A |
 | 36 | Re-enable creates a new activation and old context/Evidence/ack/subject cannot cross it | `TestProjectActivationIsWorkspaceScopedPersistentAndCloneLocal`; `TestActiveChangeMutationsRequireExactIdentity` | A |
-| 37 | Change Skill probes status before mutation, routes disabled normally, governs enabled, and has no task bypass | `TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries`; bundled `ecp-change` | A+S |
-| 38 | Normal user flow hides CLI commands and opaque protocol values across check/enable/disable/change | `TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries`; bundled Skill set | A+S |
+| 37 | Change Skill probes status before mutation, routes disabled normally, governs enabled, and has no task bypass | `TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries`; `TestPluginHostRoutingEvaluationInventory`; bundled `ecp-change` | A+S |
+| 38 | Normal user flow hides CLI commands and opaque protocol values across check/enable/disable/change | `TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries`; `TestPluginHostRoutingEvaluationInventory`; bundled Skill set | A+S |
 | 39 | Enabled BLOCKED/INDETERMINATE status is `ok:true` stdout with exit 3/4 | `TestProjectModeCommandsDefaultDisabledAndFailClosedOnDrift` | A |
 | 40 | Skill bypass limitations are explicit and never described as enforcement | `TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries`; `docs/security-model.md`; bundled Skill set | A+S |
 | 41 | Init creates honest seed truth/contract and independent control/truth digests | `TestRepositoryProjectPackLoadsAsEstablishedTruth`; `TestCLIChangeStartAndTruthReconcileMachineContract` | A |
@@ -145,13 +145,15 @@ if that unsupported-path contract is promoted to release evidence.
 | Requirement | Current repository evidence | Status |
 | --- | --- | --- |
 | Local v0.3 Core/CLI semantic loop | Implementation plus the 75-scenario mapping above | Locally automated |
-| User does not handwrite product code or operate ECP CLI | Four-Skill contracts and CLI hiding rules | Statically specified; real-use proof missing |
+| User does not handwrite product code or operate ECP CLI | Four-Skill contracts, CLI hiding rules, and `docs/plugin-host-evaluation-cases.json` | Statically specified; host matrix and real-use proof missing |
+| Four-Skill host activation and output quality | `docs/plugin-host-evaluation.md`; `TestPluginHostRoutingEvaluationInventory` | Protocol/inventory automated; required fresh-task runs not performed |
 | New task recovers without historical chat | Authority truth/policy/history tests | Mechanism proven; independent-project task proof missing |
-| Independent real product, at least six ordinary/semantic Changes | `docs/real-project-pilot.md` protocol only | `X` — not performed |
+| Independent greenfield and established products, at least eight Changes each and twenty total | `docs/real-project-pilot.md` protocol only | `X` — not performed |
 | New maintainer/product person handoff | Pilot protocol only | `X` — not performed |
 | Multi-year complexity/capacity/retention | Segmentation, health, and explicit bounds | `X` — not proven; retention/repair/GC absent |
 | Team/cross-machine authority continuity | Project Pack is portable; local Evidence is Workspace-bound | `X` — no lineage/import/shared-authority protocol |
-| Fresh Codex Desktop install, upgrade, uninstall, new-task pickup | Cache-layout test and local marketplace source | `X` — not performed in a fresh real task |
+| Installed-copy launcher, identity, default-disabled status, and explicit check smoke | Cache-layout tests and bounded 2026-08-12 record in `docs/plugin-host-evaluation.md` | Installed read-only smoke observed; independent fresh-task matrix missing |
+| Fresh-task upgrade, uninstall, reinstall, and full four-Skill pickup | Distribution policy and host-routing protocol only | `X` — not performed |
 | Trusted Plugin distribution | Checksums and reproducible package | `X` — unsigned, unnotarized, unpublished |
 | Protected CI/release enforcement | `docs/ci-consumer-contract.md` only | `X` — not implemented or deployed |
 | Isolated/hermetic Gate execution | Timeout/process-group/bounded-output hardening | `X` — no sandbox/VM, network or same-user isolation |
@@ -162,7 +164,8 @@ if that unsupported-path contract is promoted to release evidence.
 Passing this repository's checks can establish that the current local v0.3
 candidate implements its bounded Core/CLI/Skill contracts on the tested host.
 It cannot establish the full North Star product claim. That claim remains
-unproven until an independent real-project pilot, newcomer handoff, fresh
-desktop distribution validation, and the chosen CI/isolation boundaries provide
-their own evidence. Those missing results are product exit blockers, not reasons
-to weaken or relabel the acceptance criteria.
+unproven until the full fresh-task host-routing matrix, independent greenfield
+and established-project pilots, newcomer handoffs, desktop lifecycle validation,
+and the chosen CI/isolation boundaries provide their own evidence. Those missing
+results are product exit blockers, not reasons to weaken or relabel the
+acceptance criteria.

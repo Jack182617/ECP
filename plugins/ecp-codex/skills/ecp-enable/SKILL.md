@@ -49,9 +49,11 @@ CLI or copy opaque protocol values.
 5. Express each Gate as executable plus literal argv; do not create a joined
    shell program. Keep network and external-side-effect declarations false,
    `.ecp` denied, sensitive environment inheritance absent, and every reachable
-   risk covered by at least one applicable Gate. Do not install dependencies,
-   change CI/release automation, access production, or invent a validation
-   command to make enablement pass.
+   risk covered by at least one applicable Gate. Measure each exact command with
+   cold and normal local caches and give `timeout_seconds` explicit headroom;
+   never copy an example timeout or rely on cache hits/retries to pass. Do not
+   install dependencies, change CI/release automation, access production, or
+   invent a validation command to make enablement pass.
 
 ## Register and enable
 

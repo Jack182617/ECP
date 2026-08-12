@@ -332,7 +332,10 @@ Plugin runtime manifest 必须绑定 exact Plugin version、每个支持 target 
 
 ## 12. v0.3 验收场景
 
-实现至少必须自动证明：
+实现至少必须覆盖以下场景。仓库内自动行为测试、静态 Skill/Plugin 合同、
+构建证据和必须由独立 Codex host 或外部系统提供的证据类别，以
+`docs/verification-matrix.md` 为准；静态 Skill 文本和 Core 测试不得被表述为
+fresh-task host routing、真实项目、发布或生产证明：
 
 1. 新建项目在 Draft Config/注册/接受完成后仍默认 disabled；显式 enable 后启动 Change、运行 Gate、PASS、完成和历史查询的正常路径；
 2. PASS 后任意受管理源码变化使旧 Evidence stale，Verdict 非零；

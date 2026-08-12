@@ -604,10 +604,16 @@
   ],
   "unknowns": [
     {
-      "id": "independent-long-term-pilot-unproven",
-      "statement": "No independent multi-year product has yet demonstrated that this Project Pack and workflow materially preserve newcomer continuity and reduce AI semantic drift over time.",
+      "id": "independent-dual-track-pilot-unproven",
+      "statement": "No independent greenfield and established product pair has yet completed the required fresh-task host-routing matrix, at least eight real Changes per project and twenty total, newcomer handoffs, and fault exercises needed to evaluate the bounded Phase 1B value hypothesis.",
       "risk": "high",
-      "resolution_condition": "Run a staged pilot in at least one independent product repository across multiple real Changes, fresh tasks, and a newcomer handoff, then publish measured outcomes and failures."
+      "resolution_condition": "Complete the canonical dual-track protocol in docs/real-project-pilot.md, preserve all failures and measurements in the authorized project records, and evaluate the stated exit criteria without weakening them."
+    },
+    {
+      "id": "multi-year-value-unproven",
+      "statement": "Even a successful bounded Phase 1B pilot cannot prove that ECP preserves newcomer continuity, keeps Project Truth economical, or reduces semantic drift over multiple years of product evolution.",
+      "risk": "high",
+      "resolution_condition": "Collect longitudinal evidence across sustained releases, maintainer changes, policy/truth evolution, authority growth, recovery events, and measured control-group or pre-ECP baselines over a multi-year period."
     },
     {
       "id": "protected-ci-not-implemented",
@@ -634,10 +640,22 @@
       "resolution_condition": "Bind critical invariants to independent executable contracts and add a protected consumer or reviewer that can reject unsupported semantic claims for high-risk Changes."
     },
     {
-      "id": "desktop-distribution-not-proven",
-      "statement": "The Codex Plugin now bundles checksum-verified Core runtimes and passes cache-layout smoke tests, but the package is not signed, notarized, publicly published, upgrade/uninstall tested, or verified after installation in a fresh real Codex desktop task.",
+      "id": "desktop-host-routing-not-proven",
+      "statement": "An installed Plugin copy has matched reviewed source files and completed launcher, Core identity, default-disabled status, and explicit ecp-check read-only smoke in Codex Desktop, but the canonical direct, indirect, incomplete, negative, and edge-case matrix has not run in independent fresh tasks for all four Skills.",
+      "risk": "high",
+      "resolution_condition": "Pass every required independent run in docs/plugin-host-evaluation-cases.json against disposable fixtures using one exact installed Plugin/Core identity, preserve failures, and rerun the full matrix after any routing correction."
+    },
+    {
+      "id": "desktop-plugin-lifecycle-not-proven",
+      "statement": "Fresh-task Plugin upgrade, uninstall, reinstall, rollback delivery, mode/history preservation, and a governed Change across a Core identity transition have not been exercised.",
       "risk": "moderate",
-      "resolution_condition": "Build through a trusted release process, sign/notarize, install, upgrade, uninstall, and verify launcher discovery, version compatibility, default-disabled behavior, and a governed Change in fresh Codex desktop tasks."
+      "resolution_condition": "Execute the documented install, upgrade, failure-recovery, uninstall, and reinstall protocol in disposable Workspaces; verify installed paths, exact identities, project modes, authority histories, and fresh Evidence without editing cache or authority state directly."
+    },
+    {
+      "id": "trusted-plugin-distribution-not-proven",
+      "statement": "The Plugin package is reproducible and checksum-verified but remains unsigned, unnotarized, and unpublished; its local checksums prove byte compatibility, not publisher provenance or trusted distribution.",
+      "risk": "moderate",
+      "resolution_condition": "Choose a trusted release boundary, build from reviewed source, sign and notarize supported platform artifacts, publish through the authorized channel, and verify installation provenance independently of bundled checksums."
     },
     {
       "id": "authority-retention-not-scaled",

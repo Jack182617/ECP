@@ -143,6 +143,13 @@ Required behavior:
 - `command` is executable plus literal argv. Use `npm`, `go`, `make`,
   `xcodebuild`, or another real executable only when the repository already
   establishes that command. Do not put a joined shell program in one string.
+- `timeout_seconds` is a measured fail-closed budget, not a copied default. Run
+  the exact reviewed command at least once with cold build/tool caches and once
+  with normal caches on a representative supported host. Start with at least
+  50% headroom over the slowest representative result and at least 60 seconds of
+  absolute headroom for a multi-minute Gate; use a more conservative limit when
+  samples or host coverage are weak. If the resulting limit is impractical,
+  split or optimize the Gate instead of depending on cache hits or retries.
 - `working_directory` is a canonical repository-relative directory.
 - `timeout_seconds` is positive and at most Core's supported limit.
 - `allowed_exit_codes` normally contains only `0`.

@@ -7,7 +7,7 @@ not install an `ecp` executable, edit PATH, or operate the JSON protocol.
 This follows the official Codex packaging model: Skills may contain executable
 `scripts/`, repo marketplaces expose local Plugins, and the desktop app loads
 an installed copy from its Plugin cache. See the official
-[Build skills](https://learn.chatgpt.com/docs/build-skills) and
+[Build skills](https://developers.openai.com/plugins/build/skills) and
 [Package your plugin](https://developers.openai.com/plugins/build/plugins)
 documentation.
 
@@ -104,6 +104,10 @@ or deletion.
    identity. Success requires the expected installed Plugin version, the exact
    packaged Core identity, and an unchanged project mode. A source/cache check
    in the task that performed installation does not prove fresh-task pickup.
+6. Before any real-product pilot write, complete the independent disposable-
+   fixture matrix in [Codex Plugin host-routing evaluation](plugin-host-evaluation.md).
+   A successful explicit check does not prove enable, change, disable, negative,
+   incomplete, or edge-case routing.
 
 ### Upgrade
 
@@ -163,8 +167,18 @@ signature: an attacker able to replace the Plugin can replace the launcher,
 binary, checksum, and manifest together. The Core binary digest provides exact
 Evidence compatibility identity, not publisher provenance.
 
-The current source package is not signed, notarized, published in the universal
-directory, or verified in a fresh real desktop task. The local operation policy
-above is specified but has not yet completed a fresh-task upgrade/uninstall
-exercise. Those remain release requirements, along with a decision about
-whether Linux packages belong in the same Plugin or separate platform releases.
+The current installed-copy read-only smoke is recorded in
+`docs/plugin-host-evaluation.md`: the reviewed source and installed cache files
+matched, the installed launcher returned the expected Core identity, and an
+explicit check preserved disabled project mode and clean Git state. That task
+carried prior context, so it is not evidence for the independent fresh-task
+matrix.
+
+The current source package is still unsigned, unnotarized, and unpublished in
+the universal directory. Fresh-task enable/change/disable routing, upgrade,
+uninstall, reinstallation, and a governed Change have not been validated. Keep
+these independent claims separate: read-only installed-copy discovery is
+observed, while host routing, lifecycle compatibility, and publisher provenance
+remain unverified release requirements. A separate release decision is also
+required for keeping Linux packages in the same Plugin versus platform-specific
+distribution.

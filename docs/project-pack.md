@@ -48,6 +48,12 @@ Project Pack 是每个项目随仓库保存的、可评审但不能自行生效�
 5. 实现完成后，Core 分别记录产品语义结果、每项 Requirement result，并计算 accepted 与 candidate Project Pack 的真实差异。自动 Requirement 仍需当前 mapped Gate Evidence；外部 Requirement 在 v0.3 保持 pending。`PRESERVED` 不接受任何 truth delta或 declared expected change；`CHANGED` 可以在 durable truth 仍准确时保持零 delta，非零 delta 必须在 Impact 内并由用户确认精确 protected change；`UNKNOWN` 阻止 PASS。
 6. 新 accepted truth 与 Semantic Assessment 原子记录；Impact 关联 invariant 的风险和 `gate_ids` 会成为真实裁决输入，truth 演进则对 starting/final 两版取更高风险与保护 Gate 并集。取消后 replacement Change 继承原 baseline/lineage，旧 revision、完整 Change Contract/Requirement/Impact/semantic history、GateRun 终态与 Evidence 保留用于审计、接手和恢复。
 
+## Gate 时间预算
+
+`timeout_seconds` 是 fail-closed 的执行上限，不是示例默认值。启用项目或修改 Gate 前，必须在受支持、具有代表性的本地主机上执行 exact command，至少覆盖一次冷构建/冷工具缓存和一次正常缓存；命令及其传递脚本仍要先通过无网络、无凭据、无签名/发布/部署、无生产访问、无迁移和无外部写入审查。
+
+初始时间预算应至少高于最慢代表性结果 50%，并为多分钟 Gate 额外保留不少于 60 秒的绝对余量；样本不足、宿主差异明显或命令有已知抖动时使用更保守上限。积累足够样本后可按观测 p95/p99 调整，但不能依赖测试缓存、偶然快跑或重试来掩盖过小超时。若合理超时过长，应拆分聚焦/affected/full Gate 或优化测试，而不是降低 Evidence 要求。
+
 ## 新人接手标准
 
 一个合格 Project Pack 不要求新人先读完全部代码或旧聊天。新 Agent 应能从它开始回答：产品为什么存在、现在能做什么、哪些规则不能破坏、主要组件如何分工、哪些契约是权威引用、为什么做过关键取舍、目前什么仍未知，以及本次需求可能影响哪些事实。
