@@ -25,6 +25,8 @@ ECP v0.3 要回答的不是“AI 说完成了吗”，而是：
 
 用户不需要运行 ECP 工作流命令，也不需要复制 authority ID、Workspace ID、Change ID、hash 或 token。Codex adapter 会把紧邻 Core JSON 中的 opaque 值原样传给下一步，并在正常报告中隐藏协议细节。
 
+同一个 `ecp-codex` Plugin 提供四个聚焦 Skill：`ecp-check` 负责状态、Core identity 与只读诊断，`ecp-enable` 负责显式项目启用，`ecp-disable` 负责显式项目停用，`ecp-change` 负责普通仓库修改的自动模式探针与已启用闭环。用户可以直接说自然语言，也可以用对应 Skill chip/`$skill-name` 明确触发，不需要反复粘贴整段操作规约。四个 Skill 共享一份 Plugin-root launcher、CLI contract 和 bundled Core；安装 Plugin 本身仍不会启用任何项目。
+
 ### 启用当前项目
 
 直接告诉 Codex：
@@ -138,7 +140,7 @@ Codex 会先确认一个尚不存在、位于仓库和 live authority 之外的�
 User natural-language request
   │
   ▼
-Codex + ecp-change Skill      project-mode router and workflow adapter
+Codex + four ECP Skills       check / enable / disable / governed change
   │
   ▼
 ECP CLI / Core               activation, state machine, fingerprints,
@@ -173,9 +175,9 @@ Future enforcement consumers
 
 当前仓库包含一个可运行的 v0.3 本地语义闭环实现、稳定 JSON Core 接口、威胁模型、回归测试和自包含 Codex Plugin。它是本地实现候选，不是已签名、已公网上架或远端强制的发布版。
 
-仓库按官方 repo marketplace 结构提供 `.agents/plugins/marketplace.json` 和 `ecp-codex` Plugin。Plugin 不包含 MCP、Hooks 或 App；它通过 Skill 自身的 `scripts/ecp` launcher 调用包内 Darwin/Linux arm64/amd64 Core，Core 仍是唯一状态与 Verdict 权威。launcher 不读取 ambient `PATH` 中的 `ecp`，并在执行前核对包内二进制 SHA-256。
+仓库按官方 repo marketplace 结构提供 `.agents/plugins/marketplace.json` 和 `ecp-codex` Plugin。Plugin 不包含 MCP、Hooks 或 App；四个 Skill 通过 Plugin 根目录共享的 `scripts/ecp` launcher 调用包内 Darwin/Linux arm64/amd64 Core，Core 仍是唯一状态与 Verdict 权威。launcher 不读取 ambient `PATH` 中的 `ecp`，并在执行前核对包内二进制 SHA-256。
 
-在 Codex/ChatGPT desktop app 中打开本仓库，重启 App 后进入 Plugins Directory，选择 repo marketplace `ECP Local` 并安装 `ecp-codex`。本地 Plugin 会被复制到 Codex Plugin cache；Skill 通过自身安装路径定位 runtime，因此不要求用户安装 CLI、修改 PATH 或复制任何 opaque 值。安装本身仍不会启用任何项目。
+在 Codex/ChatGPT desktop app 中打开本仓库，重启 App 后进入 Plugins Directory，选择 repo marketplace `ECP Local` 并安装 `ecp-codex`。本地 Plugin 会被复制到 Codex Plugin cache；每个 Skill 从自身安装位置解析同一个 Plugin-root launcher 与 runtime，因此不要求用户安装 CLI、修改 PATH 或复制任何 opaque 值。安装本身仍不会启用任何项目。
 
 当前仓库不会自动安装 Plugin，也不会改写用户的全局 Codex 配置。开发者也可以按官方方式用 `codex plugin marketplace add .` 注册本地 marketplace，但这不是普通产品用户工作流。
 
@@ -191,7 +193,7 @@ Core 内部的 Git 同样不会从 ambient `PATH` 解析。仅安装在 Homebrew
 
 ## 开发者构建与诊断
 
-下面的 CLI 是 Adapter/Core 机器合同和开发者诊断面，不是最终用户工作流。正常使用中不要让用户手工串联这些命令或转录 opaque 字段；完整参数以 `ecp --help` 和 [Skill CLI machine contract](plugins/ecp-codex/skills/ecp-change/references/cli-contract.md) 为准。
+下面的 CLI 是 Adapter/Core 机器合同和开发者诊断面，不是最终用户工作流。正常使用中不要让用户手工串联这些命令或转录 opaque 字段；完整参数以 `ecp --help` 和 [shared CLI machine contract](plugins/ecp-codex/references/cli-contract.md) 为准。
 
 ```bash
 go build -o bin/ecp ./cmd/ecp
@@ -247,7 +249,7 @@ v0.3 会拒绝声明需要网络或产生外部副作用的 Gate。这个字段�
 cmd/ecp/                 CLI 入口
 internal/ecp/            Core 领域模型与服务
 internal/cli/            参数与稳定 JSON 输出合同
-plugins/ecp-codex/       repo-local Codex Plugin
+plugins/ecp-codex/       repo-local Codex Plugin、四个 Skill、共享 launcher/Core
 .agents/plugins/         repo-local Plugin marketplace
 scripts/                 Plugin runtime 打包工具
 docs/                    架构、安全模型和路线图

@@ -1,0 +1,6 @@
+interface:
+  display_name: "ECP Project Enablement"
+  short_description: "Enable ECP with honest Project Truth"
+  default_prompt: "Use $ecp-enable to enable ECP for this project with honest Project Truth and safe local Gates."
+policy:
+  allow_implicit_invocation: true

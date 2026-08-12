@@ -50,7 +50,7 @@ func TestRepositorySourceHygiene(t *testing.T) {
 			return nil
 		}
 		_, knownTextExtension := textExtensions[filepath.Ext(entry.Name())]
-		knownTextPath := entry.Name() == ".gitignore" || filepath.ToSlash(relative) == "plugins/ecp-codex/skills/ecp-change/scripts/ecp"
+		knownTextPath := entry.Name() == ".gitignore" || filepath.ToSlash(relative) == "plugins/ecp-codex/scripts/ecp"
 		if !knownTextExtension && !knownTextPath {
 			return nil
 		}
@@ -193,7 +193,7 @@ func TestBundledPluginRuntimeIsCompleteAndPathIndependent(t *testing.T) {
 	if runtime.GOARCH != "arm64" && runtime.GOARCH != "amd64" {
 		t.Skip("host architecture is intentionally outside the packaged runtime matrix")
 	}
-	launcherRelative := filepath.Join("skills", "ecp-change", "scripts", "ecp")
+	launcherRelative := filepath.Join("scripts", "ecp")
 	launcher := filepath.Join(pluginRoot, launcherRelative)
 	assertLauncherVersion(t, launcher)
 
@@ -269,40 +269,97 @@ func TestRepositoryMarketplaceTargetsBundledPlugin(t *testing.T) {
 	}
 }
 
-func TestBundledSkillEncodesAdapterSafetyBoundaries(t *testing.T) {
+func TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}
-	skillPath := filepath.Join(root, "plugins", "ecp-codex", "skills", "ecp-change", "SKILL.md")
-	content, err := os.ReadFile(skillPath)
+	pluginRoot := filepath.Join(root, "plugins", "ecp-codex")
+	skillsRoot := filepath.Join(pluginRoot, "skills")
+	entries, err := os.ReadDir(skillsRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
-	skill := string(content)
-	normalizedSkill := strings.Join(strings.Fields(skill), " ")
-	required := []string{
-		"Do not ask the user to run ECP commands or copy IDs, hashes, or tokens.",
-		"it is not an OS, shell, CI, or release enforcement boundary.",
-		"Before any repository mutation, run only the bundled launcher as",
-		"`enabled: false`: for an ordinary implementation request, end the ECP",
-		"Do not initialize ECP, create a Change, or prompt the user to enable it.",
-		"`enabled: true`: ECP governs every repository mutation until the project is",
-		"there is no task-level bypass",
-		"Never set, synthesize, or infer a Verdict",
-		"This is a zero-silent-ambiguity guarantee",
-		"--supersedes-change",
-		"inferred_impact",
-		"Do not run unrelated full suites merely for completeness",
-		"Local PASS does not mean defect-free, committed, pushed, deployed, published, released, device-tested, production-tested",
+	wanted := map[string][]string{
+		"ecp-check": {
+			"Inspect ECP without enabling, disabling, or changing a project.",
+			"Never infer current state from `.ecp`, Plugin installation, chat history",
+			"also run `ecp version` through the same launcher",
+			"label that fact `unverified`",
+			"Never invoke project init/register/enable/disable",
+		},
+		"ecp-enable": {
+			"only when the user explicitly asks to enable ECP",
+			"Build or review the minimum truthful Project Pack",
+			"Keep uncertainty as `Unknown`",
+			"A name such as `test` or `check` is not safety evidence.",
+			"Report success only when Core explicitly returns `enabled: true`",
+		},
+		"ecp-disable": {
+			"only for an explicit whole-project disable request",
+			"Disabled or unregistered mode is an idempotent success.",
+			"Core atomically records it as CANCELLED before project disablement",
+			"Never delete or edit `.ecp`, authority history, Evidence, source files",
+		},
+		"ecp-change": {
+			"Do not ask the user to run ECP commands or copy IDs, hashes, or tokens.",
+			"it is not an OS, shell, CI, or release enforcement boundary.",
+			"Before any repository mutation, run only",
+			"Do not initialize ECP, create a Change, or prompt the user to",
+			"There is no task-level bypass",
+			"Never set, synthesize, or infer a Verdict",
+			"zero-silent-ambiguity guarantee",
+			"--supersedes-change",
+			"inferred_impact",
+			"Do not run unrelated full suites merely for completeness.",
+			"Local PASS does not mean defect-free, committed, pushed, deployed, published",
+		},
 	}
-	for _, fragment := range required {
-		if !strings.Contains(normalizedSkill, fragment) {
-			t.Fatalf("bundled Skill lost required Adapter safety contract %q", fragment)
+	seen := make(map[string]struct{}, len(wanted))
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		required, ok := wanted[entry.Name()]
+		if !ok {
+			t.Fatalf("bundled Plugin contains unexpected Skill %q", entry.Name())
+		}
+		seen[entry.Name()] = struct{}{}
+		skillPath := filepath.Join(skillsRoot, entry.Name(), "SKILL.md")
+		content, err := os.ReadFile(skillPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		skill := string(content)
+		normalizedSkill := strings.Join(strings.Fields(skill), " ")
+		for _, shared := range []string{"../../references/cli-contract.md", "../../scripts/ecp", "Never use an ambient"} {
+			if !strings.Contains(normalizedSkill, shared) {
+				t.Fatalf("bundled Skill %s lost shared runtime contract %q", entry.Name(), shared)
+			}
+		}
+		for _, fragment := range required {
+			if !strings.Contains(normalizedSkill, fragment) {
+				t.Fatalf("bundled Skill %s lost focused safety contract %q", entry.Name(), fragment)
+			}
+		}
+		if strings.Contains(skill, "ask the user to copy the") || strings.Contains(skill, "local PASS proves release") {
+			t.Fatalf("bundled Skill %s contains a forbidden user-protocol or release-proof instruction", entry.Name())
+		}
+		if info, err := os.Stat(filepath.Join(skillsRoot, entry.Name(), "agents", "openai.yaml")); err != nil || !info.Mode().IsRegular() {
+			t.Fatalf("bundled Skill %s lacks agents/openai.yaml: info=%v err=%v", entry.Name(), info, err)
 		}
 	}
-	if strings.Contains(skill, "ask the user to copy the") || strings.Contains(skill, "local PASS proves release") {
-		t.Fatal("bundled Skill contains a forbidden user-protocol or release-proof instruction")
+	if len(seen) != len(wanted) {
+		t.Fatalf("bundled Plugin Skill set mismatch: got=%v want=%v", seen, wanted)
+	}
+	for _, sharedPath := range []string{
+		filepath.Join(pluginRoot, "scripts", "ecp"),
+		filepath.Join(pluginRoot, "references", "cli-contract.md"),
+		filepath.Join(pluginRoot, "references", "project-config.md"),
+	} {
+		if info, err := os.Stat(sharedPath); err != nil || !info.Mode().IsRegular() {
+			t.Fatalf("bundled Plugin shared resource is missing: path=%s info=%v err=%v", sharedPath, info, err)
+		}
 	}
 }
 

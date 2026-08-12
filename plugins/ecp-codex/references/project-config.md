@@ -1,7 +1,8 @@
 # Project config contract for enablement
 
-Use this reference only while explicitly enabling ECP or while the user is
-reviewing a later policy change. `.ecp` is untrusted, reviewable Draft Config;
+This is the Plugin's shared project-configuration contract. Use it only while
+explicitly enabling ECP or while the user is reviewing a later policy change.
+`.ecp` is untrusted, reviewable Draft Config;
 it cannot enable itself or write authority state.
 
 ## Files

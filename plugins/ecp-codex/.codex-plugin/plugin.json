@@ -1,7 +1,7 @@
 {
   "name": "ecp-codex",
-  "version": "0.3.0-dev+codex.20260812052031",
-  "description": "Preserve accepted project truth, close silent requirement ambiguity, and require bounded evidence-backed changes through a bundled local ECP runtime.",
+  "version": "0.3.0-dev+codex.20260812055614",
+  "description": "Check, enable, disable, and govern ECP projects through four focused Skills backed by one bundled local Core.",
   "author": {
     "name": "ECP Project"
   },
@@ -15,11 +15,11 @@
   "interface": {
     "displayName": "ECP for Codex",
     "shortDescription": "Long-lived project truth and change control",
-    "longDescription": "Projects default to ECP off. The Plugin carries a checksum-verified local Core for supported Darwin/Linux arm64/amd64 hosts, so users do not install or operate a separate CLI. After project-level enablement, Codex recovers accepted Project Truth, closes material requirement ambiguity before implementation, creates a bounded Change with structured Impact and baseline lineage, infers affected project facts from paths, runs only the minimal required Gate set, reconciles every requirement and durable semantic change, and closes only current evidence-backed PASS lifecycles without exposing protocol tokens to the user.",
+    "longDescription": "Projects default to ECP off. One Plugin exposes four focused Skills for read-only checks, explicit project enablement, explicit project disablement, and governed repository changes. All four share one checksum-verified local Core for supported Darwin/Linux arm64/amd64 hosts, so users do not install or operate a separate CLI. Enabled projects recover accepted Project Truth, close material requirement ambiguity, create bounded Changes with structured Impact, select minimal required Gates, reconcile durable semantics, and close only current evidence-backed PASS lifecycles without exposing protocol tokens.",
     "developerName": "ECP Project",
     "category": "Productivity",
     "capabilities": [
-      "Project-level ECP enable and disable",
+      "Focused project check, enable, disable, and change Skills",
       "Bundled checksum-verified local Core runtime",
       "Accepted Project Truth and structured Change Impact",
       "Zero-silent-ambiguity Requirement decisions",
@@ -31,11 +31,9 @@
       "Evidence-backed local Verdict reporting"
     ],
     "defaultPrompt": [
-      "Enable ECP for this project and establish an honest Project Truth and safe local validation policy.",
-      "Tell me whether ECP is enabled for this project.",
-      "Implement this request through the accepted Project Truth and report any protected semantic change.",
-      "Check this project's ECP authority health, integrity, and remaining capacity without repairing or deleting anything.",
-      "Disable ECP for this project while preserving its history and source changes."
+      "Check whether ECP is enabled here and report the bundled Core identity.",
+      "Enable ECP here with honest Project Truth and safe local Gates.",
+      "Disable ECP here while preserving source, Evidence, and history."
     ]
   }
 }

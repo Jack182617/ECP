@@ -222,6 +222,8 @@
       ],
       "source_refs": [
         "internal/ecp/activation_test.go",
+        "plugins/ecp-codex/skills/ecp-check/SKILL.md",
+        "plugins/ecp-codex/skills/ecp-enable/SKILL.md",
         "plugins/ecp-codex/skills/ecp-change/SKILL.md"
       ]
     },
@@ -244,14 +246,15 @@
     {
       "id": "plugin-runtime-is-self-contained",
       "name": "Plugin runtime is self-contained",
-      "statement": "The installed Skill must invoke only its own checksum-verified compatible bundled Core and must fail before repository writes instead of requiring or falling back to an ambient ECP CLI.",
+      "statement": "Every installed ECP Skill must invoke the same Plugin-root checksum-verified compatible bundled Core and must fail before repository writes instead of requiring or falling back to an ambient ECP CLI.",
       "category": "operations",
       "risk": "high",
       "gate_ids": [
         "go-test-project-pack"
       ],
       "source_refs": [
-        "plugins/ecp-codex/skills/ecp-change/scripts/ecp",
+        "plugins/ecp-codex/scripts/ecp",
+        "plugins/ecp-codex/references/cli-contract.md",
         "scripts/package-plugin.sh",
         "internal/ecp/project_pack_test.go"
       ]
@@ -512,7 +515,7 @@
       "id": "self-contained-plugin-runtime",
       "title": "Bundle Core with the Codex Plugin",
       "status": "accepted",
-      "decision": "Distribute supported Darwin/Linux arm64/amd64 Core binaries with the Plugin and require the Skill-relative launcher to checksum and execute only the matching packaged runtime.",
+      "decision": "Distribute supported Darwin/Linux arm64/amd64 Core binaries with one four-Skill Plugin and require every Skill to resolve the shared Plugin-root launcher, which checksums and executes only the matching packaged runtime.",
       "rationale": "A natural-language desktop workflow cannot depend on users installing a separate CLI or on the desktop process inheriting an ad hoc PATH, while an implicit ambient fallback would make runtime identity unpredictable.",
       "supersedes": [],
       "affected_refs": [

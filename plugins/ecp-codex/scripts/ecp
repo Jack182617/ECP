@@ -16,7 +16,7 @@ esac
 
 script_dir=$(CDPATH= cd -P -- "$script_parent" 2>/dev/null && pwd -P) ||
   fail "ECP_LAUNCHER_PATH_INVALID" "The installed ECP launcher directory cannot be resolved."
-plugin_root=$(CDPATH= cd -P -- "$script_dir/../../.." 2>/dev/null && pwd -P) ||
+plugin_root=$(CDPATH= cd -P -- "$script_dir/.." 2>/dev/null && pwd -P) ||
   fail "ECP_PLUGIN_ROOT_INVALID" "The installed ECP plugin root cannot be resolved."
 
 if [ -x /usr/bin/uname ]; then

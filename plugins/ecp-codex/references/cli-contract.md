@@ -6,8 +6,8 @@ transcribe an opaque field; copy it internally only from the named immediately
 preceding JSON result.
 
 Within the installed Plugin, every `ecp ...` command in this reference means
-the `scripts/ecp` launcher resolved relative to the selected `ecp-change`
-Skill. Never use an ambient PATH executable. The launcher selects the bundled
+the shared `scripts/ecp` launcher resolved from the selected ECP Skill's
+installed Plugin root. Never use an ambient PATH executable. The launcher selects the bundled
 Darwin/Linux arm64/amd64 Core, verifies its package checksum, and fails closed
 before Core invocation when the platform, runtime, or checksum is invalid.
 

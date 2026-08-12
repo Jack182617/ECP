@@ -32,7 +32,7 @@
 - DefaultConfig 不继承 `HOME`，扩展 capability/secret 环境名 denylist（仍是 best-effort，非 sandbox）；
 - Gate preflight、reviewable/opaque-digest plan 与 partial-sequence result；
 - durable GateRun start/Evidence/terminal history，`SIGINT`/`SIGTERM` 形成 `CANCELLED` 并清理 Gate 进程组；Darwin/Linux/BSD 上被杀/崩溃 holder 释放 advisory lease 后，由下一位 holder 记录 `INTERRUPTED`（不含自动续跑、orphan artifact 恢复或 crash 后全部后代进程收割）；
-- 自包含 Codex Plugin：Skill-relative launcher 只执行 checksum-verified bundled Core，普通仓库 mutation 先 status，disabled 正常开发，enabled 自动 Change→Gate→Verdict→completion，无用户 CLI/PATH/token 和受支持的单 task bypass；
+- 自包含 Codex Plugin：四个聚焦 Skill 共享 Plugin-root launcher 与 checksum-verified bundled Core；check/enable/disable 职责分离，普通仓库 mutation 由 change Skill 先 status，disabled 正常开发，enabled 自动 Change→Gate→Verdict→completion，无用户 CLI/PATH/token 和受支持的单 task bypass；
 - `SPEC.md` 75 个 v0.3 场景到真实测试/静态/构建证据的可执行 traceability matrix，并把外部真实项目、Desktop、CI、隔离与发布证据显式留作未证明；
 - 正常、失败、stale、越界、漂移、并发、超时和损坏测试。
 
@@ -61,7 +61,7 @@ Phase 1 原计划的 Runner 纵深强化不再整体先行。除阻断真实 Pro
 
 目标：把当前 Assurance Kernel 扩展为 North Star 的最小完整语义闭环。
 
-状态：本地 Core/CLI、自包含 Codex Skill/Plugin runtime、自举 Project Pack 与自动化安全回归已实现；Plugin 尚未签名/公开发布或在新鲜 desktop task 中验收，真实独立项目接手/长期迭代试点和受保护 CI consumer 也尚未完成，因此本阶段还不能被描述为已通过产品退出标准。
+状态：本地 Core/CLI、自包含四 Skill Codex Plugin runtime、自举 Project Pack 与自动化安全回归已实现；Plugin 尚未签名/公开发布或在新鲜 desktop task 中验收，真实独立项目接手/长期迭代试点和受保护 CI consumer 也尚未完成，因此本阶段还不能被描述为已通过产品退出标准。
 
 - 严格、版本化且项目独立的 Project Truth schema；
 - Capability、Invariant、Component、Decision、Contract reference 和 Unknown；

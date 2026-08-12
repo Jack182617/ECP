@@ -16,10 +16,15 @@ documentation.
 ```text
 plugins/ecp-codex/
 ├── .codex-plugin/plugin.json
-├── skills/ecp-change/
-│   ├── SKILL.md
-│   ├── references/
-│   └── scripts/ecp
+├── references/
+│   ├── cli-contract.md
+│   └── project-config.md
+├── scripts/ecp
+├── skills/
+│   ├── ecp-check/{SKILL.md,agents/openai.yaml}
+│   ├── ecp-enable/{SKILL.md,agents/openai.yaml}
+│   ├── ecp-disable/{SKILL.md,agents/openai.yaml}
+│   └── ecp-change/{SKILL.md,agents/openai.yaml}
 └── runtime/
     ├── manifest.json
     ├── darwin-arm64/ecp{,.sha256}
@@ -28,11 +33,12 @@ plugins/ecp-codex/
     └── linux-amd64/ecp{,.sha256}
 ```
 
-The Skill resolves `scripts/ecp` relative to its own installed `SKILL.md`.
-The launcher resolves the Plugin root from that physical path, chooses only the
-matching packaged OS/architecture, rejects symlinks or non-executable runtime
-files, calculates SHA-256 with a fixed system executable, compares the sidecar,
-and only then `exec`s Core. It never resolves an ambient `ecp` from PATH.
+Each Skill resolves the shared Plugin-root `scripts/ecp` from its own installed
+`SKILL.md`. The launcher resolves the Plugin root from that physical path,
+chooses only the matching packaged OS/architecture, rejects symlinks or
+non-executable runtime files, calculates SHA-256 with a fixed system executable,
+compares the sidecar, and only then `exec`s Core. It never resolves an ambient
+`ecp` from PATH.
 
 Missing, unsupported, unsafe, or checksum-mismatched runtimes return a
 versioned `ECP_RUNTIME_*` error with exit 4 before Core can inspect or mutate a
@@ -43,11 +49,11 @@ Git, config, Change, and Evidence checks.
 
 The release order is mandatory:
 
-1. Finish Core, Skill, reference, and manifest source edits.
+1. Finish Core, Skill, shared reference, and manifest source edits.
 2. Bump the Plugin cachebuster/version with the official Plugin Creator helper.
 3. Run `./scripts/package-plugin.sh` with a private writable Go cache.
 4. Validate `runtime/manifest.json`, every binary digest/size/execute bit, the
-   Plugin manifest, the Skill, and a copied cache-layout launcher smoke test.
+   Plugin manifest, all four Skills, and a copied cache-layout launcher smoke test.
 5. Sign/notarize and publish through the chosen trusted distribution process.
 
 `package-plugin.sh` builds with CGO disabled, `-trimpath`, and

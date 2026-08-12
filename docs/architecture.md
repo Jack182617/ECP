@@ -26,7 +26,7 @@ source + tests                            Evidence metadata and bounded logs
 
 ### Codex Plugin Launcher
 
-Plugin 把支持的 Darwin/Linux arm64/amd64 Core 与 Skill 一起分发。Skill 只从自身安装路径解析 `scripts/ecp`；launcher 由该物理路径定位 Plugin root，选择单一匹配 runtime，拒绝 symlink/缺失/非 executable 文件，使用固定系统 SHA-256 工具核对 sidecar 后才 `exec` Core。它不查找 ambient PATH、仓库或临时目录中的 `ecp`。`runtime/manifest.json` 另外把四个平台 artifact 的相对路径、size 和 digest 绑定到 exact Plugin version，并由 Project Pack 测试验证。
+Plugin 把支持的 Darwin/Linux arm64/amd64 Core 与四个聚焦 Skill 一起分发。每个 Skill 从自身安装路径解析同一个 Plugin-root `scripts/ecp`；launcher 由该物理路径定位 Plugin root，选择单一匹配 runtime，拒绝 symlink/缺失/非 executable 文件，使用固定系统 SHA-256 工具核对 sidecar 后才 `exec` Core。它不查找 ambient PATH、仓库或临时目录中的 `ecp`。`runtime/manifest.json` 另外把四个平台 artifact 的相对路径、size 和 digest 绑定到 exact Plugin version，并由 Project Pack 测试验证。
 
 Codex 本地 marketplace 安装会把 Plugin 复制到 cache，因此 launcher 不能依赖源码仓库绝对路径。自动化测试把完整 Plugin 复制到深层 cache-like 临时目录，在空 PATH 下运行 version，再损坏本机 binary 并要求 checksum mismatch 在 Core 启动前 fail closed。该机制证明安装副本的相对发现和包内一致性，不证明 Plugin 发布者身份或真实 desktop 安装已完成。
 
@@ -306,17 +306,19 @@ Control Config 与 Project Truth 分别摘要；格式化变化仍会改变所�
 
 ## 5. Codex 适配
 
-v0.3 Plugin 仅打包一个 `ecp-change` Skill：
+v0.3 Plugin 打包四个职责分离、共享 launcher/Core/CLI contract 的 Skill：
 
-- Skill metadata 覆盖任何可能修改 Git Workspace 的请求、从只读转为实现的 follow-up，以及显式 enable/disable/status/history 请求；
-- 每次普通仓库 mutation 前先只读 `project status`：disabled 退出 ECP 子流程并正常开发，enabled 自动进入受治理闭环，mode 未知则在写入前停止；
+- `ecp-check` 处理 status、Core identity、accepted state、history、Evidence、Verdict、health 与离线 verify，不做 project-mode 或 lifecycle mutation；
+- `ecp-enable` 只响应显式当前项目启用请求，区分新/旧项目证据，建立诚实 Project Pack 和安全本地 Gate，并以最终 `enabled: true` 为唯一成功条件；
+- `ecp-disable` 只响应显式整个当前项目停用请求，用一次刚读取的精确 precondition 原子取消已观察 ACTIVE Change并关闭 mode，保留源码和历史；
+- `ecp-change` metadata 覆盖任何可能修改 Git Workspace 的请求及从只读转为实现的 follow-up；每次普通仓库 mutation 前先只读 `project status`：disabled 退出 ECP 子流程并正常开发，enabled 自动进入受治理闭环，mode 未知则在写入前停止；
 - CLI/Core 决定 project mode、activation、Change state、Evidence 适用性和 Verdict；
-- Skill 只在内部转交 immediately preceding Core JSON 中的 opaque authority/Workspace/activation/config/truth/source/Change/plan/subject preconditions，绝不自行构造、默认展示或自动替换 mismatch 值；最终用户不需要运行 ECP CLI 或复制 token；
+- 四个 Skill 只在内部转交 immediately preceding Core JSON 中的 opaque authority/Workspace/activation/config/truth/source/Change/plan/subject preconditions，绝不自行构造、默认展示或自动替换 mismatch 值；最终用户不需要运行 ECP CLI 或复制 token；
 - Skill 不直接读取或写入外部 state；
 - 明确项目 enablement 可授权 Adapter 完成必要的初始化、Project Truth 建立/诚实 unknown、注册、初始 config/truth acceptance 与 final enable；后续 policy drift、protected truth delta 与风险 acknowledgement 仍需要新的明确确认；
 - enabled 项目普通实现先把遗漏的状态、错误、取消、超时、数据与兼容问题变成结构化 Requirement；不能从仓库事实确定的产品选择必须询问用户，不能由 Agent 静默决定；
 - enabled 项目随后自动 start/recover Change、建立 Impact、实现、逐项 Requirement reconciliation、审阅最小充分 plan、通过 Core 运行 Gate、读取 Verdict，并在当前 PASS 后自动 complete；不提供单 task bypass；
-- 明确 project disable 授权 Core 原子取消 status 已观察的 ACTIVE Change并关闭项目；单独 cancellation 仅响应用户明确放弃 exact active Change；
+- 明确 project disable 授权 Core 原子取消 status 已观察的 ACTIVE Change并关闭项目；单独 cancellation 由 `ecp-change` 仅响应用户明确放弃 exact active Change；
 - Plugin 可被禁用，其他工具与 direct shell 也可绕过，故它只是受支持 Codex workflow adapter，不是安全 enforcement。
 
 MCP 与 Hooks 在 CLI JSON/幂等合同稳定且出现第二个真实调用方后再引入。它们可以提高自动路由覆盖率，但在受保护 enforcement consumer 出现前仍不得宣传为不可绕过边界。

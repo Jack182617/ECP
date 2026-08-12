@@ -35,7 +35,7 @@ The authoritative scenario wording remains in `SPEC.md` section 12.
 | 11 | One ACTIVE Change per Workspace | `TestSingleActiveChangeAndScopePrefixBoundary` | A |
 | 12 | Shell metacharacters remain literal argv | `TestGateArgvMetacharactersRemainLiteral` | A |
 | 13 | Traversal, outside cwd, and followed source symlinks are rejected | `TestPathAndSymlinkBoundaries` | A |
-| 14 | Skill never sets Verdict, only forwards exact confirmed preconditions, and does not equate local PASS with release | `TestBundledSkillEncodesAdapterSafetyBoundaries`; `plugins/ecp-codex/skills/ecp-change/SKILL.md` | A+S |
+| 14 | Skills never set Verdict, only forward exact confirmed preconditions, and do not equate local PASS with release | `TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries`; bundled Skill set | A+S |
 | 15 | Existing Project Pack is not implicitly accepted; Draft Project ID cannot replace binding | `TestExistingConfigRequiresExplicitRegistration`; `TestDraftProjectIDCannotReplaceAuthorityIdentity` | A |
 | 16 | Config semantics and digest come from one stable byte epoch | `TestConfigReadRejectsMixedEpoch` | A |
 | 17 | Dirty submodule checkout changes stale Evidence | `TestSubmoduleCheckoutChangesSourceFingerprint` | A |
@@ -58,10 +58,10 @@ The authoritative scenario wording remains in `SPEC.md` section 12.
 | 34 | Enabled drift remains enabled+BLOCKED/INDETERMINATE and can disable authority-only | `TestEnabledProjectNeverFallsBackOnConfigDriftAndCanStillDisable`; `TestProjectModeCommandsDefaultDisabledAndFailClosedOnDrift` | A |
 | 35 | Disable token is stale after mutation; active cancellation+disable is atomic; repeated disable is idempotent | `TestDisableAtomicallyCancelsObservedChangeAndPreservesEvidenceAndSource`; `TestEnabledProjectNeverFallsBackOnConfigDriftAndCanStillDisable` | A |
 | 36 | Re-enable creates a new activation and old context/Evidence/ack/subject cannot cross it | `TestProjectActivationIsWorkspaceScopedPersistentAndCloneLocal`; `TestActiveChangeMutationsRequireExactIdentity` | A |
-| 37 | Supported Skill probes status before mutation, routes disabled normally, governs enabled, and has no task bypass | `TestBundledSkillEncodesAdapterSafetyBoundaries`; bundled `SKILL.md` | A+S |
-| 38 | Normal user flow hides CLI commands and opaque protocol values | `TestBundledSkillEncodesAdapterSafetyBoundaries`; bundled `SKILL.md` | A+S |
+| 37 | Change Skill probes status before mutation, routes disabled normally, governs enabled, and has no task bypass | `TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries`; bundled `ecp-change` | A+S |
+| 38 | Normal user flow hides CLI commands and opaque protocol values across check/enable/disable/change | `TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries`; bundled Skill set | A+S |
 | 39 | Enabled BLOCKED/INDETERMINATE status is `ok:true` stdout with exit 3/4 | `TestProjectModeCommandsDefaultDisabledAndFailClosedOnDrift` | A |
-| 40 | Skill bypass limitations are explicit and never described as enforcement | `TestBundledSkillEncodesAdapterSafetyBoundaries`; `docs/security-model.md`; bundled `SKILL.md` | A+S |
+| 40 | Skill bypass limitations are explicit and never described as enforcement | `TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries`; `docs/security-model.md`; bundled Skill set | A+S |
 | 41 | Init creates honest seed truth/contract and independent control/truth digests | `TestRepositoryProjectPackLoadsAsEstablishedTruth`; `TestCLIChangeStartAndTruthReconcileMachineContract` | A |
 | 42 | Change binds accepted truth and rejects empty/unknown/stale Impact references | `TestCLIChangeStartAndTruthReconcileMachineContract`; `TestStartChangeRequiresExactObservedAuthorityWorkspaceConfigAndSource` | A |
 | 43 | PASS Gates without final semantic assessment remain blocked; UNKNOWN never passes | `TestSemanticReconciliationIsRequiredForPass`; `TestUnknownSemanticOutcomeCannotPass` | A |
@@ -120,7 +120,7 @@ When Plugin/Core source changes, also:
 plugin-creator update_plugin_cachebuster.py <plugin-root>
 ./scripts/package-plugin.sh
 plugin-creator validate_plugin.py <plugin-root>
-skill-creator quick_validate.py <skill-root>
+skill-creator quick_validate.py <each-skill-root>
 ```
 
 Validate the launcher in a copied deep cache layout, all four binary formats,
@@ -145,7 +145,7 @@ if that unsupported-path contract is promoted to release evidence.
 | Requirement | Current repository evidence | Status |
 | --- | --- | --- |
 | Local v0.3 Core/CLI semantic loop | Implementation plus the 75-scenario mapping above | Locally automated |
-| User does not handwrite product code or operate ECP CLI | Skill contract and CLI hiding rules | Statically specified; real-use proof missing |
+| User does not handwrite product code or operate ECP CLI | Four-Skill contracts and CLI hiding rules | Statically specified; real-use proof missing |
 | New task recovers without historical chat | Authority truth/policy/history tests | Mechanism proven; independent-project task proof missing |
 | Independent real product, at least six ordinary/semantic Changes | `docs/real-project-pilot.md` protocol only | `X` — not performed |
 | New maintainer/product person handoff | Pilot protocol only | `X` — not performed |

@@ -59,9 +59,9 @@ Enable 在 Workspace lease 内重载并再次核对 token/config，只允许 acc
 
 Disable 使用 authority-only loader，因此 malformed Draft 也不能把项目锁在 enabled。它在同一 lease/revision 下，把 status 已观察 ACTIVE Change 的 cancellation 与 project disablement作为一个原子 event append；保留 worktree、Draft、Evidence、history，不产生 PASS。未注册或已经 disabled 且无 ACTIVE Change时幂等返回，不重复追加。Event store 预留足够 bounded terminal capacity，避免资源上限让项目永久无法关闭。
 
-Skill 对任意普通仓库 mutation 先读 status：disabled 正常开发，enabled 自动治理，mode 不能确定则停止。已启用项目没有受支持的单 task bypass；显式 project disable才改变持久 mode。但 Skill/Plugin 可被关闭，direct shell、其他 Agent/工具和同用户进程可绕过，因此这仍是 workflow guardrail，不是真正 enforcement。
+`ecp-change` Skill 对任意普通仓库 mutation 先读 status：disabled 正常开发，enabled 自动治理，mode 不能确定则停止。`ecp-check`、`ecp-enable`、`ecp-disable` 分别隔离只读诊断与显式项目模式操作。已启用项目没有受支持的单 task bypass；显式 project disable才改变持久 mode。但 Skill/Plugin 可被关闭，direct shell、其他 Agent/工具和同用户进程可绕过，因此这仍是 workflow guardrail，不是真正 enforcement。
 
-Plugin Skill 只允许使用从自身安装路径解析的 `scripts/ecp`。launcher 只选择包内与当前 Darwin/Linux arm64/amd64 匹配的 runtime，拒绝 symlink、缺失和不可执行文件，并用固定系统 SHA-256 工具核对 sidecar；不得 fallback 到 PATH、仓库 binary 或临时 build。runtime manifest 把四个 artifact 的路径、size、digest 绑定到 Plugin version，自动化还在 cache-like 副本与空 PATH 下验证发现路径，并验证一字节损坏会在 Core 启动前返回 `ECP_RUNTIME_CHECKSUM_MISMATCH`。launcher/sidecar/manifest 同属可替换 Plugin，因此这些检查是包内一致性保护，不是签名或 provenance。
+四个 Plugin Skill 只允许使用从各自安装路径解析的同一个 Plugin-root `scripts/ecp`。launcher 只选择包内与当前 Darwin/Linux arm64/amd64 匹配的 runtime，拒绝 symlink、缺失和不可执行文件，并用固定系统 SHA-256 工具核对 sidecar；不得 fallback 到 PATH、仓库 binary 或临时 build。runtime manifest 把四个 artifact 的路径、size、digest 绑定到 Plugin version，自动化还在 cache-like 副本与空 PATH 下验证发现路径，并验证一字节损坏会在 Core 启动前返回 `ECP_RUNTIME_CHECKSUM_MISMATCH`。launcher/sidecar/manifest 同属可替换 Plugin，因此这些检查是包内一致性保护，不是签名或 provenance。
 
 ### 注册、配置自我弱化与稳定读取
 

@@ -1,0 +1,6 @@
+interface:
+  display_name: "ECP Project Check"
+  short_description: "Inspect project mode and local ECP evidence"
+  default_prompt: "Use $ecp-check to report whether ECP is enabled here and identify the bundled Core."
+policy:
+  allow_implicit_invocation: true

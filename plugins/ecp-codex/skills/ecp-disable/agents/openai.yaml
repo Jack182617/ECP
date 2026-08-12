@@ -1,0 +1,6 @@
+interface:
+  display_name: "ECP Project Disablement"
+  short_description: "Disable ECP while preserving local history"
+  default_prompt: "Use $ecp-disable to disable ECP for this project while preserving source and history."
+policy:
+  allow_implicit_invocation: true
