@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "default_risk": "moderate",
+  "acknowledgement_required_for": [
+    "high",
+    "critical"
+  ],
+  "denied_path_roots": [
+    ".ecp"
+  ],
+  "risk_rules": [
+    {
+      "path_root": "internal/ecp",
+      "risk": "high"
+    },
+    {
+      "path_root": "internal/cli",
+      "risk": "high"
+    },
+    {
+      "path_root": "cmd/ecp",
+      "risk": "high"
+    },
+    {
+      "path_root": "plugins/ecp-codex",
+      "risk": "high"
+    },
+    {
+      "path_root": "scripts/package-plugin.sh",
+      "risk": "high"
+    },
+    {
+      "path_root": ".agents/plugins",
+      "risk": "high"
+    },
+    {
+      "path_root": "NORTH_STAR.md",
+      "risk": "high"
+    },
+    {
+      "path_root": "SPEC.md",
+      "risk": "high"
+    }
+  ],
+  "inherited_environment": [
+    "PATH",
+    "TMPDIR",
+    "LANG",
+    "LC_ALL",
+    "TERM",
+    "CI"
+  ],
+  "max_gate_output_bytes": 262144,
+  "max_source_files": 100000,
+  "max_source_bytes": 2147483648
+}

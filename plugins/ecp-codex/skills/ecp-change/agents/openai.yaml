@@ -1,0 +1,6 @@
+interface:
+  display_name: "ECP Long-Lived Project Guard"
+  short_description: "Guard long-lived project truth and change evidence"
+  default_prompt: "Use $ecp-change to govern this enabled project with explicit requirement decisions, accepted Project Truth, inferred impact, and exact local Evidence."
+policy:
+  allow_implicit_invocation: true

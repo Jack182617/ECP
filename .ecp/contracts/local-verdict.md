@@ -1,0 +1,16 @@
+# Local Verdict Contract
+
+An ECP local `PASS` means the accepted local policy's Required Gates produced applicable Evidence for the exact current authority, Project, Workspace, activation, Change, accepted Control Config, accepted Project Truth, source fingerprint, Gate plan, execution identity, and Core identity, and that the final source has a current non-`UNKNOWN` Semantic Assessment.
+
+It does not mean the product is defect-free, every behavior was tested, a person was authenticated, the change was committed or pushed, a device or production environment succeeded, a release was published, or the Plugin could not be bypassed.
+
+Candidate policy and truth cannot accept themselves. `PRESERVED` cannot hide a truth delta. `CHANGED` requires a Core-computed delta within the declared Impact and explicit confirmation of the exact protected change. `UNKNOWN`, stale Evidence, source mutation, mismatched identity, missing Gate, failed Gate, or integrity failure prevents `PASS`.
+
+Every sequence that reaches Gate execution is enclosed by a durable GateRun. A
+remaining `IN_PROGRESS` run keeps the current Verdict `INDETERMINATE`; only a
+later operation that actually acquires the released advisory lease may record
+the former run as `INTERRUPTED`. `COMPLETED` means every selected Gate produced
+Evidence, not that the Evidence passed. GateRun history recovery does not
+automatically resume work, undo side effects, or prove crash-descendant cleanup.
+
+Gate commands and repository scripts remain untrusted code. Until an isolated Runner and protected remote consumer exist, the local Verdict is a precise development assurance result, not a non-bypassable organizational or release authorization.

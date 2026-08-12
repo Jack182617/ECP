@@ -1,0 +1,86 @@
+#!/bin/sh
+
+set -eu
+
+fail() {
+  code=$1
+  message=$2
+  printf '%s\n' "{\"schema_version\":1,\"operation\":\"launcher\",\"ok\":false,\"error\":{\"kind\":\"integrity\",\"code\":\"$code\",\"message\":\"$message\"}}" >&2
+  exit 4
+}
+
+case $0 in
+  */*) script_parent=${0%/*} ;;
+  *) fail "ECP_LAUNCHER_PATH_INVALID" "The installed ECP launcher must be invoked by its resolved skill-relative path." ;;
+esac
+
+script_dir=$(CDPATH= cd -P -- "$script_parent" 2>/dev/null && pwd -P) ||
+  fail "ECP_LAUNCHER_PATH_INVALID" "The installed ECP launcher directory cannot be resolved."
+plugin_root=$(CDPATH= cd -P -- "$script_dir/../../.." 2>/dev/null && pwd -P) ||
+  fail "ECP_PLUGIN_ROOT_INVALID" "The installed ECP plugin root cannot be resolved."
+
+if [ -x /usr/bin/uname ]; then
+  uname_command=/usr/bin/uname
+elif [ -x /bin/uname ]; then
+  uname_command=/bin/uname
+else
+  fail "ECP_RUNTIME_PLATFORM_UNAVAILABLE" "The operating system and architecture cannot be determined using a fixed system executable."
+fi
+
+os_name=$($uname_command -s) ||
+  fail "ECP_RUNTIME_PLATFORM_UNAVAILABLE" "The operating system cannot be determined."
+arch_name=$($uname_command -m) ||
+  fail "ECP_RUNTIME_PLATFORM_UNAVAILABLE" "The machine architecture cannot be determined."
+
+case $os_name in
+  Darwin) runtime_os=darwin ;;
+  Linux) runtime_os=linux ;;
+  *) fail "ECP_RUNTIME_UNSUPPORTED" "This ECP plugin package does not support the current operating system." ;;
+esac
+
+case $arch_name in
+  arm64|aarch64) runtime_arch=arm64 ;;
+  x86_64|amd64) runtime_arch=amd64 ;;
+  *) fail "ECP_RUNTIME_UNSUPPORTED" "This ECP plugin package does not support the current machine architecture." ;;
+esac
+
+runtime_dir="$plugin_root/runtime/$runtime_os-$runtime_arch"
+binary="$runtime_dir/ecp"
+checksum_file="$runtime_dir/ecp.sha256"
+
+if [ ! -f "$binary" ] || [ -L "$binary" ] || [ ! -x "$binary" ]; then
+  fail "ECP_RUNTIME_MISSING" "The ECP plugin runtime is missing, unsafe, or not executable; reinstall a complete plugin package."
+fi
+if [ ! -f "$checksum_file" ] || [ -L "$checksum_file" ]; then
+  fail "ECP_RUNTIME_MANIFEST_MISSING" "The ECP plugin runtime checksum is missing or unsafe; reinstall a complete plugin package."
+fi
+
+expected_checksum=
+IFS= read -r expected_checksum < "$checksum_file" ||
+  fail "ECP_RUNTIME_MANIFEST_INVALID" "The ECP plugin runtime checksum cannot be read."
+case $expected_checksum in
+  *[!0-9a-f]*|'') fail "ECP_RUNTIME_MANIFEST_INVALID" "The ECP plugin runtime checksum is invalid." ;;
+esac
+if [ "${#expected_checksum}" -ne 64 ]; then
+  fail "ECP_RUNTIME_MANIFEST_INVALID" "The ECP plugin runtime checksum is invalid."
+fi
+
+if [ -x /usr/bin/shasum ]; then
+  checksum_output=$(/usr/bin/shasum -a 256 "$binary") ||
+    fail "ECP_RUNTIME_CHECKSUM_UNAVAILABLE" "The ECP plugin runtime checksum could not be calculated."
+elif [ -x /usr/bin/sha256sum ]; then
+  checksum_output=$(/usr/bin/sha256sum "$binary") ||
+    fail "ECP_RUNTIME_CHECKSUM_UNAVAILABLE" "The ECP plugin runtime checksum could not be calculated."
+elif [ -x /bin/sha256sum ]; then
+  checksum_output=$(/bin/sha256sum "$binary") ||
+    fail "ECP_RUNTIME_CHECKSUM_UNAVAILABLE" "The ECP plugin runtime checksum could not be calculated."
+else
+  fail "ECP_RUNTIME_CHECKSUM_UNAVAILABLE" "No fixed system SHA-256 executable is available to verify the ECP plugin runtime."
+fi
+actual_checksum=${checksum_output%% *}
+
+if [ "$actual_checksum" != "$expected_checksum" ]; then
+  fail "ECP_RUNTIME_CHECKSUM_MISMATCH" "The ECP plugin runtime does not match its package checksum; execution was refused."
+fi
+
+exec "$binary" "$@"

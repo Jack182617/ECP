@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "gates": [
+    {
+      "id": "source-hygiene",
+      "description": "Validate repository text hygiene even before the first Git baseline",
+      "tier": "fast",
+      "command": [
+        "go",
+        "test",
+        "./internal/ecp",
+        "-run",
+        "^TestRepositorySourceHygiene$",
+        "-count=1"
+      ],
+      "working_directory": ".",
+      "timeout_seconds": 60,
+      "allowed_exit_codes": [
+        0
+      ],
+      "required_for": [
+        "low",
+        "moderate",
+        "high",
+        "critical"
+      ],
+      "environment": {},
+      "inherit_environment": [
+        "PATH",
+        "TMPDIR",
+        "LANG",
+        "LC_ALL",
+        "TERM",
+        "CI"
+      ],
+      "max_output_bytes": 65536,
+      "requires_network": false,
+      "produces_external_side_effects": false
+    },
+    {
+      "id": "go-test-core",
+      "description": "Run the Assurance Core regression suite when Core behavior is affected",
+      "tier": "affected",
+      "command": [
+        "go",
+        "test",
+        "./internal/ecp"
+      ],
+      "working_directory": ".",
+      "timeout_seconds": 300,
+      "allowed_exit_codes": [
+        0
+      ],
+      "required_for": [
+        "low",
+        "moderate",
+        "high",
+        "critical"
+      ],
+      "component_ids": [
+        "assurance-core"
+      ],
+      "environment": {},
+      "inherit_environment": [
+        "PATH",
+        "TMPDIR",
+        "LANG",
+        "LC_ALL",
+        "TERM",
+        "CI"
+      ],
+      "max_output_bytes": 262144,
+      "requires_network": false,
+      "produces_external_side_effects": false
+    },
+    {
+      "id": "go-test-cli",
+      "description": "Run the machine CLI regression suite when CLI or packaged runtime behavior is affected",
+      "tier": "affected",
+      "command": [
+        "go",
+        "test",
+        "./internal/cli"
+      ],
+      "working_directory": ".",
+      "timeout_seconds": 180,
+      "allowed_exit_codes": [
+        0
+      ],
+      "required_for": [
+        "low",
+        "moderate",
+        "high",
+        "critical"
+      ],
+      "component_ids": [
+        "codex-adapter",
+        "distribution",
+        "machine-cli"
+      ],
+      "environment": {},
+      "inherit_environment": [
+        "PATH",
+        "TMPDIR",
+        "LANG",
+        "LC_ALL",
+        "TERM",
+        "CI"
+      ],
+      "max_output_bytes": 262144,
+      "requires_network": false,
+      "produces_external_side_effects": false
+    },
+    {
+      "id": "go-test-project-pack",
+      "description": "Run Project Pack, Skill, Plugin, and packaged-runtime contract tests when distribution or documentation changes",
+      "tier": "affected",
+      "command": [
+        "go",
+        "test",
+        "./internal/ecp",
+        "-run",
+        "TestRepositoryProjectPack|TestBundled|TestPlugin|TestVerificationMatrix|TestCanonical"
+      ],
+      "working_directory": ".",
+      "timeout_seconds": 180,
+      "allowed_exit_codes": [
+        0
+      ],
+      "required_for": [
+        "low",
+        "moderate",
+        "high",
+        "critical"
+      ],
+      "component_ids": [
+        "codex-adapter",
+        "distribution",
+        "product-contracts"
+      ],
+      "environment": {},
+      "inherit_environment": [
+        "PATH",
+        "TMPDIR",
+        "LANG",
+        "LC_ALL",
+        "TERM",
+        "CI"
+      ],
+      "max_output_bytes": 262144,
+      "requires_network": false,
+      "produces_external_side_effects": false
+    }
+  ]
+}

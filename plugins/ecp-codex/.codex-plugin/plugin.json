@@ -1,0 +1,41 @@
+{
+  "name": "ecp-codex",
+  "version": "0.3.0-dev+codex.20260812052031",
+  "description": "Preserve accepted project truth, close silent requirement ambiguity, and require bounded evidence-backed changes through a bundled local ECP runtime.",
+  "author": {
+    "name": "ECP Project"
+  },
+  "keywords": [
+    "engineering-governance",
+    "change-control",
+    "validation",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "ECP for Codex",
+    "shortDescription": "Long-lived project truth and change control",
+    "longDescription": "Projects default to ECP off. The Plugin carries a checksum-verified local Core for supported Darwin/Linux arm64/amd64 hosts, so users do not install or operate a separate CLI. After project-level enablement, Codex recovers accepted Project Truth, closes material requirement ambiguity before implementation, creates a bounded Change with structured Impact and baseline lineage, infers affected project facts from paths, runs only the minimal required Gate set, reconciles every requirement and durable semantic change, and closes only current evidence-backed PASS lifecycles without exposing protocol tokens to the user.",
+    "developerName": "ECP Project",
+    "category": "Productivity",
+    "capabilities": [
+      "Project-level ECP enable and disable",
+      "Bundled checksum-verified local Core runtime",
+      "Accepted Project Truth and structured Change Impact",
+      "Zero-silent-ambiguity Requirement decisions",
+      "Cancelled Change baseline and lineage preservation",
+      "Path-derived impact and minimal sufficient Gate selection",
+      "Protected semantic reconciliation",
+      "Durable GateRun history and interruption recovery",
+      "Read-only authority integrity and capacity diagnostics",
+      "Evidence-backed local Verdict reporting"
+    ],
+    "defaultPrompt": [
+      "Enable ECP for this project and establish an honest Project Truth and safe local validation policy.",
+      "Tell me whether ECP is enabled for this project.",
+      "Implement this request through the accepted Project Truth and report any protected semantic change.",
+      "Check this project's ECP authority health, integrity, and remaining capacity without repairing or deleting anything.",
+      "Disable ECP for this project while preserving its history and source changes."
+    ]
+  }
+}

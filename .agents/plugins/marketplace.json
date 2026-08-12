@@ -1,0 +1,20 @@
+{
+  "name": "ecp-local",
+  "interface": {
+    "displayName": "ECP Local"
+  },
+  "plugins": [
+    {
+      "name": "ecp-codex",
+      "source": {
+        "source": "local",
+        "path": "./plugins/ecp-codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

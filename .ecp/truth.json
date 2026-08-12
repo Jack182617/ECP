@@ -1,0 +1,646 @@
+{
+  "schema_version": 1,
+  "maturity": "established",
+  "purpose": "Preserve long-lived software project intent and make AI-driven changes bounded, semantically explicit, evidence-backed, auditable, and recoverable without requiring users to handwrite code or operate the control protocol.",
+  "capabilities": [
+    {
+      "id": "project-continuity",
+      "name": "Project continuity",
+      "description": "Let a future agent or maintainer recover durable product and engineering facts without depending on historical chats or one person's memory.",
+      "status": "active",
+      "component_ids": [
+        "assurance-core",
+        "product-contracts"
+      ],
+      "invariant_ids": [
+        "accepted-truth-is-recoverable",
+        "authority-export-is-exact",
+        "authority-health-is-exact-and-read-only",
+        "authority-history-remains-verifiable",
+        "candidate-never-authority",
+        "gate-run-history-is-accounted",
+        "requirements-have-decision-and-evidence-closure",
+        "unknowns-remain-visible"
+      ]
+    },
+    {
+      "id": "trusted-change-loop",
+      "name": "Trusted change loop",
+      "description": "Bind a bounded Change, semantic reconciliation, required validation evidence, and Verdict to one exact project state.",
+      "status": "active",
+      "component_ids": [
+        "assurance-core",
+        "machine-cli"
+      ],
+      "invariant_ids": [
+        "exact-evidence-applicability",
+        "gate-run-history-is-accounted",
+        "cancelled-changes-preserve-baseline",
+        "path-impact-is-inferred",
+        "protected-truth-requires-confirmation",
+        "truth-relations-enforce-gates",
+        "validation-is-minimal-and-sufficient"
+      ]
+    },
+    {
+      "id": "natural-language-adapter",
+      "name": "Natural-language project adapter",
+      "description": "Let Codex govern an explicitly enabled project without asking the user to operate ECP CLI commands or opaque protocol fields.",
+      "status": "active",
+      "component_ids": [
+        "codex-adapter",
+        "distribution",
+        "machine-cli"
+      ],
+      "invariant_ids": [
+        "disabled-projects-remain-ordinary",
+        "local-pass-is-bounded",
+        "plugin-runtime-is-self-contained"
+      ]
+    }
+  ],
+  "invariants": [
+    {
+      "id": "accepted-truth-is-recoverable",
+      "name": "Accepted truth remains recoverable",
+      "statement": "The authority must preserve and verify the exact accepted structured Project Truth and UTF-8 contract contents independently from repository candidate files, including when the candidate drifts or is malformed.",
+      "category": "architecture",
+      "risk": "critical",
+      "gate_ids": [
+        "go-test-core"
+      ],
+      "source_refs": [
+        "internal/ecp/service.go",
+        "internal/ecp/store.go",
+        "internal/ecp/service_test.go"
+      ]
+    },
+    {
+      "id": "authority-history-remains-verifiable",
+      "name": "Authority history remains append-safe and verifiable",
+      "statement": "Authority events must remain replayable as one continuous sequence and hash chain across bounded atomic segments; rotation, legacy compatibility, corruption, gaps, unsafe files, and oversized atomic batches must fail without silently changing the projection.",
+      "category": "architecture",
+      "risk": "critical",
+      "gate_ids": [
+        "go-test-core"
+      ],
+      "source_refs": [
+        "internal/ecp/store.go",
+        "internal/ecp/store_segments_test.go",
+        "docs/security-model.md"
+      ]
+    },
+    {
+      "id": "authority-export-is-exact",
+      "name": "Authority exports contain one exact verifiable history",
+      "statement": "A portable authority export must be deterministic, private, read-only, independent from candidate repository files, limited to the complete referenced binding/event/truth/Evidence set, and offline-verifiable without mutating or silently replacing live authority.",
+      "category": "architecture",
+      "risk": "critical",
+      "gate_ids": [
+        "go-test-core"
+      ],
+      "source_refs": [
+        "internal/ecp/export.go",
+        "internal/ecp/export_test.go",
+        "contracts/authority-export.md"
+      ]
+    },
+    {
+      "id": "authority-health-is-exact-and-read-only",
+      "name": "Authority health is exact, bounded, and non-repairing",
+      "statement": "Authority health must take a Gate-lease and mutation-lock consistent snapshot without reading candidate .ecp files, without repairing an unsafe authority directory or following object-store/intermediate artifact symlinks, verify every historically referenced Truth/Evidence object, disclose capacity, safe temporary remnants, orphans, unsafe entries, and released unresolved GateRuns, and never append, repair, delete, restore, compact, migrate, or attest authority state.",
+      "category": "architecture",
+      "risk": "critical",
+      "gate_ids": [
+        "go-test-core"
+      ],
+      "source_refs": [
+        "internal/ecp/health.go",
+        "internal/ecp/health_test.go",
+        "contracts/authority-health.md"
+      ]
+    },
+    {
+      "id": "candidate-never-authority",
+      "name": "Candidate files never accept themselves",
+      "statement": "Repository-local control configuration and Project Truth are untrusted proposals; only repository-external accepted epochs may govern Change, Evidence, or Verdict.",
+      "category": "architecture",
+      "risk": "critical",
+      "gate_ids": [
+        "go-test-core"
+      ],
+      "source_refs": [
+        "internal/ecp/store.go",
+        "internal/ecp/service.go",
+        "SPEC.md"
+      ]
+    },
+    {
+      "id": "exact-evidence-applicability",
+      "name": "Evidence applies only to its exact subject",
+      "statement": "A Verdict may use Evidence only when activation, Change, config, accepted truth, source, Gate plan, executable, environment, and Core identities match the current subject.",
+      "category": "security",
+      "risk": "critical",
+      "gate_ids": [
+        "go-test-core"
+      ],
+      "source_refs": [
+        "internal/ecp/service.go",
+        "internal/ecp/types.go",
+        "docs/security-model.md"
+      ]
+    },
+    {
+      "id": "gate-run-history-is-accounted",
+      "name": "Gate execution history is terminally accounted",
+      "statement": "Every Gate sequence that reaches project execution must durably start before project code, bind each Evidence item to that run, and end as COMPLETED, FAILED, CANCELLED, or as INTERRUPTED only after a later operation acquires the released exclusive lease; an unresolved run must keep assurance indeterminate.",
+      "category": "operations",
+      "risk": "critical",
+      "gate_ids": [
+        "go-test-core"
+      ],
+      "source_refs": [
+        "internal/ecp/service.go",
+        "internal/ecp/store.go",
+        "internal/ecp/gate_run_test.go",
+        "contracts/gate-run-continuity.md"
+      ]
+    },
+    {
+      "id": "protected-truth-requires-confirmation",
+      "name": "Protected truth cannot drift silently",
+      "statement": "A changed candidate Project Truth can become accepted only inside the matching ACTIVE Change, within declared Impact, after exact Semantic Reconciliation and explicit confirmation of the computed protected delta.",
+      "category": "business",
+      "risk": "critical",
+      "gate_ids": [
+        "go-test-core"
+      ],
+      "source_refs": [
+        "internal/ecp/truth.go",
+        "internal/ecp/service.go",
+        "NORTH_STAR.md"
+      ]
+    },
+    {
+      "id": "truth-relations-enforce-gates",
+      "name": "Project Truth relations enforce validation",
+      "statement": "Impacted invariant risks and Gate relations must affect the executable plan and Verdict; a truth-changing Change must retain the stronger risk and Gate requirements from both its starting and final truth epochs.",
+      "category": "architecture",
+      "risk": "critical",
+      "gate_ids": [
+        "go-test-core"
+      ],
+      "source_refs": [
+        "internal/ecp/service.go",
+        "internal/ecp/store.go",
+        "SPEC.md"
+      ]
+    },
+    {
+      "id": "unknowns-remain-visible",
+      "name": "Unknowns are not converted into facts",
+      "statement": "Material uncertainty must remain an explicit Unknown or a blocking UNKNOWN semantic assessment and cannot be presented as verified truth or PASS.",
+      "category": "business",
+      "risk": "high",
+      "gate_ids": [
+        "go-test-core"
+      ],
+      "source_refs": [
+        "internal/ecp/truth.go",
+        "internal/ecp/service.go",
+        "NORTH_STAR.md"
+      ]
+    },
+    {
+      "id": "disabled-projects-remain-ordinary",
+      "name": "Disabled projects remain ordinary",
+      "statement": "Installing the Plugin or finding repository-local ECP files must not enable a Workspace or create authority state during the status probe.",
+      "category": "compatibility",
+      "risk": "high",
+      "gate_ids": [
+        "go-test-core"
+      ],
+      "source_refs": [
+        "internal/ecp/activation_test.go",
+        "plugins/ecp-codex/skills/ecp-change/SKILL.md"
+      ]
+    },
+    {
+      "id": "local-pass-is-bounded",
+      "name": "Local PASS is never overstated",
+      "statement": "A local PASS means only that accepted local requirements were satisfied for the exact current subject; it does not prove defect-free, committed, pushed, deployed, released, device-tested, production-tested, remotely attested, or authenticated approval.",
+      "category": "operations",
+      "risk": "high",
+      "gate_ids": [
+        "go-test-core"
+      ],
+      "source_refs": [
+        "README.md",
+        "docs/verification-matrix.md",
+        "docs/security-model.md",
+        "plugins/ecp-codex/skills/ecp-change/SKILL.md"
+      ]
+    },
+    {
+      "id": "plugin-runtime-is-self-contained",
+      "name": "Plugin runtime is self-contained",
+      "statement": "The installed Skill must invoke only its own checksum-verified compatible bundled Core and must fail before repository writes instead of requiring or falling back to an ambient ECP CLI.",
+      "category": "operations",
+      "risk": "high",
+      "gate_ids": [
+        "go-test-project-pack"
+      ],
+      "source_refs": [
+        "plugins/ecp-codex/skills/ecp-change/scripts/ecp",
+        "scripts/package-plugin.sh",
+        "internal/ecp/project_pack_test.go"
+      ]
+    },
+    {
+      "id": "requirements-have-decision-and-evidence-closure",
+      "name": "Requirements have explicit decision and Evidence closure",
+      "statement": "Every acceptance, preservation, journey, data, operational, expected-change, and discovered-unknown item must be covered by a decided, not-applicable, or safely deferred requirement before implementation; final reconciliation must map every automated requirement to current PASS Evidence and must keep unsupported external verification pending.",
+      "category": "business",
+      "risk": "critical",
+      "gate_ids": [
+        "go-test-core"
+      ],
+      "source_refs": [
+        "internal/ecp/truth.go",
+        "internal/ecp/service.go",
+        "internal/ecp/change_contract_v03_test.go",
+        "contracts/requirement-closure.md"
+      ]
+    },
+    {
+      "id": "cancelled-changes-preserve-baseline",
+      "name": "Cancelled Change edits cannot become an invisible baseline",
+      "statement": "When source still differs from the latest cancelled Change baseline, a replacement Change must explicitly supersede it, carry the original baseline and lineage root, and keep every inherited touched path inside the new scope.",
+      "category": "architecture",
+      "risk": "critical",
+      "gate_ids": [
+        "go-test-core"
+      ],
+      "source_refs": [
+        "internal/ecp/service.go",
+        "internal/ecp/store.go",
+        "internal/ecp/change_contract_v03_test.go"
+      ]
+    },
+    {
+      "id": "path-impact-is-inferred",
+      "name": "Touched paths infer Project Truth impact",
+      "statement": "Established component path ownership must deterministically infer directly affected components, the reverse transitive closure of declared dependents, and their capabilities and invariants; undeclared inferred impact or a final touched path outside the component map must block PASS while still raising risk and Gate requirements conservatively.",
+      "category": "architecture",
+      "risk": "critical",
+      "gate_ids": [
+        "go-test-core"
+      ],
+      "source_refs": [
+        "internal/ecp/service.go",
+        "internal/ecp/change_contract_v03_test.go",
+        "contracts/minimal-validation.md"
+      ]
+    },
+    {
+      "id": "validation-is-minimal-and-sufficient",
+      "name": "Validation is risk-driven and minimally sufficient",
+      "statement": "Required Gates must be selected from effective risk, explicit invariant and requirement relations, and matching path/component/capability/invariant selectors; unrelated affected Gates must not run, while an empty required set and stale Evidence remain blocking.",
+      "category": "operations",
+      "risk": "high",
+      "gate_ids": [
+        "go-test-core"
+      ],
+      "source_refs": [
+        "internal/ecp/config.go",
+        "internal/ecp/service.go",
+        "internal/ecp/change_contract_v03_test.go",
+        "contracts/minimal-validation.md"
+      ]
+    }
+  ],
+  "components": [
+    {
+      "id": "assurance-core",
+      "name": "Assurance Core",
+      "responsibility": "Own project identity, accepted revisions, activation, Change, semantic reconciliation, Gate planning, Evidence applicability, Verdict, and immutable local history.",
+      "path_roots": [
+        "go.mod",
+        "internal/ecp"
+      ],
+      "depends_on": []
+    },
+    {
+      "id": "machine-cli",
+      "name": "Machine CLI",
+      "responsibility": "Expose the Core as a stable structured local adapter contract without becoming a separate source of authority.",
+      "path_roots": [
+        "cmd/ecp",
+        "internal/cli"
+      ],
+      "depends_on": [
+        "assurance-core"
+      ]
+    },
+    {
+      "id": "codex-adapter",
+      "name": "Codex adapter",
+      "responsibility": "Route natural-language Codex work through ECP when and only when the canonical Workspace is explicitly enabled.",
+      "path_roots": [
+        ".agents",
+        "plugins/ecp-codex"
+      ],
+      "depends_on": [
+        "machine-cli"
+      ]
+    },
+    {
+      "id": "product-contracts",
+      "name": "Product contracts",
+      "responsibility": "Define the North Star, current executable specification, security boundary, Project Pack model, and staged roadmap without claiming future enforcement as current capability.",
+      "path_roots": [
+        ".gitignore",
+        "NORTH_STAR.md",
+        "README.md",
+        "SPEC.md",
+        "docs"
+      ],
+      "depends_on": [
+        "assurance-core",
+        "codex-adapter",
+        "machine-cli"
+      ]
+    },
+    {
+      "id": "distribution",
+      "name": "Distribution tooling",
+      "responsibility": "Build reproducible self-contained Plugin runtime artifacts and keep source, manifest, marketplace metadata, and packaged checksums aligned without installing or publishing them implicitly.",
+      "path_roots": [
+        "scripts"
+      ],
+      "depends_on": [
+        "codex-adapter",
+        "machine-cli"
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "tool-agnostic-control-plane",
+      "title": "Keep ECP tool-agnostic and narrow",
+      "status": "accepted",
+      "decision": "ECP owns continuity and trusted change-control facts while existing agents, Git, compilers, tests, CI, release systems, and monitoring remain responsible for their native capabilities.",
+      "rationale": "The value is the cross-tool semantic and evidence loop, not duplicating mature engineering tools or building another agent platform.",
+      "supersedes": [],
+      "affected_refs": [
+        "assurance-core",
+        "natural-language-adapter",
+        "project-continuity",
+        "trusted-change-loop"
+      ]
+    },
+    {
+      "id": "trace-claims-to-evidence",
+      "title": "Trace completion claims to their actual evidence class",
+      "status": "accepted",
+      "decision": "Maintain a requirement-to-evidence matrix for the executable v0.3 contract and keep local automated, static, build-only, and external product or release evidence visibly distinct.",
+      "rationale": "A large green local suite proves only the behavior it exercises; without traceability it is easy to misstate a local candidate as having completed newcomer, long-term, desktop distribution, CI, isolation, device, release, or production validation.",
+      "supersedes": [],
+      "affected_refs": [
+        "local-pass-is-bounded",
+        "product-contracts",
+        "trusted-change-loop",
+        "unknowns-remain-visible"
+      ]
+    },
+    {
+      "id": "separate-control-and-truth-epochs",
+      "title": "Separate control policy from Project Truth",
+      "status": "accepted",
+      "decision": "Control Config and Project Truth have independent digests and accepted revisions, and policy acceptance cannot accept truth drift.",
+      "rationale": "A new or weakened policy must not validate its own adoption, and product facts need an explicit semantic-change path independent from Gate configuration.",
+      "supersedes": [],
+      "affected_refs": [
+        "assurance-core",
+        "candidate-never-authority",
+        "protected-truth-requires-confirmation",
+        "trusted-change-loop"
+      ]
+    },
+    {
+      "id": "content-addressed-accepted-truth",
+      "title": "Preserve exact accepted truth outside the repository",
+      "status": "accepted",
+      "decision": "Store exact accepted truth and contract bytes in private content-addressed blobs before appending the acceptance event, and recover them only through the accepted manifest.",
+      "rationale": "A digest can detect candidate drift but cannot let a future maintainer recover the last accepted contract; repository candidate bytes cannot safely serve as their own historical authority.",
+      "supersedes": [],
+      "affected_refs": [
+        "accepted-truth-is-recoverable",
+        "assurance-core",
+        "project-continuity"
+      ]
+    },
+    {
+      "id": "segmented-authority-history",
+      "title": "Segment authority history without changing event semantics",
+      "status": "accepted",
+      "decision": "Keep events.json as the compatible root segment, rotate new writes into bounded canonically numbered continuation segments, and replay one sequence and hash chain across every segment under an aggregate capacity and terminal reserve.",
+      "rationale": "This removes the legacy single-file growth stop without introducing a database dependency or weakening append atomicity, historical verification, fail-closed corruption handling, or project-disable capacity.",
+      "supersedes": [],
+      "affected_refs": [
+        "assurance-core",
+        "authority-history-remains-verifiable",
+        "project-continuity"
+      ]
+    },
+    {
+      "id": "exact-portable-authority-export",
+      "title": "Export only exact referenced authority state",
+      "status": "accepted",
+      "decision": "Create deterministic private read-only bundles under the authority mutation lock, include only the binding, complete event segments, historically referenced truth blobs and Evidence artifacts, and require independent semantic verification before atomic installation.",
+      "rationale": "Long-lived handoff and recovery need a portable record that can be checked without the original repository or live state, while copying an entire mutable state directory would include locks, temporary files, orphans, and ambiguous snapshots.",
+      "supersedes": [],
+      "affected_refs": [
+        "assurance-core",
+        "authority-export-is-exact",
+        "ecp-authority-export-contract",
+        "project-continuity"
+      ]
+    },
+    {
+      "id": "diagnose-before-authority-maintenance",
+      "title": "Diagnose authority before adding maintenance or repair",
+      "status": "accepted",
+      "decision": "Expose a bounded authority-only health inventory with explicit HEALTHY, ATTENTION, and INDETERMINATE states before introducing retention, garbage collection, restore, migration, or compaction, and keep diagnosis logically read-only.",
+      "rationale": "Long-lived maintenance cannot be designed safely without exact evidence about referenced integrity, capacity, crash remnants, and unreferenced objects; automatically cleaning during diagnosis would erase the evidence needed to distinguish authority from recoverable garbage.",
+      "supersedes": [],
+      "affected_refs": [
+        "assurance-core",
+        "authority-health-is-exact-and-read-only",
+        "ecp-authority-health-contract",
+        "project-continuity"
+      ]
+    },
+    {
+      "id": "lease-proven-gate-run-recovery",
+      "title": "Recover abandoned GateRuns only after lease acquisition",
+      "status": "accepted",
+      "decision": "Persist GateRun start before project execution and permit interruption recovery only when a later lifecycle operation successfully acquires the same released advisory lease; never infer abandonment from elapsed time or PID metadata.",
+      "rationale": "A durable start distinguishes no execution from an unfinished sequence, while lease ownership prevents a concurrent live run from being falsely terminalized and lets a future task recover exact history without trusting chat state.",
+      "supersedes": [],
+      "affected_refs": [
+        "assurance-core",
+        "gate-run-history-is-accounted",
+        "project-continuity",
+        "trusted-change-loop"
+      ]
+    },
+    {
+      "id": "no-task-level-bypass",
+      "title": "No supported task-level bypass",
+      "status": "accepted",
+      "decision": "An enabled project remains governed for repository mutations until the whole canonical Workspace is explicitly disabled.",
+      "rationale": "A convenient per-task escape would make governance disappear exactly when a difficult or conflicting change is encountered.",
+      "supersedes": [],
+      "affected_refs": [
+        "codex-adapter",
+        "disabled-projects-remain-ordinary",
+        "natural-language-adapter"
+      ]
+    },
+    {
+      "id": "self-contained-plugin-runtime",
+      "title": "Bundle Core with the Codex Plugin",
+      "status": "accepted",
+      "decision": "Distribute supported Darwin/Linux arm64/amd64 Core binaries with the Plugin and require the Skill-relative launcher to checksum and execute only the matching packaged runtime.",
+      "rationale": "A natural-language desktop workflow cannot depend on users installing a separate CLI or on the desktop process inheriting an ad hoc PATH, while an implicit ambient fallback would make runtime identity unpredictable.",
+      "supersedes": [],
+      "affected_refs": [
+        "codex-adapter",
+        "machine-cli",
+        "natural-language-adapter",
+        "plugin-runtime-is-self-contained"
+      ]
+    },
+    {
+      "id": "zero-silent-ambiguity",
+      "title": "Block silent ambiguity before implementation",
+      "status": "accepted",
+      "decision": "Represent each material Change question as a structured requirement and refuse first write while any item is blocking or any acceptance, preservation, journey, data, operational, expected-change, or discovered-unknown item lacks an explicit decision and verification mode.",
+      "rationale": "Product requests routinely omit loading, empty, error, retry, cancellation, permission, data, and failure behavior; forcing explicit current behavior is safer than letting an agent guess, while NOT_APPLICABLE and DEFERRED_SAFE avoid inventing unnecessary work.",
+      "supersedes": [],
+      "affected_refs": [
+        "requirements-have-decision-and-evidence-closure",
+        "trusted-change-loop",
+        "unknowns-remain-visible"
+      ]
+    },
+    {
+      "id": "risk-driven-minimal-validation",
+      "title": "Run the smallest Gate set that closes the actual risk",
+      "status": "accepted",
+      "decision": "Select Gates from effective risk plus explicit requirement and invariant relations, filtered by matching path, component, capability, and invariant selectors; keep selector-free Gates universal and prohibit vacuous PASS.",
+      "rationale": "Always running a full suite wastes time and encourages bypasses, while selecting only by the agent's declaration can miss impact; deterministic path inference and explicit relations provide the necessary conservative closure.",
+      "supersedes": [],
+      "affected_refs": [
+        "path-impact-is-inferred",
+        "trusted-change-loop",
+        "validation-is-minimal-and-sufficient"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "ecp-product-boundaries",
+      "kind": "boundary",
+      "path": "contracts/product-boundaries.md",
+      "description": "Canonical current product, trust, responsibility, and non-goal boundaries for ECP."
+    },
+    {
+      "id": "ecp-local-verdict-contract",
+      "kind": "operations",
+      "path": "contracts/local-verdict.md",
+      "description": "What local Evidence and Verdict do and do not establish."
+    },
+    {
+      "id": "ecp-distribution-contract",
+      "kind": "release",
+      "path": "contracts/distribution.md",
+      "description": "Self-contained Plugin runtime, versioning, installation, and trust boundaries."
+    },
+    {
+      "id": "ecp-authority-export-contract",
+      "kind": "operations",
+      "path": "contracts/authority-export.md",
+      "description": "Deterministic exact-reference authority export, offline verification, privacy, and non-restore boundaries."
+    },
+    {
+      "id": "ecp-authority-health-contract",
+      "kind": "operations",
+      "path": "contracts/authority-health.md",
+      "description": "Consistent authority-only health inventory, status, capacity, object classification, locking, and non-repair boundaries."
+    },
+    {
+      "id": "ecp-gate-run-continuity-contract",
+      "kind": "operations",
+      "path": "contracts/gate-run-continuity.md",
+      "description": "Durable GateRun lifecycle, lease-proven interruption recovery, history visibility, and crash cleanup boundaries."
+    },
+    {
+      "id": "ecp-requirement-closure-contract",
+      "kind": "operations",
+      "path": "contracts/requirement-closure.md",
+      "description": "Zero-silent-ambiguity decisions, exact contract coverage, verification modes, and requirement-level Verdict semantics."
+    },
+    {
+      "id": "ecp-minimal-validation-contract",
+      "kind": "operations",
+      "path": "contracts/minimal-validation.md",
+      "description": "Path-derived impact, Gate applicability selectors, minimal sufficient validation, and fail-closed fallback rules."
+    }
+  ],
+  "unknowns": [
+    {
+      "id": "independent-long-term-pilot-unproven",
+      "statement": "No independent multi-year product has yet demonstrated that this Project Pack and workflow materially preserve newcomer continuity and reduce AI semantic drift over time.",
+      "risk": "high",
+      "resolution_condition": "Run a staged pilot in at least one independent product repository across multiple real Changes, fresh tasks, and a newcomer handoff, then publish measured outcomes and failures."
+    },
+    {
+      "id": "protected-ci-not-implemented",
+      "statement": "The current Plugin and local authority are bypassable and no protected CI, branch rule, or release consumer enforces ECP Verdict for this repository.",
+      "risk": "high",
+      "resolution_condition": "Implement and deploy a protected consumer that independently verifies exact commit, accepted policy/truth, required Evidence, and current attestation before merge or release."
+    },
+    {
+      "id": "runner-isolation-not-implemented",
+      "statement": "Gate declarations are reviewed but project commands are not isolated from same-user files, network, credentials, external side effects, or crash-surviving descendant processes by a sandbox or VM; durable GateRun interruption recovery accounts for authority history only.",
+      "risk": "high",
+      "resolution_condition": "Add a capability-separated isolated Runner and verify denial of filesystem, secret, network, and process-tree escape paths."
+    },
+    {
+      "id": "non-unix-authority-unsupported",
+      "statement": "Project and authority operations require POSIX Unix private-file semantics; Windows and other unsupported platforms can only use non-authority commands such as version output.",
+      "risk": "moderate",
+      "resolution_condition": "Design and test an equivalent private state, locking, process, and canonical Workspace model for each additional supported platform."
+    },
+    {
+      "id": "semantic-judgment-not-independent",
+      "statement": "The Adapter or Agent supplies the semantic PRESERVED, CHANGED, or UNKNOWN judgment; Core validates consistency and bindings but cannot independently prove arbitrary product behavior from source code.",
+      "risk": "high",
+      "resolution_condition": "Bind critical invariants to independent executable contracts and add a protected consumer or reviewer that can reject unsupported semantic claims for high-risk Changes."
+    },
+    {
+      "id": "desktop-distribution-not-proven",
+      "statement": "The Codex Plugin now bundles checksum-verified Core runtimes and passes cache-layout smoke tests, but the package is not signed, notarized, publicly published, upgrade/uninstall tested, or verified after installation in a fresh real Codex desktop task.",
+      "risk": "moderate",
+      "resolution_condition": "Build through a trusted release process, sign/notarize, install, upgrade, uninstall, and verify launcher discovery, version compatibility, default-disabled behavior, and a governed Change in fresh Codex desktop tasks."
+    },
+    {
+      "id": "authority-retention-not-scaled",
+      "statement": "The local authority now has append-safe bounded segmented history, deterministic exact-reference export/verification, and bounded health diagnostics for capacity, referenced integrity, remnants, orphans, and released unresolved GateRuns; however its 1 GiB/1024-continuation limits have not been validated under multi-year workloads and truth/Evidence artifacts still lack scheduled reference-aware retention, redaction/encryption, restore/import, repair, safe compaction, and garbage collection.",
+      "risk": "high",
+      "resolution_condition": "Run capacity and crash-injection tests using health telemetry, then implement explicit restore/migration, a retention policy with referenced-object preservation, tested repair boundaries, and safe compaction or an explicitly migrated database before configured limits are reached."
+    }
+  ]
+}
