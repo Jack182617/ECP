@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plugin_name": "ecp-codex",
-  "plugin_version": "0.3.0-dev+codex.20260812072220",
+  "plugin_version": "0.3.0-dev+codex.20260812095321",
   "artifacts": [
-    {"os":"darwin","arch":"arm64","path":"runtime/darwin-arm64/ecp","sha256":"0e716e999a01b1499fd820901bdc2314904d2b023dc18d05b4eb87a2b5b55335","size_bytes":3490050},
-    {"os":"darwin","arch":"amd64","path":"runtime/darwin-amd64/ecp","sha256":"088c037be97126b6b35f25bb4c67d3ca6ad4ecc1e7075f4f03c5e9446bff2c07","size_bytes":3770128},
-    {"os":"linux","arch":"arm64","path":"runtime/linux-arm64/ecp","sha256":"ebea89dc1d0dc0dc41f50bb5c6153af7c043b02adb50f304487fb0579e816c19","size_bytes":3604642},
-    {"os":"linux","arch":"amd64","path":"runtime/linux-amd64/ecp","sha256":"4322ef11141ad7cf2f7e031e413e8229dc9607e5d2c8b6e5fb5263b89278a27d","size_bytes":3780770}
+    {"os":"darwin","arch":"arm64","path":"runtime/darwin-arm64/ecp","sha256":"5a2d80647fc02f81b53d8a855a42d8c8e593c720e27d50838964f92a98ff29b5","size_bytes":3523138},
+    {"os":"darwin","arch":"amd64","path":"runtime/darwin-amd64/ecp","sha256":"07266cdda9368597d81105a32558aab69f0704eea304d5b1799de8eb8cffd79d","size_bytes":3819344},
+    {"os":"linux","arch":"arm64","path":"runtime/linux-arm64/ecp","sha256":"40a1b4f9583ac5514005251ebf317cf00020a0ab2ce6ffe5001d9da3400e455b","size_bytes":3604642},
+    {"os":"linux","arch":"amd64","path":"runtime/linux-amd64/ecp","sha256":"31e27c8561fae73f205f62af98e8e84772bb1f4647bbbb9c268e73ff99dde174","size_bytes":3825826}
   ]
 }

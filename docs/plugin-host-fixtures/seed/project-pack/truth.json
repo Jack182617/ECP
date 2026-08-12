@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "maturity": "established",
+  "purpose": "Provide a disposable session-state project for Codex Plugin host-routing evaluation.",
+  "capabilities": [
+    {
+      "id": "session-refresh",
+      "name": "Session refresh",
+      "description": "Keep the newest authenticated session when refresh results arrive out of order.",
+      "status": "active",
+      "component_ids": [
+        "session-core"
+      ],
+      "invariant_ids": [
+        "session-generation-monotonic"
+      ]
+    }
+  ],
+  "invariants": [
+    {
+      "id": "session-generation-monotonic",
+      "name": "Session generation is monotonic",
+      "statement": "A refresh with an older generation never replaces a newer authenticated session.",
+      "category": "business",
+      "risk": "moderate",
+      "gate_ids": [
+        "unit-tests"
+      ],
+      "source_refs": [
+        "docs/session-contract.md",
+        "src/session.py",
+        "tests/test_session.py"
+      ]
+    }
+  ],
+  "components": [
+    {
+      "id": "session-core",
+      "name": "Session core",
+      "responsibility": "Implement and verify local session refresh ordering.",
+      "path_roots": [
+        "README.md",
+        "admin",
+        "docs",
+        "src",
+        "tests"
+      ],
+      "depends_on": []
+    }
+  ],
+  "decisions": [
+    {
+      "id": "local-python-gate",
+      "title": "Use a dependency-free local Python Gate",
+      "status": "accepted",
+      "decision": "Use standard-library unittest through /usr/bin/python3.",
+      "rationale": "The disposable fixture must not install dependencies or use the network.",
+      "supersedes": [],
+      "affected_refs": [
+        "session-core"
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "session-contract",
+      "kind": "api",
+      "path": "contracts/session.md",
+      "description": "Stable ordering and validation rules for session refresh."
+    }
+  ],
+  "unknowns": []
+}

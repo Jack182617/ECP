@@ -110,7 +110,19 @@ func TestAuthorityHealthReturnsIndeterminateReportForCorruptReferences(t *testin
 	}
 	evidence := workspace.Projection.Evidence[workspace.Projection.ChangeOrder[len(workspace.Projection.ChangeOrder)-1]][0]
 	artifact := filepath.Join(workspace.Store.Directory(), filepath.FromSlash(evidence.StdoutArtifact))
-	if err := os.WriteFile(artifact, []byte("tampered Evidence output"), 0o600); err != nil {
+	originalArtifact, err := os.ReadFile(artifact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tamperedArtifact := append([]byte(nil), originalArtifact...)
+	if len(tamperedArtifact) == 0 {
+		// Empty output has a fixed SHA-256 digest, so replace it with a same-size
+		// private directory entry corruption below and assert the size branch.
+		tamperedArtifact = []byte("x")
+	} else {
+		tamperedArtifact[0] ^= 0xff
+	}
+	if err := os.WriteFile(artifact, tamperedArtifact, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	truthDigest := workspace.Projection.TruthHistory[0].Files[0].Digest
@@ -126,7 +138,11 @@ func TestAuthorityHealthReturnsIndeterminateReportForCorruptReferences(t *testin
 	if report.Status != AuthorityHealthIndeterminate || report.TruthBlobs.InvalidReferencedFiles == 0 || report.EvidenceArtifacts.InvalidReferencedFiles == 0 {
 		t.Fatalf("corrupt referenced objects did not make health indeterminate: %+v", report)
 	}
-	if !healthHasFinding(report, "TRUTH_BLOB_MISSING") || !healthHasFinding(report, "ARTIFACT_DIGEST_MISMATCH") {
+	artifactFinding := "ARTIFACT_DIGEST_MISMATCH"
+	if len(originalArtifact) == 0 {
+		artifactFinding = "ARTIFACT_SIZE_MISMATCH"
+	}
+	if !healthHasFinding(report, "TRUTH_BLOB_MISSING") || !healthHasFinding(report, artifactFinding) {
 		t.Fatalf("health report lost exact corruption diagnostics: %+v", report.Findings)
 	}
 }

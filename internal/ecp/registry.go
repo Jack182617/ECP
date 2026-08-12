@@ -22,6 +22,9 @@ func loadWorkspaceBinding(stateDir, workspaceID string) (WorkspaceBinding, error
 	if err != nil {
 		return WorkspaceBinding{}, err
 	}
+	if err := verifyAuthorityDirectoryAncestors(stateDir, filepath.Dir(path)); err != nil {
+		return WorkspaceBinding{}, newError(KindIntegrity, "WORKSPACE_BINDING_UNSAFE", "Workspace binding has an unsafe authority directory chain", err)
+	}
 	info, err := os.Lstat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -68,7 +71,7 @@ func createWorkspaceBinding(ctx context.Context, stateDir string, binding Worksp
 	if err != nil {
 		return err
 	}
-	if err := ensurePrivateDirectory(filepath.Dir(path)); err != nil {
+	if err := ensureAuthorityDirectory(stateDir, filepath.Dir(path)); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(binding, "", "  ")

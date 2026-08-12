@@ -42,7 +42,7 @@ Codex 本地 marketplace 安装会把 Plugin 复制到 cache，因此 launcher �
 
 ### Project Truth Registry
 
-`truth.json` 保存 Purpose、Capability、Invariant、Component、Decision、Contract Reference 与 Unknown。Core 校验全局唯一 ID、跨实体引用、component 路径、contract 文件、gate reference 和 maturity；每个 `contracts/**` 文件必须由 contract ID 寻址。仓库外每个 `project_truth_accepted` 事件保存 exact truth digest、结构化 payload 和文件 manifest，projection 保留 revision history；exact UTF-8 bytes 则先写入按 SHA-256 去重的私有 `truth-blobs/`。`truth get` 可按 latest 或历史 accepted digest 恢复这些内容并重验类型、权限、大小与 digest；候选 Project Truth 永远不是权威，也不能在 blob 缺失时充当恢复副本。
+`truth.json` 保存 Purpose、Capability、Invariant、Component、Decision、Contract Reference 与 Unknown。Core 校验全局唯一 ID、跨实体引用、component 路径、contract 文件、gate reference 和 maturity；每个 `contracts/**` 文件必须恰由一个 contract ID 寻址，同一路径不能被多个 ID 复用而产生顺序依赖的 Impact 映射。仓库外每个 `project_truth_accepted` 事件保存 exact truth digest、结构化 payload 和文件 manifest，projection 保留 revision history；exact UTF-8 bytes 则先写入按 SHA-256 去重的私有 `truth-blobs/`。`truth get` 可按 latest 或历史 accepted digest 恢复这些内容并重验类型、权限、大小与 digest；候选 Project Truth 永远不是权威，也不能在 blob 缺失时充当恢复副本。
 
 Control Config 的每次 acceptance 同样在事件历史中保存结构化 Project/Policy/Gates payload。`policy get` 可按 latest 或历史 accepted digest 经 authority-only 路径恢复它，用于候选 drift/malformed 时的比较和人工恢复；读取不会执行 Gate、改写候选或产生 acceptance。
 
@@ -84,9 +84,9 @@ state-v1/
         └── stderr.log
 ```
 
-Workspace binding 由 canonical Workspace 直接索引，不能由未接受的 Draft `project_id` 选择或替换。Binding、根 event segment、continuation segments 和 Evidence stdout/stderr artifacts 在读取时必须仍是有界、非 symlink 的 regular private files；替换类型或暴露 group/other 权限会以 integrity failure 停止，不会继续信任 projection 或 Evidence。因此 v0.3 权威状态仅支持能提供 POSIX private-file 语义的 Unix；非 Unix 平台在项目或 authority 写入/加载前返回 `PLATFORM_SECURITY_UNSUPPORTED`，只保留 `ecp version` 等不触及 authority 的操作。改变 canonical state path 会选中不同 `authority_id`；v0.3 不支持 state-directory migration。
+Workspace binding 由 canonical Workspace 直接索引，不能由未接受的 Draft `project_id` 选择或替换。Core 从 canonical state root 到 binding、project store、segment、truth blob 与 Evidence artifact directory 的每个已存在目录组件都以 `Lstat` 逐层拒绝 symlink、非目录和 group/other 权限；已存在但不安全的 state root 只报错，不会被静默 `chmod`。Binding、event segments 与 Evidence stdout/stderr 在读取时还必须是有界、非 symlink 的 regular private files；Evidence path 必须精确等于 `artifacts/<change-id>/<evidence-id>/stdout.log|stderr.log`，且记录大小、stored digest 和历史 accepted Gate epoch 都必须一致。替换类型、祖先链逃逸或权限暴露会以 integrity failure 停止，不会继续信任 projection 或 Evidence。逐层检查缩小了误配置/损坏造成的越界面，但仍不等同 directory-fd + `openat(O_NOFOLLOW)` 的无竞争强隔离。因此 v0.3 权威状态仅支持能提供 POSIX private-file 语义的 Unix；非 Unix 平台在项目或 authority 写入/加载前返回 `PLATFORM_SECURITY_UNSUPPORTED`，只保留 `ecp version` 等不触及 authority 的操作。改变 canonical state path 会选中不同 `authority_id`；v0.3 不支持 state-directory migration。
 
-`events.json` 保持第 0 段兼容性；新写入在 8 MiB 阈值后滚动到连续命名的 continuation segments，旧版单文件可读到 64 MiB。所有段共用一条 sequence/hash chain；加载时要求从第 1 段连续、非空、私有且有界。单次 mutation 的 event batch 永不跨段，当前段重写和新段创建均为 atomic rename。整个 history 最多 1024 个 continuation、1 GiB，并在 enabled/never-enabled projection 上保留 2 MiB project-disable capacity；存在 ACTIVE Change 时必须容纳同一次 append 的 cancellation + disablement。
+`events.json` 保持第 0 段兼容性；新写入在 8 MiB 阈值后滚动到连续命名的 continuation segments，旧版单文件可读到 64 MiB。所有段共用一条 sequence/hash chain；加载时要求从第 1 段连续、非空、私有且有界。单次 mutation 的 event batch 永不跨段，当前段重写和新段创建均为 atomic rename。整个 history 最多 1024 个 continuation、1 GiB。普通 mutation 不能消费最后 2 MiB 或最后 3 个 segment；GateRun terminal/cancellation lifecycle 可以使用其中一层，但仍须给最终 project disable 留出 512 KiB 和最后 1 个 segment；符合精确形状的原子 project-disable batch 才可使用全部最终预留。`gate_run_started` 与 `evidence_recorded` 在落盘前还会按当前 run 的最坏有界 terminal 大小检查 byte/segment headroom，不能先执行项目代码再发现终态无处写入。
 
 Darwin/Linux/BSD 上 `.lock` 与 `.gate-run.lock` 是持久 metadata file + 内核 advisory lock，进程退出自动释放所有权；其他 Unix 使用保守 sentinel/manual crash-recovery fallback，但尚未列入已验证运行矩阵。选择原子分段文件而不是立即引入 SQLite，原因是 v0.3 是单用户、单 Workspace 串行 mutation，且当前能力无需新增依赖。事件接口保持存储无关；未来若真实并发、查询、压缩或迁移需求成立，可迁移到 SQLite 而不改变领域合同。分段没有解决 truth/Evidence artifact GC、安全 compaction、自动 retention 或多年容量验证。
 
@@ -98,7 +98,7 @@ Authority Health Inspector 是另一条不依赖 candidate `.ecp` 的 authority-
 
 只在 project mode enabled 时维护单 ACTIVE Change、activation ID、baseline、scope、acceptance、structured Impact、Requirement decision ledger、starting truth digest、risk 和 `ACTIVE → COMPLETED|CANCELLED` 生命周期。每个验收、保持、旅程、数据/运行影响、预期变化与已发现 unknown 必须被一个 exact Requirement 覆盖；每项保存当前要求、状态、理由、决策来源、验证方式和可选 revisit 条件。`BLOCKING_UNKNOWN` 可以在 Adapter 草稿中表达，但 Core 在第一次实现写入前拒绝启动它。
 
-单独 cancellation 是带 actor/reason 的终态补偿事件，保持项目 enabled；project disable 则可把已观察 ACTIVE Change 的 cancellation 与新 disabled activation 原子追加。两者都不要求 PASS、不删除 Evidence、不修改工作树。若取消项留下源码 delta，replacement 必须显式 supersede 最新取消项、继承它的原始 baseline/lineage，并把 inherited touched paths 纳入新 scope；否则 Core 不允许把这些旧修改吸收到一个伪装成干净的新 baseline。状态不保存“verified=true”；assurance 每次根据当前 activation 与 subject 重算。Contract version 0 的已记录历史继续按旧 subject/risk/Gate 语义重放，新 Change 使用 version 2 合同。
+单独 cancellation 是带 actor/reason 的终态补偿事件，保持项目 enabled；project disable 若观察到 ACTIVE GateRun/Change，则在同一次 append 中依次记录 `INTERRUPTED`、Change cancellation 与新 disabled activation。这样三项要么全部落盘，要么都不落盘；它们都不要求 PASS、不删除 Evidence、不修改工作树。若取消项留下源码 delta，replacement 必须显式 supersede 最新取消项、继承它的原始 baseline/lineage，并把 inherited touched paths 纳入新 scope；否则 Core 不允许把这些旧修改吸收到一个伪装成干净的新 baseline。状态不保存“verified=true”；assurance 每次根据当前 activation 与 subject 重算。Contract version 0 的已记录历史继续按旧 subject/risk/Gate 语义重放，新 Change 使用 version 2 合同。
 
 ### Gate Runner
 
@@ -106,7 +106,7 @@ Authority Health Inspector 是另一条不依赖 candidate `.ecp` 的 authority-
 
 Required Gates 是三者的并集：匹配 effective risk 且 selector 适用的 Gate、Impact/inferred invariant 显式 `gate_ids`、AUTOMATED Requirement 显式 Gate。Selector 可匹配 path/component/capability/invariant，空 selector 保持 universal；显式关系不能被 selector 过滤。计划按 `fast → affected → full`、同 tier 内按 ID 稳定排序，只运行与当前 contract 相关的最小集合，但 Required Gate 为空仍禁止 vacuous PASS。Project Truth 演进时，Core 同时读取 Change 启动摘要对应的 authority history 与 final accepted truth，对两版全部 invariant/unknown 取更高风险并合并 Gate，避免同一 Change 通过弱化 truth 来弱化自己的门槛。
 
-DefaultConfig 不继承 `HOME`；常见 secret/capability 环境名 denylist 会在预检和执行两处拒绝，但该名称检查仍只是 best-effort，不隔离同用户文件/网络能力。调用方必须审阅计划并把其 exact Change ID 与摘要传回。Runner 在 Workspace lease 内重新加载并重建计划，在任何项目代码前先提交 exact GateRun start；只有当前 activation、Change ID 与摘要均匹配才捕获 pre fingerprint、执行 argv、捕获 post fingerprint、保存 artifact，再把绑定 `gate_run_id` 的执行事实提交到 Event Store；每个后续 Gate 前重复相同核对。Run 最终记录 `COMPLETED/FAILED/CANCELLED`，被杀或崩溃留下的 `IN_PROGRESS` 只能由后来真正取得已释放 advisory lease 的操作记录为 `INTERRUPTED`。CLI 的 signal-aware root context 捕获 `SIGINT`/`SIGTERM`，使当前受支持的 Unix Runner 可以清理独立进程组并通过 defer 释放锁；crash recovery 只修复权威生命周期，不保证收割所有后代进程或自动续跑。非 Unix 直接进程取消代码仅保持可交叉编译，不代表 v0.3 authority 运行支持。
+DefaultConfig 不继承 `HOME`；常见 secret/capability 环境名 denylist 会在预检和执行两处拒绝，但该名称检查仍只是 best-effort，不隔离同用户文件/网络能力。调用方必须审阅计划并把其 exact Change ID 与摘要传回。Runner 在 Workspace lease 内重新加载并重建计划，在任何项目代码前先确认 store 同时容纳 GateRun start、最坏有界 terminal 与最终 disable recovery，再提交 exact GateRun start；只有当前 activation、Change ID 与摘要均匹配才捕获 pre fingerprint、执行 argv、捕获 post fingerprint、保存 artifact，再把绑定 `gate_run_id` 的执行事实提交到 Event Store；每个后续 Gate 前重复相同核对与 terminal headroom 检查。Run 最终记录 `COMPLETED/FAILED/CANCELLED`，被杀或崩溃留下的 `IN_PROGRESS` 只能由后来真正取得已释放 advisory lease 的操作记录为 `INTERRUPTED`。CLI 的 signal-aware root context 捕获 `SIGINT`/`SIGTERM`，使当前受支持的 Unix Runner 可以清理独立进程组并通过 defer 释放锁；crash recovery 只修复权威生命周期，不保证收割所有后代进程或自动续跑。非 Unix 直接进程取消代码仅保持可交叉编译，不代表 v0.3 authority 运行支持。
 
 ### Verdict Evaluator
 

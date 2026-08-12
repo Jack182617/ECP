@@ -40,9 +40,11 @@ ECP 的价值不能由 ECP 仓库自己的单元测试证明。真实试点必�
 
 ## Plugin 宿主预检
 
-在任何真实产品仓库发生首次 ECP 写入之前，必须先在独立、可丢弃的 Git Workspaces 中完整执行 [Codex Plugin host-routing evaluation](plugin-host-evaluation.md)。四个 Skill 的 direct、indirect、incomplete、negative 和 edge cases 必须在 fresh Codex Desktop tasks 中达到该协议的重复运行标准。
+在任何真实产品仓库发生首次 ECP 写入之前，必须先在独立、可丢弃的 Git Workspaces 中完整执行 [Codex Plugin host-routing evaluation](plugin-host-evaluation.md)。四个 Skill 的 direct、indirect、incomplete、negative 和 edge cases 必须在 fresh Codex Desktop tasks 中达到该协议的重复运行标准。每个 scored/preparation run 都必须使用新的 Git Workspace 和新的 dedicated `ECP_STATE_DIR` authority；不是建立五个 fixture 后重复 reset。
 
-错误 Skill、误 enable/disable、enabled 项目写入前漏掉 status probe、task-level bypass、ambient/repository-built Core、无依据成功或任何未授权写入都阻断真实试点。不能把正式新项目或旧项目当成第一轮 Plugin 路由调试环境，也不能用 Skill 文件的静态字符串测试替代宿主证据。
+Plugin 宿主预检的全部用例只有在 `scripts/validate-plugin-host-results.py validate --results ABSOLUTE_RESULTS_ROOT` 对一个 exact installed Plugin/Core campaign 返回 `PASS` 后才完成。结果必须含 42 个唯一 required run、全部额外 retry 与全部失败；任何保留的 `FAIL`、默认 authority sentinel 变化、fresh task 与 operator `authority_id` hash 不一致、项目 trust/config 无法确认，或 package identity 漂移都阻断试点。
+
+错误 Skill、误 enable/disable、enabled 项目写入前漏掉 status probe、task-level bypass、ambient/repository-built Core、无依据成功或任何未授权写入都阻断真实试点。不能把正式新项目或旧项目当成第一轮 Plugin 路由调试环境，也不能用 Skill 文件的静态字符串测试替代宿主证据。ECP 实现仓库自身也不得作为 fixture、新项目轨道或旧项目轨道。
 
 ## 四个阶段
 
@@ -96,7 +98,7 @@ ECP 的价值不能由 ECP 仓库自己的单元测试证明。真实试点必�
 
 Phase 1B 只有在全部条件满足时才完成：
 
-1. Plugin 宿主预检的全部用例在规定的独立 fresh-task 运行中通过，且没有被隐藏或覆盖的失败记录。
+1. Plugin 宿主预检的 canonical validator 对 exact package identity 返回 PASS：42 个 required run 全部通过，没有被隐藏、覆盖或删除的 required/extra 失败记录，默认 authority 未变。
 2. 一个新项目和一个旧项目都完整执行 A–D，每个项目不少于八个真实 Change，两个项目合计不少于二十个真实 Change；其中每个项目至少三个普通 Change 和三个语义 Change。
 3. 全部普通使用中用户手工 ECP CLI 次数为 0，用户手写产品代码不是完成条件。
 4. 新旧项目的接手者都能仅依赖当前仓库与 accepted authority state 正确指出主要事实、未知项和本次影响，没有依赖旧聊天中的隐藏约定。

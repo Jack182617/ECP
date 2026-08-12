@@ -20,6 +20,16 @@ const (
 	maxEventSegments               = 1024
 	maxEventStoreBytes       int64 = 1 << 30
 	terminalEventReserve     int64 = 2 << 20
+	projectDisableReserve    int64 = 512 << 10
+	terminalSegmentReserve         = 3
+)
+
+type eventAppendClass uint8
+
+const (
+	eventAppendOrdinary eventAppendClass = iota
+	eventAppendLifecycle
+	eventAppendProjectDisable
 )
 
 type Store struct {
@@ -33,6 +43,9 @@ type Store struct {
 	// eventSegmentBytes is intentionally unexported. Production stores use the
 	// fixed default; tests lower it to exercise rotation without huge fixtures.
 	eventSegmentBytes int
+	// Test-only capacity seams. Production stores leave both values zero.
+	maxEventStoreBytes int64
+	maxEventSegments   int
 }
 
 type PendingEvent struct {
@@ -56,6 +69,95 @@ type eventHistory struct {
 	currentBytes  int64
 	currentEvents []Event
 	segmentCount  int
+}
+
+// ensureAuthorityDirectory creates target one component at a time below the
+// canonical authority root. Unlike os.MkdirAll, it never traverses an existing
+// symlink in the authority-owned portion of the path.
+func ensureAuthorityDirectory(root, target string) error {
+	root = filepath.Clean(root)
+	info, err := os.Lstat(root)
+	if os.IsNotExist(err) {
+		if err := ensurePrivateDirectory(root); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return newError(KindRuntime, "STATE_DIR_STAT_FAILED", "could not inspect ECP state root", err)
+	} else if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() || !hasPrivateFilePermissions(info) {
+		return newError(KindIntegrity, "UNSAFE_STATE_DIR", "ECP state root must be a private real directory", nil)
+	}
+	return inspectAuthorityDirectoryChain(root, target, true, true)
+}
+
+// verifyAuthorityDirectory checks an existing authority-owned directory chain
+// without repairing permissions or creating missing directories.
+func verifyAuthorityDirectory(root, target string) error {
+	return inspectAuthorityDirectoryChain(root, target, false, true)
+}
+
+// verifyAuthorityDirectoryAncestors rejects unsafe existing ancestors while
+// allowing an unregistered/missing suffix to retain the caller's NotFound
+// semantics.
+func verifyAuthorityDirectoryAncestors(root, target string) error {
+	return inspectAuthorityDirectoryChain(root, target, false, false)
+}
+
+func inspectAuthorityDirectoryChain(root, target string, create, requireComplete bool) error {
+	root = filepath.Clean(root)
+	target = filepath.Clean(target)
+	relative, err := filepath.Rel(root, target)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
+		return newError(KindIntegrity, "AUTHORITY_PATH_ESCAPE", "authority path escapes its canonical state root", err)
+	}
+	rootInfo, err := os.Lstat(root)
+	if err != nil {
+		if !requireComplete && os.IsNotExist(err) {
+			return nil
+		}
+		return newError(KindRuntime, "STATE_DIR_STAT_FAILED", "could not inspect ECP state root", err)
+	}
+	if rootInfo.Mode()&os.ModeSymlink != 0 || !rootInfo.IsDir() || !hasPrivateFilePermissions(rootInfo) {
+		return newError(KindIntegrity, "UNSAFE_STATE_DIR", "ECP state root must be a private real directory", nil)
+	}
+	if relative == "." {
+		return nil
+	}
+	cursor := root
+	for _, component := range strings.Split(relative, string(filepath.Separator)) {
+		if component == "" || component == "." || component == ".." {
+			return newError(KindIntegrity, "AUTHORITY_PATH_INVALID", "authority path contains a non-canonical component", nil)
+		}
+		cursor = filepath.Join(cursor, component)
+		info, statErr := os.Lstat(cursor)
+		if os.IsNotExist(statErr) && create {
+			if mkdirErr := os.Mkdir(cursor, 0o700); mkdirErr != nil && !os.IsExist(mkdirErr) {
+				return newError(KindRuntime, "STATE_DIR_CREATE_FAILED", "could not create private ECP state directory", mkdirErr)
+			}
+			info, statErr = os.Lstat(cursor)
+		}
+		if statErr != nil {
+			if !requireComplete && os.IsNotExist(statErr) {
+				return nil
+			}
+			return newError(KindRuntime, "STATE_DIR_STAT_FAILED", "could not inspect ECP state directory", statErr)
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() || !hasPrivateFilePermissions(info) {
+			return newError(KindIntegrity, "UNSAFE_STATE_DIR", "authority directory chain contains a symlink, non-directory, or non-private component", nil)
+		}
+	}
+	return nil
+}
+
+func (s *Store) ensureAuthorityDirectory(target string) error {
+	return ensureAuthorityDirectory(s.baseDir, target)
+}
+
+func (s *Store) verifyAuthorityDirectory(target string) error {
+	return verifyAuthorityDirectory(s.baseDir, target)
+}
+
+func (s *Store) verifyAuthorityDirectoryAncestors(target string) error {
+	return verifyAuthorityDirectoryAncestors(s.baseDir, target)
 }
 
 func DefaultStateDir() (string, error) {
@@ -139,6 +241,9 @@ func (s *Store) acquireExistingGateLease(ctx context.Context) (func(), error) {
 }
 
 func (s *Store) Exists() bool {
+	if err := s.verifyAuthorityDirectoryAncestors(s.dir); err != nil {
+		return false
+	}
 	info, err := os.Lstat(filepath.Join(s.dir, "events.json"))
 	return err == nil && info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0
 }
@@ -166,6 +271,7 @@ func (s *Store) Append(ctx context.Context, expectedRevision *uint64, pending ..
 		return Projection{}, err
 	}
 	projection := history.projection
+	initialProjection := projection
 	if expectedRevision != nil && projection.Revision != *expectedRevision {
 		return Projection{}, newError(KindConflict, "STALE_REVISION", "workspace state changed before the requested mutation", nil)
 	}
@@ -209,15 +315,50 @@ func (s *Store) Append(ctx context.Context, expectedRevision *uint64, pending ..
 	if len(encodedNew) > segmentLimit {
 		return Projection{}, newError(KindIntegrity, "EVENT_BATCH_TOO_LARGE", "atomic event batch exceeds the segment safety limit", nil)
 	}
+	appendClass := classifyEventAppend(initialProjection, projection, pending)
+	storeMaximum := s.eventStoreMaximum()
+	segmentMaximum := s.eventSegmentMaximum()
+	if storeMaximum <= terminalEventReserve || segmentMaximum <= 0 {
+		return Projection{}, newError(KindIntegrity, "STATE_CAPACITY_INVALID", "authority history capacity cannot preserve lifecycle reserves", nil)
+	}
+	if appendClass == eventAppendLifecycle && int64(len(encodedNew)) > terminalEventReserve-projectDisableReserve {
+		return Projection{}, newError(KindIntegrity, "TERMINAL_BATCH_TOO_LARGE", "lifecycle terminal batch exceeds its protected reserve", nil)
+	}
+	if appendClass == eventAppendProjectDisable && int64(len(encodedNew)) > terminalEventReserve {
+		return Projection{}, newError(KindIntegrity, "TERMINAL_BATCH_TOO_LARGE", "project disable batch exceeds its protected reserve", nil)
+	}
+	storeLimit := eventStoreLimitForAppend(appendClass, storeMaximum)
+	segmentCountLimit := eventSegmentLimitForAppend(appendClass, segmentMaximum)
 
 	combined := append(append([]Event(nil), history.currentEvents...), newEvents...)
 	encodedCombined, err := encodeEventSegment(combined)
 	if err != nil {
 		return Projection{}, newError(KindRuntime, "STATE_ENCODE_FAILED", "could not encode state events", err)
 	}
-	if len(encodedCombined) <= segmentLimit {
+	rotates := len(encodedCombined) > segmentLimit
+	resultingCurrentBytes := len(encodedCombined)
+	resultingSegmentCount := history.segmentCount
+	if rotates {
+		resultingCurrentBytes = len(encodedNew)
+		resultingSegmentCount++
+	}
+	if containsPendingEventType(pending, "gate_run_started") || containsPendingEventType(pending, "evidence_recorded") {
+		terminalBytes, terminalErr := maximumGateRunTerminalSegmentBytes(projection)
+		if terminalErr != nil {
+			return Projection{}, terminalErr
+		}
+		canRotateTerminal := resultingSegmentCount < eventSegmentLimitForAppend(eventAppendLifecycle, segmentMaximum)
+		canAppendTerminalInPlace := terminalBytes <= segmentLimit-resultingCurrentBytes
+		if terminalBytes > segmentLimit || (!canRotateTerminal && !canAppendTerminalInPlace) {
+			return Projection{}, newError(KindIntegrity, "GATE_RUN_HEADROOM_EXHAUSTED", "authority history cannot guarantee a terminal GateRun event", nil)
+		}
+		if containsPendingEventType(pending, "gate_run_started") && history.segmentCount > segmentMaximum-terminalSegmentReserve {
+			return Projection{}, newError(KindIntegrity, "GATE_RUN_HEADROOM_EXHAUSTED", "authority history cannot guarantee both GateRun recovery and project-disable segment headroom", nil)
+		}
+	}
+	if !rotates {
 		newTotal := history.totalBytes - history.currentBytes + int64(len(encodedCombined))
-		if newTotal > eventStoreLimit(projection) {
+		if newTotal > storeLimit {
 			return Projection{}, newError(KindIntegrity, "STATE_TOO_LARGE", "event append would exceed the segmented authority history limit", nil)
 		}
 		if err := atomicWriteFile(history.currentPath, encodedCombined, 0o600); err != nil {
@@ -226,15 +367,15 @@ func (s *Store) Append(ctx context.Context, expectedRevision *uint64, pending ..
 		return projection, nil
 	}
 
-	if history.segmentCount >= maxEventSegments {
+	if history.segmentCount >= segmentCountLimit {
 		return Projection{}, newError(KindIntegrity, "STATE_TOO_LARGE", "event history reached the maximum segment count", nil)
 	}
 	newTotal := history.totalBytes + int64(len(encodedNew))
-	if newTotal > eventStoreLimit(projection) {
+	if newTotal > storeLimit {
 		return Projection{}, newError(KindIntegrity, "STATE_TOO_LARGE", "event append would exceed the segmented authority history limit", nil)
 	}
 	segmentDir := filepath.Join(s.dir, "event-segments")
-	if err := ensurePrivateDirectory(segmentDir); err != nil {
+	if err := s.ensureAuthorityDirectory(segmentDir); err != nil {
 		return Projection{}, err
 	}
 	nextIndex := history.currentIndex + 1
@@ -250,6 +391,47 @@ func (s *Store) Append(ctx context.Context, expectedRevision *uint64, pending ..
 	return projection, nil
 }
 
+func maximumGateRunTerminalSegmentBytes(projection Projection) (int, error) {
+	active := projection.ActiveGateRun()
+	if active == nil {
+		return 0, newError(KindIntegrity, "GATE_RUN_HEADROOM_INVALID", "terminal headroom was requested without an active GateRun", nil)
+	}
+	terminal := GateRunTerminal{
+		SchemaVersion: SchemaVersion,
+		RunID:         active.RunID,
+		ChangeID:      active.ChangeID,
+		ActivationID:  active.ActivationID,
+		State:         GateRunInterrupted,
+		FinishedAt:    time.Date(9999, 12, 31, 23, 59, 59, 999999999, time.UTC),
+		EvidenceIDs:   append([]string(nil), active.EvidenceIDs...),
+		OutcomeCode:   strings.Repeat("A", 200),
+		Reason:        strings.Repeat("x", 2000),
+	}
+	payload, err := json.Marshal(terminal)
+	if err != nil {
+		return 0, newError(KindRuntime, "GATE_RUN_HEADROOM_ENCODE_FAILED", "could not size the protected GateRun terminal event", err)
+	}
+	event := Event{
+		SchemaVersion: SchemaVersion,
+		Sequence:      ^uint64(0),
+		EventID:       strings.Repeat("e", 96),
+		Timestamp:     terminal.FinishedAt,
+		Type:          "gate_run_finished",
+		Origin:        "cli",
+		PreviousHash:  "sha256:" + strings.Repeat("0", 64),
+		Payload:       payload,
+		Hash:          "sha256:" + strings.Repeat("0", 64),
+	}
+	encoded, err := encodeEventSegment([]Event{event})
+	if err != nil {
+		return 0, newError(KindRuntime, "GATE_RUN_HEADROOM_ENCODE_FAILED", "could not size the protected GateRun terminal segment", err)
+	}
+	// Combining with an existing JSON array replaces two closing/opening bytes
+	// with a comma and indentation. A small fixed margin keeps the check
+	// conservative without coupling it to json.MarshalIndent formatting details.
+	return len(encoded) + 16, nil
+}
+
 func eventStoreLimit(projection Projection) int64 {
 	// The reserve exists so an enabled Workspace can always record an audited
 	// project-level disablement. Completing or cancelling only the active Change
@@ -258,6 +440,84 @@ func eventStoreLimit(projection Projection) int64 {
 		return maxEventStoreBytes
 	}
 	return maxEventStoreBytes - terminalEventReserve
+}
+
+func eventStoreLimitForAppend(class eventAppendClass, maximum int64) int64 {
+	switch class {
+	case eventAppendLifecycle:
+		return maximum - projectDisableReserve
+	case eventAppendProjectDisable:
+		return maximum
+	default:
+		return maximum - terminalEventReserve
+	}
+}
+
+func eventSegmentLimitForAppend(class eventAppendClass, maximum int) int {
+	switch class {
+	case eventAppendLifecycle:
+		return maximum - 1
+	case eventAppendProjectDisable:
+		return maximum
+	default:
+		return maximum - terminalSegmentReserve
+	}
+}
+
+func (s *Store) eventStoreMaximum() int64 {
+	if s.maxEventStoreBytes > 0 {
+		return s.maxEventStoreBytes
+	}
+	return maxEventStoreBytes
+}
+
+func (s *Store) eventSegmentMaximum() int {
+	if s.maxEventSegments > 0 {
+		return s.maxEventSegments
+	}
+	return maxEventSegments
+}
+
+func classifyEventAppend(initial, final Projection, pending []PendingEvent) eventAppendClass {
+	types := make([]string, len(pending))
+	for i := range pending {
+		types[i] = pending[i].Type
+	}
+	if final.Activation != nil && !final.Activation.Enabled && final.ActiveChange() == nil {
+		valid := len(types) >= 1 && len(types) <= 3 && types[len(types)-1] == "project_disabled"
+		index := 0
+		if valid && index < len(types)-1 && types[index] == "gate_run_finished" {
+			index++
+		}
+		if valid && index < len(types)-1 && types[index] == "change_cancelled" {
+			index++
+		}
+		if valid && index == len(types)-1 && initial.Activation != nil && initial.Activation.Enabled {
+			return eventAppendProjectDisable
+		}
+	}
+	if len(types) >= 1 && len(types) <= 2 {
+		index := 0
+		if types[index] == "gate_run_finished" {
+			index++
+		}
+		if index < len(types) && types[index] == "change_cancelled" {
+			index++
+		}
+		if index == len(types) {
+			return eventAppendLifecycle
+		}
+	}
+	return eventAppendOrdinary
+}
+
+func containsPendingEventType(pending []PendingEvent, expected string) bool {
+	for _, event := range pending {
+		if event.Type == expected {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Store) eventSegmentLimit() int {
@@ -286,8 +546,11 @@ func (s *Store) WriteArtifacts(changeID, evidenceID string, stdout, stderr []byt
 	if err := validateIdentifier(evidenceID, "evidence_id"); err != nil {
 		return ArtifactInfo{}, err
 	}
+	if int64(len(stdout)) > maxEvidenceArtifactBytes || int64(len(stderr)) > maxEvidenceArtifactBytes {
+		return ArtifactInfo{}, newError(KindIntegrity, "ARTIFACT_TOO_LARGE", "evidence artifact exceeds the per-file safety limit", nil)
+	}
 	artifactRoot := filepath.Join(s.dir, "artifacts", changeID)
-	if err := ensurePrivateDirectory(artifactRoot); err != nil {
+	if err := s.ensureAuthorityDirectory(artifactRoot); err != nil {
 		return ArtifactInfo{}, err
 	}
 	temp, err := os.MkdirTemp(artifactRoot, ".artifact-")
@@ -315,6 +578,9 @@ func (s *Store) WriteArtifacts(changeID, evidenceID string, stdout, stderr []byt
 	if err := os.Rename(temp, target); err != nil {
 		return ArtifactInfo{}, newError(KindRuntime, "ARTIFACT_COMMIT_FAILED", "could not atomically install artifacts", err)
 	}
+	if err := s.verifyAuthorityDirectory(target); err != nil {
+		return ArtifactInfo{}, newError(KindIntegrity, "ARTIFACT_DIRECTORY_UNSAFE", "installed Evidence artifact directory is not a private symlink-free directory", err)
+	}
 	relStdout, _ := filepath.Rel(s.dir, filepath.Join(target, "stdout.log"))
 	relStderr, _ := filepath.Rel(s.dir, filepath.Join(target, "stderr.log"))
 	return ArtifactInfo{
@@ -325,25 +591,37 @@ func (s *Store) WriteArtifacts(changeID, evidenceID string, stdout, stderr []byt
 	}, nil
 }
 
-func (s *Store) VerifyArtifact(relative, expectedDigest string) error {
+func (s *Store) VerifyArtifact(relative, expectedDigest string, expectedSize int64) error {
 	if relative == "" {
 		return newError(KindIntegrity, "ARTIFACT_PATH_EMPTY", "evidence artifact path is empty", nil)
 	}
 	normalized, err := normalizePathRoot(relative)
-	if err != nil || normalized == "." {
+	if err != nil || normalized == "." || normalized != relative || !isCanonicalEvidenceArtifactPath(relative) {
 		return newError(KindIntegrity, "ARTIFACT_PATH_INVALID", "evidence artifact path is unsafe", err)
+	}
+	if !isSHA256Digest(expectedDigest) {
+		return newError(KindIntegrity, "ARTIFACT_DIGEST_INVALID", "evidence artifact digest is invalid", nil)
+	}
+	if expectedSize < 0 || expectedSize > maxEvidenceArtifactBytes {
+		return newError(KindIntegrity, "ARTIFACT_SIZE_INVALID", "evidence artifact expected size is invalid", nil)
 	}
 	path := filepath.Join(s.dir, filepath.FromSlash(normalized))
 	rel, err := filepath.Rel(s.dir, path)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return newError(KindIntegrity, "ARTIFACT_PATH_ESCAPE", "evidence artifact path escapes the state directory", err)
 	}
+	if err := s.verifyAuthorityDirectory(filepath.Dir(path)); err != nil {
+		return newError(KindIntegrity, "ARTIFACT_UNSAFE", "evidence artifact has an unsafe authority directory chain", err)
+	}
 	info, err := os.Lstat(path)
 	if err != nil {
 		return newError(KindIntegrity, "ARTIFACT_MISSING", "evidence artifact is missing", err)
 	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() || !hasPrivateFilePermissions(info) {
-		return newError(KindIntegrity, "ARTIFACT_UNSAFE", "evidence artifact is not a regular file", nil)
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() || !hasPrivateFilePermissions(info) || info.Size() < 0 || info.Size() > maxEvidenceArtifactBytes {
+		return newError(KindIntegrity, "ARTIFACT_UNSAFE", "evidence artifact is not a bounded private regular file", nil)
+	}
+	if info.Size() != expectedSize {
+		return newError(KindIntegrity, "ARTIFACT_SIZE_MISMATCH", "evidence artifact size does not match the recorded output size", nil)
 	}
 	digest, err := digestFile(path)
 	if err != nil {
@@ -364,7 +642,7 @@ func (s *Store) WriteTruthBlobs(files []TruthFileContent) error {
 		return newError(KindIntegrity, "TRUTH_BLOB_SET_INVALID", "accepted Project Truth content set is empty or too large", nil)
 	}
 	root := filepath.Join(s.dir, "truth-blobs")
-	if err := ensurePrivateDirectory(root); err != nil {
+	if err := s.ensureAuthorityDirectory(root); err != nil {
 		return err
 	}
 	var total int64
@@ -409,12 +687,8 @@ func (s *Store) ReadTruthFiles(files []TruthFileDigest) ([]AcceptedTruthFile, er
 		return nil, newError(KindIntegrity, "TRUTH_BLOB_SET_INVALID", "accepted Project Truth manifest is empty or too large", nil)
 	}
 	root := filepath.Join(s.dir, "truth-blobs")
-	rootInfo, err := os.Lstat(root)
-	if err != nil {
-		return nil, newError(KindIntegrity, "TRUTH_BLOB_STORE_MISSING", "accepted Project Truth blob store is missing", err)
-	}
-	if rootInfo.Mode()&os.ModeSymlink != 0 || !rootInfo.IsDir() || !hasPrivateFilePermissions(rootInfo) {
-		return nil, newError(KindIntegrity, "TRUTH_BLOB_STORE_UNSAFE", "accepted Project Truth blob store is not a private real directory", nil)
+	if err := s.verifyAuthorityDirectory(root); err != nil {
+		return nil, newError(KindIntegrity, "TRUTH_BLOB_STORE_UNSAFE", "accepted Project Truth blob store is missing or is not a private real directory", err)
 	}
 	result := make([]AcceptedTruthFile, 0, len(files))
 	var total int64
@@ -465,9 +739,11 @@ func (s *Store) readTruthBlob(digest string) ([]byte, error) {
 
 func (s *Store) loadEventHistory(ctx context.Context, create bool) (eventHistory, error) {
 	if create {
-		if err := ensurePrivateDirectory(s.dir); err != nil {
+		if err := s.ensureAuthorityDirectory(s.dir); err != nil {
 			return eventHistory{}, err
 		}
+	} else if err := s.verifyAuthorityDirectoryAncestors(s.dir); err != nil {
+		return eventHistory{}, err
 	}
 	history := eventHistory{
 		projection:  NewProjection(),
@@ -536,7 +812,7 @@ func (s *Store) loadEventHistory(ctx context.Context, create bool) (eventHistory
 			}
 			continue
 		}
-		if expectedIndex > maxEventSegments || entry.Name() != eventSegmentName(expectedIndex) {
+		if expectedIndex > s.eventSegmentMaximum() || entry.Name() != eventSegmentName(expectedIndex) {
 			return eventHistory{}, newError(KindIntegrity, "EVENT_SEGMENT_LAYOUT_INVALID", "event segment names must be contiguous and canonical", nil)
 		}
 		path := filepath.Join(segmentDir, entry.Name())
@@ -552,7 +828,7 @@ func (s *Store) loadEventHistory(ctx context.Context, create bool) (eventHistory
 			return eventHistory{}, newError(KindIntegrity, "EVENT_SEGMENT_EMPTY", "continuation event segments cannot be empty", nil)
 		}
 		history.totalBytes += size
-		if history.totalBytes > maxEventStoreBytes {
+		if history.totalBytes > s.eventStoreMaximum() {
 			return eventHistory{}, newError(KindIntegrity, "STATE_TOO_LARGE", "segmented authority history exceeds the safety limit", nil)
 		}
 		if err := applyEventSegment(ctx, &history.projection, events); err != nil {
@@ -1027,6 +1303,9 @@ func applyEvent(projection *Projection, event Event) error {
 		} else if evidence.GateRunID != "" {
 			return newError(KindIntegrity, "EVIDENCE_GATE_RUN_MISMATCH", "Evidence references a GateRun that is not active", nil)
 		}
+		if err := validateEvidenceRecord(*projection, evidence, change, activeRun); err != nil {
+			return err
+		}
 		for _, existing := range projection.Evidence[evidence.ChangeID] {
 			if existing.EvidenceID == evidence.EvidenceID {
 				return newError(KindIntegrity, "DUPLICATE_EVIDENCE", "evidence ID is duplicated", nil)
@@ -1158,6 +1437,127 @@ func applyEvent(projection *Projection, event Event) error {
 	return nil
 }
 
+func validateEvidenceRecord(projection Projection, evidence Evidence, change *Change, activeRun *GateRun) error {
+	if err := validateIdentifier(evidence.EvidenceID, "evidence_id"); err != nil {
+		return newError(KindIntegrity, "EVIDENCE_ID_INVALID", "Evidence ID is invalid", err)
+	}
+	if err := validateIdentifier(evidence.GateID, "gate_id"); err != nil {
+		return newError(KindIntegrity, "EVIDENCE_GATE_INVALID", "Evidence Gate ID is invalid", err)
+	}
+	if evidence.GateRunID != "" {
+		if err := validateIdentifier(evidence.GateRunID, "gate_run_id"); err != nil {
+			return newError(KindIntegrity, "EVIDENCE_GATE_RUN_MISMATCH", "Evidence GateRun ID is invalid", err)
+		}
+	}
+	if activeRun != nil && evidence.GateRunID == "" {
+		return newError(KindIntegrity, "EVIDENCE_GATE_RUN_MISMATCH", "Evidence is missing its active GateRun ID", nil)
+	}
+	expectedBase := "artifacts/" + change.ChangeID + "/" + evidence.EvidenceID
+	if evidence.StdoutArtifact != expectedBase+"/stdout.log" || evidence.StderrArtifact != expectedBase+"/stderr.log" || evidence.StdoutArtifact == evidence.StderrArtifact {
+		return newError(KindIntegrity, "EVIDENCE_ARTIFACT_PATH_INVALID", "Evidence artifact paths do not match their canonical Change and Evidence identity", nil)
+	}
+	for label, digest := range map[string]string{
+		"plan":                evidence.PlanDigest,
+		"gate":                evidence.GateDigest,
+		"contract":            evidence.ContractDigest,
+		"config":              evidence.ConfigDigest,
+		"truth":               evidence.TruthDigest,
+		"pre source":          evidence.PreSnapshot.Fingerprint,
+		"pre Git executable":  evidence.PreSnapshot.GitExecutableDigest,
+		"post source":         evidence.PostSnapshot.Fingerprint,
+		"post Git executable": evidence.PostSnapshot.GitExecutableDigest,
+		"resolved executable": evidence.ResolvedExecutableDigest,
+		"environment":         evidence.EnvironmentDigest,
+		"stdout":              evidence.StdoutDigest,
+		"stderr":              evidence.StderrDigest,
+		"stored stdout":       evidence.StdoutStoredDigest,
+		"stored stderr":       evidence.StderrStoredDigest,
+	} {
+		if !isSHA256Digest(digest) {
+			return newError(KindIntegrity, "EVIDENCE_DIGEST_INVALID", fmt.Sprintf("Evidence %s digest is invalid", label), nil)
+		}
+	}
+	config, gate, err := acceptedGateForEvidence(projection, evidence)
+	if err != nil {
+		return err
+	}
+	gateDigest, err := digestJSON(gate)
+	if err != nil {
+		return newError(KindRuntime, "GATE_DIGEST_FAILED", "could not validate recorded Gate identity", err)
+	}
+	if evidence.GateDigest != gateDigest || !slices.Equal(evidence.Command, gate.Command) {
+		return newError(KindIntegrity, "EVIDENCE_GATE_DEFINITION_INVALID", "Evidence command or Gate digest does not match the accepted Gate", nil)
+	}
+	if evidence.WorkingDirectory == "" || !filepath.IsAbs(evidence.WorkingDirectory) || filepath.Clean(evidence.WorkingDirectory) != evidence.WorkingDirectory ||
+		evidence.ResolvedExecutable == "" || !filepath.IsAbs(evidence.ResolvedExecutable) || filepath.Clean(evidence.ResolvedExecutable) != evidence.ResolvedExecutable ||
+		strings.ContainsRune(evidence.WorkingDirectory, '\x00') || strings.ContainsRune(evidence.ResolvedExecutable, '\x00') {
+		return newError(KindIntegrity, "EVIDENCE_EXECUTION_PATH_INVALID", "Evidence execution paths are incomplete or non-canonical", nil)
+	}
+	if evidence.PreSnapshot.Branch == "" || evidence.PostSnapshot.Branch == "" || evidence.PreSnapshot.GitExecutable == "" || evidence.PostSnapshot.GitExecutable == "" ||
+		!filepath.IsAbs(evidence.PreSnapshot.GitExecutable) || !filepath.IsAbs(evidence.PostSnapshot.GitExecutable) {
+		return newError(KindIntegrity, "EVIDENCE_SNAPSHOT_INVALID", "Evidence source snapshot references are incomplete", nil)
+	}
+	if !slices.IsSorted(evidence.EnvironmentNames) {
+		return newError(KindIntegrity, "EVIDENCE_ENVIRONMENT_INVALID", "Evidence environment names are not canonical", nil)
+	}
+	for i, name := range evidence.EnvironmentNames {
+		if err := validateEnvironmentName(name); err != nil || isSensitiveEnvironmentName(name) || (i > 0 && evidence.EnvironmentNames[i-1] == name) {
+			return newError(KindIntegrity, "EVIDENCE_ENVIRONMENT_INVALID", "Evidence environment names are invalid or duplicated", err)
+		}
+	}
+	if evidence.StartedAt.IsZero() || evidence.FinishedAt.IsZero() || evidence.FinishedAt.Before(evidence.StartedAt) || evidence.Duration < 0 || evidence.Duration != evidence.FinishedAt.Sub(evidence.StartedAt) {
+		return newError(KindIntegrity, "EVIDENCE_TIME_INVALID", "Evidence execution timestamps and duration are inconsistent", nil)
+	}
+	if evidence.ExitCode < -1 || evidence.ExitCode > 255 || evidence.ExitCodeAllowed != (!evidence.TimedOut && containsExitCode(gate.AllowedExitCodes, evidence.ExitCode)) ||
+		(evidence.ExitCodeAllowed && evidence.ProcessError != "") || (evidence.TimedOut && strings.TrimSpace(evidence.ProcessError) == "") || len(evidence.ProcessError) > 4000 || strings.ContainsRune(evidence.ProcessError, '\x00') {
+		return newError(KindIntegrity, "EVIDENCE_PROCESS_RESULT_INVALID", "Evidence process outcome is internally inconsistent", nil)
+	}
+	if evidence.SourceMutated != (evidence.PreSnapshot.Fingerprint != evidence.PostSnapshot.Fingerprint) {
+		return newError(KindIntegrity, "EVIDENCE_SOURCE_RESULT_INVALID", "Evidence source mutation result does not match its snapshots", nil)
+	}
+	limit := effectiveGateOutputLimit(config.Policy, gate)
+	if evidence.StdoutBytes < 0 || evidence.StderrBytes < 0 ||
+		evidence.StdoutTruncated != (evidence.StdoutBytes > limit) || evidence.StderrTruncated != (evidence.StderrBytes > limit) ||
+		(!evidence.StdoutTruncated && evidence.StdoutDigest != evidence.StdoutStoredDigest) || (!evidence.StderrTruncated && evidence.StderrDigest != evidence.StderrStoredDigest) {
+		return newError(KindIntegrity, "EVIDENCE_OUTPUT_INVALID", "Evidence output sizes, truncation flags, or digests are inconsistent", nil)
+	}
+	return nil
+}
+
+func acceptedGateForEvidence(projection Projection, evidence Evidence) (ConfigAcceptance, GateConfig, error) {
+	for _, config := range projection.ConfigHistory {
+		if config.ConfigDigest != evidence.ConfigDigest {
+			continue
+		}
+		for _, gate := range config.Gates.Gates {
+			if gate.ID == evidence.GateID {
+				return config, gate, nil
+			}
+		}
+		return ConfigAcceptance{}, GateConfig{}, newError(KindIntegrity, "EVIDENCE_GATE_DEFINITION_INVALID", "Evidence references a Gate outside its accepted config epoch", nil)
+	}
+	return ConfigAcceptance{}, GateConfig{}, newError(KindIntegrity, "EVIDENCE_GATE_DEFINITION_INVALID", "Evidence references an unknown accepted config epoch", nil)
+}
+
+func effectiveGateOutputLimit(policy PolicyConfig, gate GateConfig) int64 {
+	if gate.MaxOutputBytes > 0 {
+		return gate.MaxOutputBytes
+	}
+	return policy.MaxGateOutputBytes
+}
+
+func expectedEvidenceArtifactSizes(projection Projection, evidence Evidence) (int64, int64, error) {
+	config, gate, err := acceptedGateForEvidence(projection, evidence)
+	if err != nil {
+		return 0, 0, err
+	}
+	limit := effectiveGateOutputLimit(config.Policy, gate)
+	if limit <= 0 || limit > maxEvidenceArtifactBytes || evidence.StdoutBytes < 0 || evidence.StderrBytes < 0 {
+		return 0, 0, newError(KindIntegrity, "EVIDENCE_OUTPUT_INVALID", "Evidence output limit or byte count is invalid", nil)
+	}
+	return min(evidence.StdoutBytes, limit), min(evidence.StderrBytes, limit), nil
+}
+
 func validGateRunOutcomeCode(value string) bool {
 	if value == "" || len(value) > 200 {
 		return false
@@ -1219,21 +1619,14 @@ func (s *Store) acquireExistingLock(ctx context.Context) (func(), error) {
 }
 
 func (s *Store) acquireExistingFileLock(ctx context.Context, path string, timeout time.Duration, code, message string) (func(), error) {
-	info, err := os.Lstat(s.dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, newError(KindIntegrity, "AUTHORITY_STATE_DIR_MISSING", "authority state directory is missing", err)
-		}
-		return nil, newError(KindRuntime, "AUTHORITY_STATE_DIR_STAT_FAILED", "could not inspect authority state directory", err)
-	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() || !hasPrivateFilePermissions(info) {
-		return nil, newError(KindIntegrity, "AUTHORITY_STATE_DIR_UNSAFE", "authority state directory must already be a private real directory", nil)
+	if err := s.verifyAuthorityDirectory(s.dir); err != nil {
+		return nil, newError(KindIntegrity, "AUTHORITY_STATE_DIR_UNSAFE", "authority state directory must already have a private symlink-free chain", err)
 	}
 	return acquirePlatformFileLock(ctx, path, timeout, code, message)
 }
 
 func (s *Store) acquireFileLock(ctx context.Context, path string, timeout time.Duration, code, message string) (func(), error) {
-	if err := ensurePrivateDirectory(s.dir); err != nil {
+	if err := s.ensureAuthorityDirectory(s.dir); err != nil {
 		return nil, err
 	}
 	return acquirePlatformFileLock(ctx, path, timeout, code, message)

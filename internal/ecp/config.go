@@ -385,6 +385,7 @@ func validateProjectTruth(truth ProjectTruthConfig, gates GatesConfig) error {
 		}
 	}
 	validContractKind := map[string]struct{}{"boundary": {}, "api": {}, "data": {}, "event": {}, "permission": {}, "release": {}, "operations": {}}
+	contractPaths := make(map[string]string, len(truth.Contracts))
 	for _, item := range truth.Contracts {
 		if !validText(item.Description, 4000) {
 			return newError(KindIntegrity, "INVALID_TRUTH_CONTRACT", fmt.Sprintf("contract %q has no valid description", item.ID), nil)
@@ -396,6 +397,10 @@ func validateProjectTruth(truth ProjectTruthConfig, gates GatesConfig) error {
 		if err != nil || normalized != item.Path || (item.Path != "contracts" && !strings.HasPrefix(item.Path, "contracts/")) {
 			return newError(KindIntegrity, "INVALID_TRUTH_CONTRACT_PATH", fmt.Sprintf("contract %q path must be canonical and under contracts/", item.ID), err)
 		}
+		if previousID, exists := contractPaths[item.Path]; exists {
+			return newError(KindIntegrity, "DUPLICATE_TRUTH_CONTRACT_PATH", fmt.Sprintf("contracts %q and %q reference the same canonical path %q", previousID, item.ID, item.Path), nil)
+		}
+		contractPaths[item.Path] = item.ID
 	}
 	for _, item := range truth.Unknowns {
 		if !validText(item.Statement, 4000) || !validText(item.ResolutionCondition, 4000) || item.Risk.Rank() == 0 {

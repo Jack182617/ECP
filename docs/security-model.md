@@ -57,7 +57,7 @@ Enable/disable 都要求调用方原样回传 immediately preceding status 的 e
 
 Enable 在 Workspace lease 内重载并再次核对 token/config，只允许 accepted default risk 至少有一个 Required Gate且 cwd/executable/environment 可解析的 Workspace进入 enabled。该 preflight 不执行项目代码；任一 setup/registration/acceptance/preflight/transition 失败都不写 enabled event。仓库 Draft Config 无权启用自己。
 
-Disable 使用 authority-only loader，因此 malformed Draft 也不能把项目锁在 enabled。它在同一 lease/revision 下，把 status 已观察 ACTIVE Change 的 cancellation 与 project disablement作为一个原子 event append；保留 worktree、Draft、Evidence、history，不产生 PASS。未注册或已经 disabled 且无 ACTIVE Change时幂等返回，不重复追加。Event store 预留足够 bounded terminal capacity，避免资源上限让项目永久无法关闭。
+Disable 使用 authority-only loader，因此 malformed Draft 也不能把项目锁在 enabled。它在同一 lease/revision 下，把 status 已观察的 ACTIVE GateRun `INTERRUPTED` terminal、ACTIVE Change cancellation 与 project disablement（按实际存在项）作为一个原子 event append；保留 worktree、Draft、Evidence、history，不产生 PASS。未注册或已经 disabled 且无 ACTIVE Change/GateRun 时幂等返回，不重复追加。Event store 为 ordinary、lifecycle 与最终 disable 分层保留 byte/segment capacity，避免资源上限让项目在 Gate 已执行后永久无法关闭。
 
 `ecp-change` Skill 对任意普通仓库 mutation 先读 status：disabled 正常开发，enabled 自动治理，mode 不能确定则停止。`ecp-check`、`ecp-enable`、`ecp-disable` 分别隔离只读诊断与显式项目模式操作。已启用项目没有受支持的单 task bypass；显式 project disable才改变持久 mode。但 Skill/Plugin 可被关闭，direct shell、其他 Agent/工具和同用户进程可绕过，因此这仍是 workflow guardrail，不是真正 enforcement。
 
@@ -73,7 +73,7 @@ Core 保存 accepted Project/Policy/Gates payload 与 digest。语法有效的 D
 
 Control Config 与 Project Truth 使用独立摘要和独立 accepted epoch。`truth.json` 与 `contracts/**` 都是不可信 proposal；Core 保存 accepted truth payload/file manifest，并在事件写入前把 exact UTF-8 truth/contract bytes 写入 repository-external content-addressed private blobs。`truth get` 只按 accepted manifest 读取并重验 blob，候选 bytes 不能替代缺失或损坏的 accepted content。status、context、Change、plan、Evidence 与 Verdict 传播 exact truth digest。候选 truth drift 使 enabled 项目保持 enabled 但 BLOCKED，不能靠 `policy accept` 或普通 Gate PASS 生效。一个 valid candidate truth drift 可以进入显式 recovery/adoption Change，但该 Change 仍以 previous accepted truth 为 authority；malformed truth 不能进入，且 reconciliation 之前 Gate plan、PASS 与 completion 都被阻断。
 
-Change start 必须声明结构化 Impact，并只引用当前 accepted truth 中存在的 capability、invariant、component、decision、contract 和 accepted unknown；purpose/maturity 变化使用独立布尔声明。无法在启动时精确引用的新发现必须诚实声明具体 unknown，但该文本 unknown 只能覆盖新增 truth entity，不能授权修改或删除任何既有受保护事实。Core 自己比较 previous accepted 与 candidate truth/file manifest，生成排序后的结构化 delta，并检查 delta 是否被 Impact 覆盖。`contracts/**` 中的每个文件还必须由一个 contract ID 引用，禁止不可寻址的隐含 truth 文件。
+Change start 必须声明结构化 Impact，并只引用当前 accepted truth 中存在的 capability、invariant、component、decision、contract 和 accepted unknown；purpose/maturity 变化使用独立布尔声明。无法在启动时精确引用的新发现必须诚实声明具体 unknown，但该文本 unknown 只能覆盖新增 truth entity，不能授权修改或删除任何既有受保护事实。Core 自己比较 previous accepted 与 candidate truth/file manifest，生成排序后的结构化 delta，并检查 delta 是否被 Impact 覆盖。`contracts/**` 中的每个文件还必须恰由一个 contract ID 引用；缺失引用或多个 ID 复用同一路径都在加载时拒绝，避免 delta Impact 归属随 JSON 数组顺序变化。
 
 每个 Change 还必须提供排序后的 Requirement ledger。Core 要求 acceptance、journey、data/operation effect、expected change/preservation 和 startup unknown 全部被 exact string coverage；每项必须有非空的当前要求、status、rationale、decision source 与 verification mode。`BLOCKING_UNKNOWN` 在实现前停止，`DEFERRED_SAFE` 必须有可执行的 revisit condition，AUTOMATED 必须指向已接受 Gate，EXTERNAL 在 v0.3 只能保持 pending。这样可以消除“没有记录就当默认”的静默空洞，但 Core 无法认证产品是否真的作出该决定，也无法保证提出的问题集合已经穷尽现实世界；Adapter 仍需基于实际需求主动检查相关状态链，无法确定时向产品所有者提问。
 
@@ -101,7 +101,7 @@ Semantic Assessment 的 `PRESERVED/CHANGED/UNKNOWN` 与摘要仍来自 Adapter/A
 
 DefaultConfig 不再继承 `HOME`，环境变量 denylist 覆盖常见 token/secret/password/passwd/credential/private-key/API-key/access-key 片段、主要 cloud/vendor 前缀，以及 `KUBECONFIG`、`DOCKER_CONFIG`、SSH/GPG agent、XDG config/runtime 等 capability 名。这只是 best-effort 减损：项目命令本身仍是同用户任意代码，即使没有 `HOME` 环境变量，仍可能通过 OS 身份信息或绝对路径访问用户目录/Keychain，也可自行联网、fork、消耗 CPU/内存或修改仓库外状态。路径哈希与 spawn 之间仍存在同用户 executable swap 窗口；v0.3 没有 fd-exec 或 sandbox。
 
-authority event history 使用兼容的 `events.json` 根段和 `event-segments/0000000000000001.json` 起的连续 continuation segments。新写入按 8 MiB 分段滚动；旧版单文件仍可读取到 64 MiB；continuation 最多 1024 段、聚合最多 1 GiB，并为项目关闭保留 2 MiB terminal capacity。一个原子 event batch 不跨段，放不进单段时在写入前拒绝。所有段共同维持 sequence/hash chain；缺段、非 canonical 名称、空 continuation、超限、非 private regular file、危险的原子写临时残留或跨段 hash 不一致都 fail closed。
+authority event history 使用兼容的 `events.json` 根段和 `event-segments/0000000000000001.json` 起的连续 continuation segments。新写入按 8 MiB 分段滚动；旧版单文件仍可读取到 64 MiB；continuation 最多 1024 段、聚合最多 1 GiB。普通 mutation 保留最后 2 MiB/3 段；GateRun terminal/cancellation lifecycle 仍保留最终 disable 所需的 512 KiB/1 段；只有精确的 disable batch 可消费最终预留。`gate_run_started`/`evidence_recorded` 若不能保证当前 run 的有界 terminal 仍可落盘，会在执行项目代码前 fail closed。一个原子 event batch 不跨段，放不进单段时在写入前拒绝。所有段共同维持 sequence/hash chain；缺段、非 canonical 名称、空 continuation、超限、非 private regular file、危险的原子写临时残留或跨段 hash 不一致都 fail closed。
 
 `authority health` 在 Gate lease → mutation lock 下构造 authority-only snapshot：authority state directory 必须在取锁前已经是 private real directory，binding/event projection 不可信时直接失败；可信时核验全部历史 referenced truth/Evidence 并有界扫描 event capacity、safe crash remnants、orphans、unrecognized/unsafe entries 与 active GateRun。它不读取 candidate `.ecp`，因此 malformed candidate 不能阻止诊断；也不沿 object-store 或中间 artifact directory symlink 读取对象。`HEALTHY`/`ATTENTION`/`INDETERMINATE` 是 `ok: true` 的观察结果，不是自动动作；后两者以退出码 3/4 保留完整 findings。取得 released Gate lease 只允许报告旧 `IN_PROGRESS` 可由下一 lifecycle operation 中断恢复，health 自身不得 terminalize。操作不会 append/repair/delete/restore/compact/migrate/GC 或 chmod authority directory，但 advisory lock 获取可创建或刷新私有 lock metadata；revision/event head 必须保持不变。仍被 live holder 占有的 lease 必须 conflict/cancel，不能通过 PID 年龄猜测。
 
@@ -119,8 +119,9 @@ authority event history 使用兼容的 `events.json` 根段和 `event-segments/
 - source symlink 只哈希 link text；
 - indexed submodule 必须是已初始化的 real Git directory；缺失或被 regular/symlink 替换时 fail closed。有效 submodule 递归绑定 exact HEAD/index/worktree/untracked manifest，共享 top-level 文件/字节预算，Git status 强制 `--ignore-submodules=none`；
 - submodule 内部变更在 scope 投影中折叠为 mount path，内部 risk rule 或 denied path 与 mount 重叠时均保守匹配；v0.3 不承诺细粒度 submodule scope；
-- Core artifact 名称由 Core 生成并写入私有 state；
-- Workspace binding、`events.json`、continuation event segments 和 Evidence artifacts 必须是有界、非 symlink 的 regular private files；读取时类型被替换或 group/other 权限暴露则 integrity fail closed。这是安全性检查，不把本地同用户写权限变成强隔离；
+- Core artifact 名称由 Core 生成并写入私有 state；Evidence path 必须精确绑定其 Change/Evidence ID 和 `stdout.log|stderr.log` 角色；
+- 从 canonical state root 到 binding、project store、truth/Evidence object 的每个已存在目录组件都必须是 private real directory；不安全的已存在 root 只报错、不自动 chmod，祖先 symlink、非目录或 group/other 权限暴露均 fail closed；
+- Workspace binding、`events.json`、continuation event segments 和 Evidence artifacts 必须是有界、非 symlink 的 regular private files；Evidence replay 还按其历史 accepted config epoch 校验 Gate/command/result/output metadata，并要求 artifact exact stored size/digest。这些检查不把本地同用户写权限或检查与打开之间的窗口变成强隔离；
 - 非 regular/symlink/合法目录边界输入 fail closed。
 
 Go 标准库无法在所有平台上完全实现 `openat(O_NOFOLLOW)` 式防 symlink swap；这是本地同用户攻击者模型下的已知边界。
@@ -133,6 +134,7 @@ Go 标准库无法在所有平台上完全实现 `openat(O_NOFOLLOW)` 式防 sym
 - state mutation 使用 workspace lock、expected revision CAS，并只原子重写当前 event segment 或原子创建下一个连续 segment；
 - Gate sequence、semantic reconciliation、acknowledgement、Change completion/cancellation 与 project enable/disable共享独占 lease；Change start 必须匹配调用方刚观察的 exact authority/Workspace/activation/config/source，所有后续 active mutation 必须仍属同一 enabled activation并匹配 exact ACTIVE Change ID，Gate sequence 还必须匹配已绑定 authority/Workspace/activation 的 opaque plan digest，acknowledgement/completion 还必须匹配已覆盖 authority/Workspace/activation 的 exact subject digest；单独 cancellation 额外必须匹配 `change list` 中的 exact authority/Workspace target；
 - Gate sequence 在任何项目命令前先追加 `IN_PROGRESS` GateRun；每条 Evidence 绑定 exact run，同一 Gate 不可重复记录，终态必须是 `COMPLETED/FAILED/CANCELLED/INTERRUPTED` 之一。存在 unresolved run 时只允许匹配的 Evidence/terminal event，status/context 暴露它且 Verdict `INDETERMINATE`；
+- GateRun start 与每条 Evidence append 必须先证明 byte/segment headroom 足以记录该 run 的最坏有界 terminal；显式 project disable 可在一个原子 batch 中追加已释放 run 的 `INTERRUPTED`、ACTIVE Change cancellation 与 disablement；
 - contender 只有成功取得同一已释放 lease 后才可把旧 `IN_PROGRESS` 记录为 `INTERRUPTED`。live holder 仍占有 lease 时 contender 等待或失败，不能按时间、PID metadata 或错误文本猜测中断；
 - 每条 Evidence 保存执行时的 exact `activation_id` 与 `plan_digest`；Verdict 要求当前 enabled epoch并重建 current plan，activation 或 plan digest 不匹配时旧 Evidence 不得满足 Requirement；
 - project registration/policy acceptance 必须匹配调用方在同一次审阅中提供的 exact authority ID、Workspace ID 和 candidate config digest；稳定读取不替代 review-to-command 绑定；

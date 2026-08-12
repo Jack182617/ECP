@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"go/format"
 	"io/fs"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -440,15 +442,19 @@ func TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries(t *testing.T) {
 
 func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	type routingCase struct {
-		ID                  string `json:"id"`
-		Category            string `json:"category"`
-		Prompt              string `json:"prompt"`
-		InitialMode         string `json:"initial_mode"`
-		ExpectedSkill       string `json:"expected_skill"`
-		ExpectedBehavior    string `json:"expected_behavior"`
-		RepositoryMutation  string `json:"repository_mutation"`
-		ProjectModeMutation string `json:"project_mode_mutation"`
-		MinimumRuns         int    `json:"minimum_runs"`
+		ID                  string   `json:"id"`
+		Category            string   `json:"category"`
+		Prompt              string   `json:"prompt"`
+		PromptSequence      []string `json:"prompt_sequence"`
+		FixtureProfile      string   `json:"fixture_profile"`
+		InitialMode         string   `json:"initial_mode"`
+		ExpectedSkill       string   `json:"expected_skill"`
+		StatusProbe         string   `json:"status_probe"`
+		ExpectedBehavior    string   `json:"expected_behavior"`
+		RepositoryMutation  string   `json:"repository_mutation"`
+		AuthorityMutation   string   `json:"authority_mutation"`
+		ProjectModeMutation string   `json:"project_mode_mutation"`
+		MinimumRuns         int      `json:"minimum_runs"`
 	}
 	var inventory struct {
 		SchemaVersion    int           `json:"schema_version"`
@@ -470,114 +476,296 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	if err := decodeStrictJSON(content, &inventory); err != nil {
 		t.Fatalf("host-routing inventory is not valid JSON: %v", err)
 	}
-	if inventory.SchemaVersion != 1 || !strings.Contains(inventory.ExecutionSurface, "installed Plugin cache") || inventory.AcceptanceRule == "" {
+	if inventory.SchemaVersion != 2 || inventory.ExecutionSurface != "Fresh Codex Desktop task using the installed Plugin cache" || inventory.AcceptanceRule == "" {
 		t.Fatalf("host-routing inventory lacks a versioned installed-host contract: %+v", inventory)
 	}
 
 	requiredRecordFields := []string{
-		"case_id", "run_number", "task_id", "fixture_id", "initial_project_mode",
-		"installed_plugin_version", "core_identity", "selected_skill",
-		"observed_status_probe", "observed_repository_mutation",
-		"observed_project_mode_mutation", "outcome", "notes",
+		"schema_version", "campaign_id", "case_id", "run_number", "required_run",
+		"task_id", "fixture_id", "fixture_profile", "initial_project_mode",
+		"environment_probe", "installed_plugin_version", "core_identity", "turn_observations", "selected_skill",
+		"observed_status_probe", "observed_repository_mutation", "observed_authority_mutation",
+		"observed_project_mode_mutation", "expected_behavior_conformant", "prohibitions_preserved",
+		"before", "after", "outcome", "failure_codes", "notes",
 	}
-	recordFields := make(map[string]struct{}, len(inventory.RecordFields))
-	for _, field := range inventory.RecordFields {
-		if _, duplicate := recordFields[field]; duplicate {
-			t.Fatalf("host-routing record field %q is duplicated", field)
-		}
-		recordFields[field] = struct{}{}
+	if len(inventory.RecordFields) != len(requiredRecordFields) {
+		t.Fatalf("host-routing records have %d fields, want the exact %d-field schema contract", len(inventory.RecordFields), len(requiredRecordFields))
 	}
-	for _, field := range requiredRecordFields {
-		if _, ok := recordFields[field]; !ok {
-			t.Fatalf("host-routing records omit required field %q", field)
+	for index, field := range requiredRecordFields {
+		if inventory.RecordFields[index] != field {
+			t.Fatalf("host-routing record field %d is %q, want %q", index, inventory.RecordFields[index], field)
 		}
 	}
 
-	allowedCategories := map[string]struct{}{
-		"direct": {}, "indirect": {}, "incomplete": {}, "negative": {}, "edge": {},
+	type caseContract struct {
+		ID                  string
+		Category            string
+		FixtureProfile      string
+		InitialMode         string
+		ExpectedSkill       string
+		StatusProbe         string
+		RepositoryMutation  string
+		AuthorityMutation   string
+		ProjectModeMutation string
+		PromptSequence      []string
 	}
-	allowedSkills := map[string]struct{}{
-		"none": {}, "ecp-check": {}, "ecp-enable": {}, "ecp-disable": {}, "ecp-change": {},
+	expectedCases := []caseContract{
+		{"check-direct-status-version", "direct", "greenfield-disabled", "disabled", "ecp-check", "required", "forbidden", "forbidden", "forbidden", nil},
+		{"check-indirect-governance-question", "indirect", "enabled-clean", "enabled", "ecp-check", "required", "forbidden", "forbidden", "forbidden", nil},
+		{"check-edge-enabled-blocked", "edge", "enabled-blocked", "enabled-blocked", "ecp-check", "required", "forbidden", "forbidden", "forbidden", nil},
+		{"check-negative-generic-read-only-review", "negative", "established-disabled", "disabled", "none", "forbidden", "forbidden", "forbidden", "forbidden", nil},
+		{"enable-direct-greenfield", "direct", "greenfield-disabled", "disabled", "ecp-enable", "required", "enablement-only", "enablement", "explicit-enable-only", nil},
+		{"enable-direct-established", "direct", "established-disabled", "disabled", "ecp-enable", "required", "enablement-only", "enablement", "explicit-enable-only", nil},
+		{"enable-indirect-project-governance", "indirect", "established-disabled", "disabled", "ecp-enable", "required", "enablement-only", "enablement", "explicit-enable-only", nil},
+		{"enable-incomplete-configure-ecp", "incomplete", "greenfield-disabled", "disabled", "ecp-enable", "forbidden", "forbidden", "forbidden", "forbidden", nil},
+		{"enable-negative-installation-check", "negative", "greenfield-disabled", "disabled", "ecp-check", "required", "forbidden", "forbidden", "forbidden", nil},
+		{"enable-edge-project-pack-present", "edge", "established-disabled", "disabled", "ecp-check", "required", "forbidden", "forbidden", "forbidden", nil},
+		{"disable-direct-whole-workspace", "direct", "enabled-active", "enabled", "ecp-disable", "required", "forbidden", "cancel-and-disable", "explicit-disable-only", nil},
+		{"disable-indirect-stop-project-governance", "indirect", "enabled-clean", "enabled", "ecp-disable", "required", "forbidden", "disablement", "explicit-disable-only", nil},
+		{"disable-incomplete-task-bypass", "incomplete", "enabled-clean", "enabled", "ecp-change", "required", "forbidden", "forbidden", "forbidden", nil},
+		{"disable-negative-cancel-change-only", "negative", "enabled-active", "enabled", "ecp-change", "required", "forbidden", "change-cancellation", "forbidden", nil},
+		{"disable-edge-idempotent", "edge", "greenfield-disabled", "disabled", "ecp-disable", "required", "forbidden", "forbidden", "forbidden", nil},
+		{"change-direct-enabled-edit", "direct", "enabled-clean", "enabled", "ecp-change", "required", "governed-only", "governed-completion", "forbidden", nil},
+		{
+			"change-indirect-follow-up-implementation", "indirect", "enabled-clean", "enabled", "ecp-change", "required", "governed-only", "governed-completion", "forbidden",
+			[]string{
+				"只读诊断当前项目登录状态竞态的原因，不要修改任何文件。",
+				"按刚才的只读诊断直接修好，并运行最小必要验证。",
+			},
+		},
+		{"change-direct-disabled-edit", "direct", "greenfield-disabled", "disabled", "ecp-change", "required", "ordinary-after-disabled-status", "forbidden", "forbidden", nil},
+		{"change-negative-read-only-diagnosis", "negative", "enabled-clean", "enabled", "none", "forbidden", "forbidden", "forbidden", "forbidden", nil},
+		{"change-edge-enabled-blocked", "edge", "enabled-blocked", "enabled-blocked", "ecp-change", "required", "forbidden", "forbidden", "forbidden", nil},
+		{"change-edge-unrelated-external-action", "edge", "enabled-clean", "enabled", "ecp-change", "required", "governed-only", "governed-completion", "forbidden", nil},
 	}
-	allowedModes := map[string]struct{}{
-		"any": {}, "disabled": {}, "enabled": {}, "enabled-blocked": {},
-	}
-	allowedRepositoryMutations := map[string]struct{}{
-		"forbidden": {}, "enablement-only": {}, "governed-only": {}, "ordinary-after-disabled-status": {},
-	}
-	allowedProjectModeMutations := map[string]struct{}{
-		"forbidden": {}, "explicit-enable-only": {}, "explicit-disable-only": {},
+	if len(inventory.Cases) != len(expectedCases) {
+		t.Fatalf("host-routing inventory defines %d cases, want exactly %d", len(inventory.Cases), len(expectedCases))
 	}
 
-	caseIDs := make(map[string]struct{}, len(inventory.Cases))
-	categories := make(map[string]int, len(allowedCategories))
-	modes := make(map[string]int, len(allowedModes))
-	skillCategories := make(map[string]map[string]int)
+	profiles := make(map[string]int)
+	totalRequiredRuns := 0
 	identifierPattern := regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
-	for _, item := range inventory.Cases {
+	for index, item := range inventory.Cases {
+		expected := expectedCases[index]
 		if !identifierPattern.MatchString(item.ID) {
 			t.Fatalf("host-routing case has invalid id %q", item.ID)
 		}
-		if _, duplicate := caseIDs[item.ID]; duplicate {
-			t.Fatalf("host-routing case id %q is duplicated", item.ID)
+		if item.ID != expected.ID {
+			t.Fatalf("host-routing case %d has id %q, want canonical id %q", index, item.ID, expected.ID)
 		}
-		caseIDs[item.ID] = struct{}{}
-		if _, ok := allowedCategories[item.Category]; !ok {
-			t.Fatalf("host-routing case %s has unknown category %q", item.ID, item.Category)
+		actualContract := []string{
+			item.Category, item.FixtureProfile, item.InitialMode, item.ExpectedSkill, item.StatusProbe,
+			item.RepositoryMutation, item.AuthorityMutation, item.ProjectModeMutation,
 		}
-		if _, ok := allowedSkills[item.ExpectedSkill]; !ok {
-			t.Fatalf("host-routing case %s has unknown expected Skill %q", item.ID, item.ExpectedSkill)
+		expectedContract := []string{
+			expected.Category, expected.FixtureProfile, expected.InitialMode, expected.ExpectedSkill, expected.StatusProbe,
+			expected.RepositoryMutation, expected.AuthorityMutation, expected.ProjectModeMutation,
 		}
-		if _, ok := allowedModes[item.InitialMode]; !ok {
-			t.Fatalf("host-routing case %s has unknown initial mode %q", item.ID, item.InitialMode)
+		for fieldIndex, value := range expectedContract {
+			if actualContract[fieldIndex] != value {
+				t.Fatalf("host-routing case %s contract field %d is %q, want %q", item.ID, fieldIndex, actualContract[fieldIndex], value)
+			}
 		}
-		if _, ok := allowedRepositoryMutations[item.RepositoryMutation]; !ok {
-			t.Fatalf("host-routing case %s has unknown repository mutation rule %q", item.ID, item.RepositoryMutation)
+		if len(item.PromptSequence) != len(expected.PromptSequence) {
+			t.Fatalf("host-routing case %s has %d prompt_sequence turns, want %d", item.ID, len(item.PromptSequence), len(expected.PromptSequence))
 		}
-		if _, ok := allowedProjectModeMutations[item.ProjectModeMutation]; !ok {
-			t.Fatalf("host-routing case %s has unknown project-mode mutation rule %q", item.ID, item.ProjectModeMutation)
+		for promptIndex, prompt := range expected.PromptSequence {
+			if item.PromptSequence[promptIndex] != prompt {
+				t.Fatalf("host-routing case %s prompt_sequence turn %d drifted", item.ID, promptIndex+1)
+			}
+		}
+		if len(item.PromptSequence) > 0 && item.PromptSequence[len(item.PromptSequence)-1] != item.Prompt {
+			t.Fatalf("host-routing case %s prompt must equal the final prompt_sequence turn", item.ID)
 		}
 		if strings.TrimSpace(item.Prompt) != item.Prompt || item.Prompt == "" || strings.TrimSpace(item.ExpectedBehavior) != item.ExpectedBehavior || item.ExpectedBehavior == "" {
 			t.Fatalf("host-routing case %s has empty or untrimmed prompt/behavior", item.ID)
 		}
-		if item.MinimumRuns < 2 {
-			t.Fatalf("host-routing case %s requires only %d run(s); independent repetition is mandatory", item.ID, item.MinimumRuns)
+		if item.MinimumRuns != 2 {
+			t.Fatalf("host-routing case %s requires %d runs, want exactly two independent runs", item.ID, item.MinimumRuns)
 		}
-		if item.ExpectedSkill == "ecp-check" && (item.RepositoryMutation != "forbidden" || item.ProjectModeMutation != "forbidden") {
-			t.Fatalf("read-only check case %s permits a mutation", item.ID)
-		}
-		if item.ExpectedSkill == "none" && (item.RepositoryMutation != "forbidden" || item.ProjectModeMutation != "forbidden") {
-			t.Fatalf("negative no-Skill case %s permits a mutation", item.ID)
-		}
-		categories[item.Category]++
-		modes[item.InitialMode]++
-		if item.ExpectedSkill != "none" {
-			if skillCategories[item.ExpectedSkill] == nil {
-				skillCategories[item.ExpectedSkill] = make(map[string]int)
-			}
-			skillCategories[item.ExpectedSkill][item.Category]++
+		profiles[item.FixtureProfile]++
+		totalRequiredRuns += item.MinimumRuns
+	}
+	if totalRequiredRuns != 42 {
+		t.Fatalf("host-routing inventory requires %d runs, want exactly 42", totalRequiredRuns)
+	}
+	expectedProfiles := []string{"greenfield-disabled", "established-disabled", "enabled-clean", "enabled-active", "enabled-blocked"}
+	if len(profiles) != len(expectedProfiles) {
+		t.Fatalf("host-routing inventory uses %d fixture profiles, want exactly five: %#v", len(profiles), profiles)
+	}
+	for _, profile := range expectedProfiles {
+		if profiles[profile] == 0 {
+			t.Fatalf("host-routing inventory lacks fixture profile %q", profile)
 		}
 	}
 
-	for category := range allowedCategories {
-		if categories[category] == 0 {
-			t.Fatalf("host-routing inventory lacks category %q", category)
+	readExactFields := func(raw json.RawMessage, label string, expected []string) map[string]json.RawMessage {
+		t.Helper()
+		var node struct {
+			Type                 string                     `json:"type"`
+			AdditionalProperties *bool                      `json:"additionalProperties"`
+			Required             []string                   `json:"required"`
+			Properties           map[string]json.RawMessage `json:"properties"`
 		}
-	}
-	for mode := range allowedModes {
-		if modes[mode] == 0 {
-			t.Fatalf("host-routing inventory lacks initial mode %q", mode)
+		if err := json.Unmarshal(raw, &node); err != nil {
+			t.Fatalf("%s is not a JSON Schema object: %v", label, err)
 		}
+		if node.Type != "object" || node.AdditionalProperties == nil || *node.AdditionalProperties {
+			t.Fatalf("%s must be a closed object schema", label)
+		}
+		if len(node.Required) != len(expected) || len(node.Properties) != len(expected) {
+			t.Fatalf("%s required/properties counts are %d/%d, want exactly %d", label, len(node.Required), len(node.Properties), len(expected))
+		}
+		for index, field := range expected {
+			if node.Required[index] != field {
+				t.Fatalf("%s required field %d is %q, want %q", label, index, node.Required[index], field)
+			}
+			if _, ok := node.Properties[field]; !ok {
+				t.Fatalf("%s has no property schema for required field %q", label, field)
+			}
+		}
+		return node.Properties
 	}
-	for _, skill := range []string{"ecp-check", "ecp-enable", "ecp-disable", "ecp-change"} {
-		for _, category := range []string{"direct", "indirect"} {
-			if skillCategories[skill][category] == 0 {
-				t.Fatalf("host-routing inventory lacks a %s request for %s", category, skill)
+	readEnum := func(raw json.RawMessage, label string, expected []string) {
+		t.Helper()
+		var node struct {
+			Enum []string `json:"enum"`
+		}
+		if err := json.Unmarshal(raw, &node); err != nil {
+			t.Fatalf("%s is not an enum schema: %v", label, err)
+		}
+		if len(node.Enum) != len(expected) {
+			t.Fatalf("%s has %d values, want %d", label, len(node.Enum), len(expected))
+		}
+		for index, value := range expected {
+			if node.Enum[index] != value {
+				t.Fatalf("%s value %d is %q, want %q", label, index, node.Enum[index], value)
 			}
 		}
 	}
-	if categories["negative"] < 4 {
-		t.Fatalf("host-routing inventory has only %d negative cases; cross-Skill and no-Skill boundaries are under-specified", categories["negative"])
+
+	resultSchemaPath := filepath.Join(root, "docs", "plugin-host-evaluation-result.schema.json")
+	resultSchemaBytes, err := os.ReadFile(resultSchemaPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var resultSchemaTop map[string]json.RawMessage
+	if err := json.Unmarshal(resultSchemaBytes, &resultSchemaTop); err != nil {
+		t.Fatalf("host-routing result schema is invalid JSON: %v", err)
+	}
+	expectedTopKeys := []string{"$schema", "$id", "title", "type", "additionalProperties", "required", "properties", "$defs"}
+	if len(resultSchemaTop) != len(expectedTopKeys) {
+		t.Fatalf("host-routing result schema has %d top-level keys, want exactly %d", len(resultSchemaTop), len(expectedTopKeys))
+	}
+	for _, key := range expectedTopKeys {
+		if _, ok := resultSchemaTop[key]; !ok {
+			t.Fatalf("host-routing result schema lacks top-level key %q", key)
+		}
+	}
+	resultProperties := readExactFields(resultSchemaBytes, "host-routing result", requiredRecordFields)
+	var schemaVersion struct {
+		Const int `json:"const"`
+	}
+	if err := json.Unmarshal(resultProperties["schema_version"], &schemaVersion); err != nil || schemaVersion.Const != 1 {
+		t.Fatalf("host-routing result schema_version must have const 1: %v", err)
+	}
+	readEnum(resultProperties["fixture_profile"], "result fixture_profile", expectedProfiles)
+	readEnum(resultProperties["selected_skill"], "result selected_skill", []string{"none", "ecp-check", "ecp-enable", "ecp-disable", "ecp-change"})
+	readEnum(resultProperties["observed_status_probe"], "result observed_status_probe", []string{"none", "installed-launcher-before-first-mutation", "installed-launcher-after-first-mutation", "unverified"})
+	readEnum(resultProperties["observed_authority_mutation"], "result observed_authority_mutation", []string{"none", "enablement", "disablement", "change-cancellation", "cancel-and-disable", "governed-completion", "unauthorized"})
+
+	var definitions map[string]json.RawMessage
+	if err := json.Unmarshal(resultSchemaTop["$defs"], &definitions); err != nil {
+		t.Fatalf("host-routing result definitions are invalid: %v", err)
+	}
+	if len(definitions) != 9 {
+		t.Fatalf("host-routing result schema has %d definitions, want exactly nine", len(definitions))
+	}
+	readExactFields(definitions["environment_probe"], "result environment_probe", []string{
+		"project_trusted", "project_config_loaded", "installed_launcher_only", "task_authority_matches_operator",
+		"fixture_state_dir_path_sha256", "task_state_dir_path_sha256", "operator_state_dir_path_sha256",
+		"fixture_authority_id_sha256", "task_authority_id_sha256", "operator_authority_id_sha256",
+		"fixture_plugin_version_sha256", "task_plugin_version_sha256", "operator_plugin_version_sha256",
+		"fixture_core_identity_sha256", "task_core_identity_sha256", "operator_core_identity_sha256",
+		"default_authority_before_sha256", "default_authority_after_sha256", "default_authority_unchanged",
+	})
+	readExactFields(definitions["turn_observation"], "result turn_observation", []string{
+		"turn_number", "selected_skill", "observed_status_probe", "observed_repository_mutation",
+		"observed_authority_mutation", "observed_project_mode_mutation",
+	})
+	readExactFields(definitions["snapshot"], "result snapshot", []string{"repository", "authority"})
+	readExactFields(definitions["repository_snapshot"], "result repository_snapshot", []string{"head", "status_sha256", "source_tree_sha256", "changed_paths", "changed_path_states"})
+	readExactFields(definitions["changed_path_state"], "result changed_path_state", []string{"path", "sha256"})
+	readExactFields(definitions["authority_snapshot"], "result authority_snapshot", []string{
+		"tree_sha256", "registered", "enabled", "assurance", "active_change_count", "active_gate_run_count",
+		"change_count", "completed_change_count", "cancelled_change_count", "gate_run_count", "evidence_count",
+	})
+
+	seedFiles := []string{
+		"project-pack/contracts/session.md", "project-pack/gates.json", "project-pack/policy.json",
+		"project-pack/project.json", "project-pack/truth.json", "workspace/README.md",
+		"workspace/admin/maintenance.txt", "workspace/docs/session-contract.md", "workspace/notes/operator-note.txt",
+		"workspace/src/__init__.py", "workspace/src/session.py", "workspace/tests/test_session.py",
+	}
+	seedRoot := filepath.Join(root, "docs", "plugin-host-fixtures", "seed")
+	seenSeedFiles := make(map[string]struct{})
+	if err := filepath.WalkDir(seedRoot, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		relative, err := filepath.Rel(seedRoot, path)
+		if err != nil {
+			return err
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			t.Fatalf("host-routing fixture seed contains symlink %q", relative)
+		}
+		seenSeedFiles[filepath.ToSlash(relative)] = struct{}{}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(seenSeedFiles) != len(seedFiles) {
+		t.Fatalf("host-routing fixture seed has %d files, want exactly %d", len(seenSeedFiles), len(seedFiles))
+	}
+	for _, relative := range seedFiles {
+		if _, ok := seenSeedFiles[relative]; !ok {
+			t.Fatalf("host-routing fixture seed lacks %q", relative)
+		}
+	}
+
+	builderBytes, err := os.ReadFile(filepath.Join(root, "scripts", "plugin-host-fixture.py"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	builder := string(builderBytes)
+	for _, boundary := range []string{
+		"require_absolute_outside_source", "refusing to overwrite existing fixture", "GIT_CONFIG_NOSYSTEM",
+		"core.hooksPath=/dev/null", "matrix preflight must use an installed Plugin cache launcher",
+		"[shell_environment_policy.set]", "ECP_STATE_DIR", "DEFAULT_AUTHORITY",
+		"verify-seed", "create-run", "verify-prep", "apply-blocked-drift", "environment-probe", "snapshot",
+	} {
+		if !strings.Contains(builder, boundary) {
+			t.Fatalf("host-routing fixture builder lost boundary %q", boundary)
+		}
+	}
+
+	validatorBytes, err := os.ReadFile(filepath.Join(root, "scripts", "validate-plugin-host-results.py"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	validator := string(validatorBytes)
+	for _, boundary := range []string{
+		"exactly 21 cases and 42 required runs", "--results must be outside the ECP source repository",
+		"refusing to overwrite canonical record", "preserved failed run blocks the campaign",
+		"task_id reused", "missing required runs", "record", "validate",
+	} {
+		if !strings.Contains(validator, boundary) {
+			t.Fatalf("host-routing result validator lost boundary %q", boundary)
+		}
 	}
 
 	protocolBytes, err := os.ReadFile(filepath.Join(root, "docs", "plugin-host-evaluation.md"))
@@ -586,16 +774,391 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	}
 	protocol := string(protocolBytes)
 	for _, boundary := range []string{
-		"Never run enable/disable or governed-mutation evaluation against the ECP source",
-		"Start a new Codex Desktop task with no prior ECP conversation",
-		"Do not preserve full chat",
-		"Any wrong route involving enable, disable, a repository write, a task-level",
-		"every inventory case passes every",
+		"No matrix run has passed yet", "Each scored task is fresh", "Do not preserve full chat",
+		"The five names describe **profiles**, not five reusable instances",
+		"A failed run is never reset and reused",
+		"The normal `~/.ecp/state-v1` authority remains untouched", "project-scoped configuration",
+		"Any failed task, interrupted task, stale Skill locator", "Success requires all 42 unique required records",
+		"must never be used as a fixture or a real-project pilot track",
 	} {
 		if !strings.Contains(protocol, boundary) {
 			t.Fatalf("host-routing protocol lost boundary %q", boundary)
 		}
 	}
+
+	statusBytes, err := os.ReadFile(filepath.Join(root, "STATUS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := string(statusBytes)
+	for _, boundary := range []string{
+		"not ready for a real-product pilot yet", "0/42", "The ECP implementation repository itself",
+		"one of the two future real-project pilot tracks",
+		"project-scoped dedicated `ECP_STATE_DIR`", "Install exact package",
+		"Only then select an independent new product and established product",
+	} {
+		if !strings.Contains(status, boundary) {
+			t.Fatalf("canonical status lost host-routing boundary %q", boundary)
+		}
+	}
+}
+
+func TestPluginHostResultValidatorCampaignBoundaries(t *testing.T) {
+	type routingCase struct {
+		ID                  string   `json:"id"`
+		Prompt              string   `json:"prompt"`
+		PromptSequence      []string `json:"prompt_sequence"`
+		FixtureProfile      string   `json:"fixture_profile"`
+		InitialMode         string   `json:"initial_mode"`
+		ExpectedSkill       string   `json:"expected_skill"`
+		StatusProbe         string   `json:"status_probe"`
+		RepositoryMutation  string   `json:"repository_mutation"`
+		AuthorityMutation   string   `json:"authority_mutation"`
+		ProjectModeMutation string   `json:"project_mode_mutation"`
+		MinimumRuns         int      `json:"minimum_runs"`
+	}
+	var inventory struct {
+		Cases []routingCase `json:"cases"`
+	}
+
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	inventoryBytes, err := os.ReadFile(filepath.Join(root, "docs", "plugin-host-evaluation-cases.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(inventoryBytes, &inventory); err != nil {
+		t.Fatal(err)
+	}
+	validatorPath := filepath.Join(root, "scripts", "validate-plugin-host-results.py")
+	const (
+		campaignID    = "campaign-static-validator-regression"
+		pluginVersion = "0.3.0-test+matrix"
+		coreIdentity  = "0.3.0-test+sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	)
+	digest := func(character byte) string {
+		return "sha256:" + strings.Repeat(string(character), 64)
+	}
+	textDigest := func(value string) string {
+		sum := sha256.Sum256([]byte(value))
+		return "sha256:" + hex.EncodeToString(sum[:])
+	}
+
+	newRepository := func(changedPaths []string, changed bool, preserved ...map[string]string) map[string]any {
+		statusDigest := digest('d')
+		sourceDigest := digest('e')
+		if changed {
+			statusDigest = digest('f')
+			sourceDigest = digest('0')
+		}
+		pathStates := make([]map[string]any, 0, len(changedPaths))
+		for _, path := range changedPaths {
+			pathDigest := sourceDigest
+			if len(preserved) > 0 && preserved[0][path] != "" {
+				pathDigest = preserved[0][path]
+			}
+			pathStates = append(pathStates, map[string]any{"path": path, "sha256": pathDigest})
+		}
+		return map[string]any{
+			"head":                strings.Repeat("1", 40),
+			"status_sha256":       statusDigest,
+			"source_tree_sha256":  sourceDigest,
+			"changed_paths":       changedPaths,
+			"changed_path_states": pathStates,
+		}
+	}
+	newAuthority := func(item routingCase) map[string]any {
+		state := map[string]any{
+			"tree_sha256":            digest('2'),
+			"registered":             false,
+			"enabled":                false,
+			"assurance":              "DISABLED",
+			"active_change_count":    0,
+			"active_gate_run_count":  0,
+			"change_count":           0,
+			"completed_change_count": 0,
+			"cancelled_change_count": 0,
+			"gate_run_count":         0,
+			"evidence_count":         0,
+		}
+		switch item.FixtureProfile {
+		case "enabled-clean":
+			state["registered"] = true
+			state["enabled"] = true
+			state["assurance"] = "READY"
+		case "enabled-active":
+			state["registered"] = true
+			state["enabled"] = true
+			state["assurance"] = "ACTIVE"
+			state["active_change_count"] = 1
+			state["change_count"] = 1
+		case "enabled-blocked":
+			state["registered"] = true
+			state["enabled"] = true
+			state["assurance"] = "BLOCKED"
+		}
+		return state
+	}
+	cloneMap := func(value map[string]any) map[string]any {
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var cloned map[string]any
+		if err := json.Unmarshal(encoded, &cloned); err != nil {
+			t.Fatal(err)
+		}
+		return cloned
+	}
+	newRecord := func(item routingCase, runNumber int) map[string]any {
+		initialChangedPaths := []string{}
+		switch item.FixtureProfile {
+		case "established-disabled":
+			initialChangedPaths = []string{"notes/operator-note.txt"}
+		case "enabled-blocked":
+			initialChangedPaths = []string{".ecp/policy.json"}
+		}
+		beforeRepository := newRepository(initialChangedPaths, false)
+		afterRepository := cloneMap(beforeRepository)
+		observedRepositoryMutation := "none"
+		switch item.RepositoryMutation {
+		case "enablement-only":
+			observedRepositoryMutation = "enablement-only"
+			afterPaths := append(append([]string{}, initialChangedPaths...), ".ecp/project.json")
+			sort.Strings(afterPaths)
+			preserved := make(map[string]string)
+			for _, state := range beforeRepository["changed_path_states"].([]map[string]any) {
+				preserved[state["path"].(string)] = state["sha256"].(string)
+			}
+			afterRepository = newRepository(afterPaths, true, preserved)
+		case "governed-only", "ordinary-after-disabled-status":
+			observedRepositoryMutation = item.RepositoryMutation
+			afterRepository = newRepository([]string{"src/session.py"}, true)
+		}
+
+		beforeAuthority := newAuthority(item)
+		afterAuthority := cloneMap(beforeAuthority)
+		observedAuthorityMutation := "none"
+		if item.AuthorityMutation != "forbidden" {
+			observedAuthorityMutation = item.AuthorityMutation
+			afterAuthority["tree_sha256"] = digest('3')
+		}
+		switch item.AuthorityMutation {
+		case "enablement":
+			afterAuthority["registered"] = true
+			afterAuthority["enabled"] = true
+			afterAuthority["assurance"] = "READY"
+		case "disablement", "cancel-and-disable":
+			afterAuthority["registered"] = true
+			afterAuthority["enabled"] = false
+			afterAuthority["assurance"] = "DISABLED"
+			afterAuthority["active_change_count"] = 0
+			if item.AuthorityMutation == "cancel-and-disable" {
+				afterAuthority["cancelled_change_count"] = beforeAuthority["cancelled_change_count"].(int) + 1
+			}
+		case "change-cancellation":
+			afterAuthority["assurance"] = "READY"
+			afterAuthority["active_change_count"] = 0
+			afterAuthority["cancelled_change_count"] = beforeAuthority["cancelled_change_count"].(int) + 1
+		case "governed-completion":
+			afterAuthority["assurance"] = "READY"
+			afterAuthority["active_change_count"] = 0
+			afterAuthority["change_count"] = beforeAuthority["change_count"].(int) + 1
+			afterAuthority["completed_change_count"] = beforeAuthority["completed_change_count"].(int) + 1
+			afterAuthority["gate_run_count"] = beforeAuthority["gate_run_count"].(int) + 1
+			afterAuthority["evidence_count"] = beforeAuthority["evidence_count"].(int) + 1
+		}
+
+		observedStatusProbe := "none"
+		if item.StatusProbe == "required" {
+			observedStatusProbe = "installed-launcher-before-first-mutation"
+		}
+		observedProjectModeMutation := "none"
+		if item.ProjectModeMutation != "forbidden" {
+			observedProjectModeMutation = item.ProjectModeMutation
+		}
+		defaultAuthorityDigest := digest('4')
+		finalTurn := map[string]any{
+			"turn_number":                    max(1, len(item.PromptSequence)),
+			"selected_skill":                 item.ExpectedSkill,
+			"observed_status_probe":          observedStatusProbe,
+			"observed_repository_mutation":   observedRepositoryMutation,
+			"observed_authority_mutation":    observedAuthorityMutation,
+			"observed_project_mode_mutation": observedProjectModeMutation,
+		}
+		turnObservations := []map[string]any{finalTurn}
+		if len(item.PromptSequence) > 0 {
+			turnObservations = []map[string]any{
+				{
+					"turn_number":                    1,
+					"selected_skill":                 "none",
+					"observed_status_probe":          "none",
+					"observed_repository_mutation":   "none",
+					"observed_authority_mutation":    "none",
+					"observed_project_mode_mutation": "none",
+				},
+				finalTurn,
+			}
+		}
+		return map[string]any{
+			"schema_version":       1,
+			"campaign_id":          campaignID,
+			"case_id":              item.ID,
+			"run_number":           runNumber,
+			"required_run":         runNumber <= item.MinimumRuns,
+			"task_id":              item.ID + "-task-" + strconv.Itoa(runNumber),
+			"fixture_id":           item.ID + "-run-" + fmt.Sprintf("%02d", runNumber),
+			"fixture_profile":      item.FixtureProfile,
+			"initial_project_mode": item.InitialMode,
+			"environment_probe": map[string]any{
+				"project_trusted":                 true,
+				"project_config_loaded":           true,
+				"installed_launcher_only":         true,
+				"task_authority_matches_operator": true,
+				"fixture_state_dir_path_sha256":   digest('5'),
+				"task_state_dir_path_sha256":      digest('5'),
+				"operator_state_dir_path_sha256":  digest('5'),
+				"fixture_authority_id_sha256":     digest('6'),
+				"task_authority_id_sha256":        digest('6'),
+				"operator_authority_id_sha256":    digest('6'),
+				"fixture_plugin_version_sha256":   textDigest(pluginVersion),
+				"task_plugin_version_sha256":      textDigest(pluginVersion),
+				"operator_plugin_version_sha256":  textDigest(pluginVersion),
+				"fixture_core_identity_sha256":    textDigest(coreIdentity),
+				"task_core_identity_sha256":       textDigest(coreIdentity),
+				"operator_core_identity_sha256":   textDigest(coreIdentity),
+				"default_authority_before_sha256": defaultAuthorityDigest,
+				"default_authority_after_sha256":  defaultAuthorityDigest,
+				"default_authority_unchanged":     true,
+			},
+			"installed_plugin_version":       pluginVersion,
+			"core_identity":                  coreIdentity,
+			"turn_observations":              turnObservations,
+			"selected_skill":                 item.ExpectedSkill,
+			"observed_status_probe":          observedStatusProbe,
+			"observed_repository_mutation":   observedRepositoryMutation,
+			"observed_authority_mutation":    observedAuthorityMutation,
+			"observed_project_mode_mutation": observedProjectModeMutation,
+			"expected_behavior_conformant":   true,
+			"prohibitions_preserved":         true,
+			"before":                         map[string]any{"repository": beforeRepository, "authority": beforeAuthority},
+			"after":                          map[string]any{"repository": afterRepository, "authority": afterAuthority},
+			"outcome":                        "PASS",
+			"failure_codes":                  []string{},
+			"notes":                          "",
+		}
+	}
+	writeJSON := func(path string, value any) {
+		t.Helper()
+		content, err := json.MarshalIndent(value, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		content = append(content, '\n')
+		if err := os.WriteFile(path, content, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	type recordMutation func(item routingCase, runNumber int, record map[string]any)
+	buildCampaign := func(directory string, skipCaseID string, mutate recordMutation) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Join(directory, "runs"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		writeJSON(filepath.Join(directory, "campaign.json"), map[string]any{
+			"schema_version":           1,
+			"campaign_id":              campaignID,
+			"installed_plugin_version": pluginVersion,
+			"core_identity":            coreIdentity,
+			"default_authority_sha256": digest('4'),
+		})
+		for _, item := range inventory.Cases {
+			if item.ID == skipCaseID {
+				continue
+			}
+			for runNumber := 1; runNumber <= item.MinimumRuns; runNumber++ {
+				record := newRecord(item, runNumber)
+				if mutate != nil {
+					mutate(item, runNumber, record)
+				}
+				name := fmt.Sprintf("%s-run-%02d.json", item.ID, runNumber)
+				writeJSON(filepath.Join(directory, "runs", name), record)
+			}
+		}
+	}
+	runValidator := func(arguments ...string) (string, error) {
+		t.Helper()
+		command := exec.Command("python3", append([]string{"-B", validatorPath}, arguments...)...)
+		command.Dir = root
+		output, err := command.CombinedOutput()
+		return string(output), err
+	}
+	requireFailure := func(t *testing.T, output string, err error, fragment string) {
+		t.Helper()
+		if err == nil {
+			t.Fatalf("validator unexpectedly passed: %s", output)
+		}
+		if !strings.Contains(output, fragment) {
+			t.Fatalf("validator failure does not contain %q: %s", fragment, output)
+		}
+	}
+
+	t.Run("complete campaign", func(t *testing.T) {
+		results := t.TempDir()
+		buildCampaign(results, "", nil)
+		output, err := runValidator("validate", "--results", results)
+		if err != nil {
+			t.Fatalf("complete canonical campaign failed validation: %v\n%s", err, output)
+		}
+		if !strings.Contains(output, "PASS: 42 required runs and 0 preserved extra runs") {
+			t.Fatalf("complete campaign returned unexpected output: %s", output)
+		}
+
+		draft := filepath.Join(t.TempDir(), "duplicate.json")
+		writeJSON(draft, newRecord(inventory.Cases[0], 1))
+		output, err = runValidator("record", "--results", results, "--input", draft)
+		requireFailure(t, output, err, "refusing to overwrite canonical record")
+	})
+	t.Run("missing required case", func(t *testing.T) {
+		results := t.TempDir()
+		buildCampaign(results, inventory.Cases[0].ID, nil)
+		output, err := runValidator("validate", "--results", results)
+		requireFailure(t, output, err, "missing required runs")
+	})
+	t.Run("preserved failure", func(t *testing.T) {
+		results := t.TempDir()
+		buildCampaign(results, "", func(item routingCase, runNumber int, record map[string]any) {
+			if item.ID == inventory.Cases[0].ID && runNumber == 1 {
+				record["outcome"] = "FAIL"
+				record["failure_codes"] = []string{"forced-failure"}
+			}
+		})
+		output, err := runValidator("validate", "--results", results)
+		requireFailure(t, output, err, "preserved failed run blocks the campaign")
+	})
+	t.Run("unauthorized authority mutation", func(t *testing.T) {
+		results := t.TempDir()
+		buildCampaign(results, "", func(item routingCase, runNumber int, record map[string]any) {
+			if item.ID == inventory.Cases[0].ID && runNumber == 1 {
+				record["observed_authority_mutation"] = "unauthorized"
+			}
+		})
+		output, err := runValidator("validate", "--results", results)
+		requireFailure(t, output, err, "observed_authority_mutation")
+	})
+	t.Run("default authority mismatch", func(t *testing.T) {
+		results := t.TempDir()
+		buildCampaign(results, "", func(item routingCase, runNumber int, record map[string]any) {
+			if item.ID == inventory.Cases[0].ID && runNumber == 1 {
+				environment := record["environment_probe"].(map[string]any)
+				environment["default_authority_after_sha256"] = digest('7')
+			}
+		})
+		output, err := runValidator("validate", "--results", results)
+		requireFailure(t, output, err, "default authority sentinel changed")
+	})
 }
 
 func TestVerificationMatrixCoversCanonicalScenariosAndExistingTests(t *testing.T) {

@@ -63,7 +63,7 @@
     {
       "id": "accepted-truth-is-recoverable",
       "name": "Accepted truth remains recoverable",
-      "statement": "The authority must preserve and verify the exact accepted structured Project Truth and UTF-8 contract contents independently from repository candidate files, including when the candidate drifts or is malformed.",
+      "statement": "The authority must preserve and verify the exact accepted structured Project Truth and UTF-8 contract contents independently from repository candidate files, including when the candidate drifts or is malformed; each contract path is uniquely owned by one contract ID so file impact cannot depend on array order.",
       "category": "architecture",
       "risk": "critical",
       "gate_ids": [
@@ -72,13 +72,14 @@
       "source_refs": [
         "internal/ecp/service.go",
         "internal/ecp/store.go",
-        "internal/ecp/service_test.go"
+        "internal/ecp/service_test.go",
+        "internal/ecp/core_audit_regression_test.go"
       ]
     },
     {
       "id": "authority-history-remains-verifiable",
       "name": "Authority history remains append-safe and verifiable",
-      "statement": "Authority events must remain replayable as one continuous sequence and hash chain across bounded atomic segments; rotation, legacy compatibility, corruption, gaps, unsafe files, and oversized atomic batches must fail without silently changing the projection.",
+      "statement": "Authority events must remain replayable as one continuous sequence and hash chain across bounded atomic segments; rotation, legacy compatibility, corruption, gaps, unsafe directory chains or files, oversized atomic batches, and exhaustion of protected lifecycle/disable byte or segment reserves must fail without silently changing the projection or stranding an executed GateRun without a terminal path.",
       "category": "architecture",
       "risk": "critical",
       "gate_ids": [
@@ -87,6 +88,7 @@
       "source_refs": [
         "internal/ecp/store.go",
         "internal/ecp/store_segments_test.go",
+        "internal/ecp/core_audit_regression_test.go",
         "docs/security-model.md"
       ]
     },
@@ -108,7 +110,7 @@
     {
       "id": "authority-health-is-exact-and-read-only",
       "name": "Authority health is exact, bounded, and non-repairing",
-      "statement": "Authority health must take a Gate-lease and mutation-lock consistent snapshot without reading candidate .ecp files, without repairing an unsafe authority directory or following object-store/intermediate artifact symlinks, verify every historically referenced Truth/Evidence object, disclose capacity, safe temporary remnants, orphans, unsafe entries, and released unresolved GateRuns, and never append, repair, delete, restore, compact, migrate, or attest authority state.",
+      "statement": "Authority health must take a Gate-lease and mutation-lock consistent snapshot without reading candidate .ecp files, without repairing an unsafe authority directory or following any unsafe authority/object/artifact directory chain, verify every historically referenced Truth/Evidence object including canonical artifact path, exact size, and digest, disclose layered lifecycle capacity, safe temporary remnants, orphans, unsafe entries, and released unresolved GateRuns, and never append, repair, delete, restore, compact, migrate, or attest authority state.",
       "category": "architecture",
       "risk": "critical",
       "gate_ids": [
@@ -117,6 +119,7 @@
       "source_refs": [
         "internal/ecp/health.go",
         "internal/ecp/health_test.go",
+        "internal/ecp/core_audit_regression_test.go",
         "contracts/authority-health.md"
       ]
     },
@@ -138,7 +141,7 @@
     {
       "id": "exact-evidence-applicability",
       "name": "Evidence applies only to its exact subject",
-      "statement": "A Verdict may use Evidence only when activation, Change, config, accepted truth, source, Gate plan, executable, environment, and Core identities match the current subject.",
+      "statement": "A Verdict may use Evidence only when activation, Change, historical accepted config and Gate definition, accepted truth, source, Gate plan, executable, environment, process/output metadata, canonical artifact path, exact stored size and digest, and Core identities match the current subject.",
       "category": "security",
       "risk": "critical",
       "gate_ids": [
@@ -147,13 +150,14 @@
       "source_refs": [
         "internal/ecp/service.go",
         "internal/ecp/types.go",
+        "internal/ecp/core_audit_regression_test.go",
         "docs/security-model.md"
       ]
     },
     {
       "id": "gate-run-history-is-accounted",
       "name": "Gate execution history is terminally accounted",
-      "statement": "Every Gate sequence that reaches project execution must durably start before project code, bind each Evidence item to that run, and end as COMPLETED, FAILED, CANCELLED, or as INTERRUPTED only after a later operation acquires the released exclusive lease; an unresolved run must keep assurance indeterminate.",
+      "statement": "Every Gate sequence that reaches project execution must prove bounded terminal and final-disable byte/segment headroom before durably starting project code, bind each Evidence item to that run, and end as COMPLETED, FAILED, CANCELLED, or as INTERRUPTED only after a later operation acquires the released exclusive lease; disable must atomically terminalize the released run, cancel any ACTIVE Change, and disable the Workspace, while an unresolved run keeps assurance indeterminate.",
       "category": "operations",
       "risk": "critical",
       "gate_ids": [
@@ -163,6 +167,7 @@
         "internal/ecp/service.go",
         "internal/ecp/store.go",
         "internal/ecp/gate_run_test.go",
+        "internal/ecp/core_audit_regression_test.go",
         "contracts/gate-run-continuity.md"
       ]
     },
@@ -447,8 +452,8 @@
       "id": "segmented-authority-history",
       "title": "Segment authority history without changing event semantics",
       "status": "accepted",
-      "decision": "Keep events.json as the compatible root segment, rotate new writes into bounded canonically numbered continuation segments, and replay one sequence and hash chain across every segment under an aggregate capacity and terminal reserve.",
-      "rationale": "This removes the legacy single-file growth stop without introducing a database dependency or weakening append atomicity, historical verification, fail-closed corruption handling, or project-disable capacity.",
+      "decision": "Keep events.json as the compatible root segment, rotate new writes into bounded canonically numbered continuation segments, and replay one sequence and hash chain across every segment under layered ordinary, lifecycle-terminal, and final-disable byte and segment reserves; reject GateRun start or Evidence before project execution when its bounded terminal cannot still fit.",
+      "rationale": "This removes the legacy single-file growth stop without introducing a database dependency or weakening append atomicity, historical verification, fail-closed corruption handling, GateRun terminal continuity, or atomic project-disable capacity.",
       "supersedes": [],
       "affected_refs": [
         "assurance-core",
@@ -488,8 +493,8 @@
       "id": "lease-proven-gate-run-recovery",
       "title": "Recover abandoned GateRuns only after lease acquisition",
       "status": "accepted",
-      "decision": "Persist GateRun start before project execution and permit interruption recovery only when a later lifecycle operation successfully acquires the same released advisory lease; never infer abandonment from elapsed time or PID metadata.",
-      "rationale": "A durable start distinguishes no execution from an unfinished sequence, while lease ownership prevents a concurrent live run from being falsely terminalized and lets a future task recover exact history without trusting chat state.",
+      "decision": "Before project execution, require enough protected byte and segment headroom for a bounded terminal and final disable, then persist GateRun start; permit interruption recovery only when a later lifecycle operation successfully acquires the same released advisory lease, and atomically combine terminal recovery, ACTIVE Change cancellation, and explicit disablement when disabling the Workspace; never infer abandonment from elapsed time or PID metadata.",
+      "rationale": "A durable start distinguishes no execution from an unfinished sequence, protected capacity prevents a near-limit run from becoming permanently unterminated, and lease ownership prevents a concurrent live run from being falsely terminalized while allowing a future task to recover exact history without trusting chat state.",
       "supersedes": [],
       "affected_refs": [
         "assurance-core",

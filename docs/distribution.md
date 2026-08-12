@@ -107,7 +107,10 @@ or deletion.
 6. Before any real-product pilot write, complete the independent disposable-
    fixture matrix in [Codex Plugin host-routing evaluation](plugin-host-evaluation.md).
    A successful explicit check does not prove enable, change, disable, negative,
-   incomplete, or edge-case routing.
+   incomplete, or edge-case routing. The matrix uses a new Git Workspace and a
+   new dedicated authority for every scored/preparation run. It is accepted
+   only when the canonical result validator returns `PASS` for all 42 required
+   runs without a preserved failed retry.
 
 ### Upgrade
 
@@ -167,16 +170,16 @@ signature: an attacker able to replace the Plugin can replace the launcher,
 binary, checksum, and manifest together. The Core binary digest provides exact
 Evidence compatibility identity, not publisher provenance.
 
-The current installed-copy read-only smoke is recorded in
-`docs/plugin-host-evaluation.md`: the reviewed source and installed cache files
-matched, the installed launcher returned the expected Core identity, and an
-explicit check preserved disabled project mode and clean Git state. That task
-carried prior context, so it is not evidence for the independent fresh-task
-matrix.
+The installed-copy read-only smoke recorded in
+`docs/plugin-host-evaluation.md` is diagnostic only. Fresh tasks selected the
+check workflow but the host supplied a removed older Skill locator, and the
+worktrees were derived from ECP rather than canonical disposable fixtures. The
+canonical status is therefore 0/42, not a partially passed matrix.
 
 The current source package is still unsigned, unnotarized, and unpublished in
-the universal directory. Fresh-task enable/change/disable routing, upgrade,
-uninstall, reinstallation, and a governed Change have not been validated. Keep
+the universal directory. Fresh-task enable/change/disable routing, the trusted
+project-scoped dedicated-state handoff, upgrade, uninstall, reinstallation,
+and a governed Change have not been validated. Keep
 these independent claims separate: read-only installed-copy discovery is
 observed, while host routing, lifecycle compatibility, and publisher provenance
 remain unverified release requirements. A separate release decision is also

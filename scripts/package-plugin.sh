@@ -22,18 +22,40 @@ if [ ! -f "$repo_root/go.mod" ] || [ ! -f "$repo_root/cmd/ecp/main.go" ] || [ ! 
 fi
 
 if [ -x /usr/bin/mktemp ]; then
-  stage_root=$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/ecp-plugin-package.XXXXXX")
+  stage_root=$(/usr/bin/mktemp -d "$plugin_root/.runtime-package.XXXXXX")
 elif [ -x /bin/mktemp ]; then
-  stage_root=$(/bin/mktemp -d "${TMPDIR:-/tmp}/ecp-plugin-package.XXXXXX")
+  stage_root=$(/bin/mktemp -d "$plugin_root/.runtime-package.XXXXXX")
 else
   printf '%s\n' "fixed system mktemp is unavailable" >&2
   exit 1
 fi
 
+previous_runtime="$stage_root/previous-runtime"
+
 cleanup() {
-  rm -rf -- "$stage_root"
+  cleanup_status=$?
+  trap - EXIT HUP INT TERM
+
+  if [ -e "$previous_runtime" ] && [ ! -e "$runtime_root" ]; then
+    if ! mv -- "$previous_runtime" "$runtime_root"; then
+      printf '%s\n' "could not restore the previous plugin runtime" >&2
+      printf '%s\n' "previous runtime retained at $previous_runtime" >&2
+      exit 1
+    fi
+  fi
+
+  if ! rm -rf -- "$stage_root"; then
+    printf '%s\n' "could not remove plugin runtime staging directory $stage_root" >&2
+    if [ "$cleanup_status" -eq 0 ]; then
+      cleanup_status=1
+    fi
+  fi
+  exit "$cleanup_status"
 }
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 stage_runtime="$stage_root/runtime"
 mkdir -p -- "$stage_runtime"
@@ -97,14 +119,10 @@ $manifest_entries
 EOF
 chmod 0644 "$stage_runtime/manifest.json"
 
-previous_runtime="$stage_root/previous-runtime"
 if [ -e "$runtime_root" ]; then
   mv -- "$runtime_root" "$previous_runtime"
 fi
 if ! mv -- "$stage_runtime" "$runtime_root"; then
-  if [ -e "$previous_runtime" ]; then
-    mv -- "$previous_runtime" "$runtime_root"
-  fi
   printf '%s\n' "could not install the staged plugin runtime" >&2
   exit 1
 fi

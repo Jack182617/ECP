@@ -4,7 +4,9 @@ An ECP local `PASS` means the accepted local policy's Required Gates produced ap
 
 It does not mean the product is defect-free, every behavior was tested, a person was authenticated, the change was committed or pushed, a device or production environment succeeded, a release was published, or the Plugin could not be bypassed.
 
-Candidate policy and truth cannot accept themselves. `PRESERVED` cannot hide a truth delta. `CHANGED` requires a Core-computed delta within the declared Impact and explicit confirmation of the exact protected change. `UNKNOWN`, stale Evidence, source mutation, mismatched identity, missing Gate, failed Gate, or integrity failure prevents `PASS`.
+Candidate policy and truth cannot accept themselves. Contract paths are unique within accepted Project Truth, so one changed file cannot be order-dependently attributed to only one of several IDs. `PRESERVED` cannot hide a truth delta. `CHANGED` requires a Core-computed delta within the declared Impact and explicit confirmation of the exact protected change. `UNKNOWN`, stale Evidence, source mutation, mismatched identity, missing Gate, failed Gate, or integrity failure prevents `PASS`.
+
+Evidence replay validates the recorded Gate and command against its exact historical accepted config epoch. Artifact paths must canonically bind the Change, Evidence, and stdout/stderr role; private regular-file type, exact stored size, and stored digest must all match before the Evidence can apply.
 
 Every sequence that reaches Gate execution is enclosed by a durable GateRun. A
 remaining `IN_PROGRESS` run keeps the current Verdict `INDETERMINATE`; only a

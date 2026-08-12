@@ -929,15 +929,15 @@ func (s Service) DisableProject(ctx context.Context, start, expectedAuthorityID,
 	if err := requireExpectedActivationToken(service, workspace, expectedActivationToken); err != nil {
 		return ProjectStatus{}, err
 	}
-	workspace, err = recoverInterruptedGateRun(ctx, service, workspace, "project disable acquired the released Gate sequence lease")
-	if err != nil {
-		return ProjectStatus{}, err
-	}
 	active := workspace.Projection.ActiveChange()
 	if !workspace.Projection.ECPEnabled() && active == nil {
 		return service.ProjectStatus(ctx, workspace.Root)
 	}
-	pending := make([]PendingEvent, 0, 2)
+	pending := make([]PendingEvent, 0, 3)
+	if activeRun := workspace.Projection.ActiveGateRun(); activeRun != nil {
+		terminal := buildGateRunTerminal(service, activeRun, GateRunInterrupted, "PREVIOUS_PROCESS_EXITED", "project disable acquired the released Gate sequence lease")
+		pending = append(pending, PendingEvent{Type: "gate_run_finished", Origin: "cli", Payload: terminal})
+	}
 	currentActivationID := ""
 	if workspace.Projection.Activation != nil {
 		currentActivationID = workspace.Projection.Activation.ActivationID
@@ -1980,13 +1980,24 @@ func finalizeGateRun(ctx context.Context, service Service, store *Store, project
 	if active == nil || active.RunID != runID {
 		return newError(KindIntegrity, "GATE_RUN_FINALIZE_MISMATCH", "the GateRun being finalized is no longer active", nil)
 	}
+	terminal := buildGateRunTerminal(service, active, state, outcomeCode, reason)
+	revision := projection.Revision
+	updated, err := store.Append(ctx, &revision, PendingEvent{Type: "gate_run_finished", Origin: "cli", Payload: terminal})
+	if err != nil {
+		return err
+	}
+	*projection = updated
+	return nil
+}
+
+func buildGateRunTerminal(service Service, active *GateRun, state GateRunState, outcomeCode, reason string) GateRunTerminal {
 	reason = strings.ReplaceAll(reason, "\x00", "�")
 	reason = truncateUTF8Bytes(strings.TrimSpace(reason), 2000)
 	finishedAt := service.Clock().UTC()
 	if finishedAt.Before(active.StartedAt) {
 		finishedAt = active.StartedAt
 	}
-	terminal := GateRunTerminal{
+	return GateRunTerminal{
 		SchemaVersion: SchemaVersion,
 		RunID:         active.RunID,
 		ChangeID:      active.ChangeID,
@@ -1997,13 +2008,6 @@ func finalizeGateRun(ctx context.Context, service Service, store *Store, project
 		OutcomeCode:   outcomeCode,
 		Reason:        reason,
 	}
-	revision := projection.Revision
-	updated, err := store.Append(ctx, &revision, PendingEvent{Type: "gate_run_finished", Origin: "cli", Payload: terminal})
-	if err != nil {
-		return err
-	}
-	*projection = updated
-	return nil
 }
 
 func truncateUTF8Bytes(value string, limit int) string {
@@ -2501,13 +2505,20 @@ func (s Service) evaluate(ctx context.Context, workspace loadedWorkspace, change
 			}
 			matchedSubject = true
 			assessment.EvidenceID = evidence.EvidenceID
-			if err := workspace.Store.VerifyArtifact(evidence.StdoutArtifact, evidence.StdoutStoredDigest); err != nil {
+			stdoutSize, stderrSize, sizeErr := expectedEvidenceArtifactSizes(workspace.Projection, evidence)
+			if sizeErr != nil {
+				assessment.State = "CORRUPT"
+				reasons = append(reasons, VerdictReason{Code: "EVIDENCE_ARTIFACT_INVALID", Message: sizeErr.Error(), GateID: gate.ID})
+				indeterminate = true
+				break
+			}
+			if err := workspace.Store.VerifyArtifact(evidence.StdoutArtifact, evidence.StdoutStoredDigest, stdoutSize); err != nil {
 				assessment.State = "CORRUPT"
 				reasons = append(reasons, VerdictReason{Code: "EVIDENCE_ARTIFACT_INVALID", Message: err.Error(), GateID: gate.ID})
 				indeterminate = true
 				break
 			}
-			if err := workspace.Store.VerifyArtifact(evidence.StderrArtifact, evidence.StderrStoredDigest); err != nil {
+			if err := workspace.Store.VerifyArtifact(evidence.StderrArtifact, evidence.StderrStoredDigest, stderrSize); err != nil {
 				assessment.State = "CORRUPT"
 				reasons = append(reasons, VerdictReason{Code: "EVIDENCE_ARTIFACT_INVALID", Message: err.Error(), GateID: gate.ID})
 				indeterminate = true

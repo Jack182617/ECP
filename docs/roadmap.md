@@ -46,12 +46,12 @@ Phase 1 原计划的 Runner 纵深强化不再整体先行。除阻断真实 Pro
 
 - request idempotency、orphan artifact 恢复、crash 后跨平台进程树收割和非 advisory-lock 平台恢复协议；
 - activation enable/disable crash-injection、event-capacity exhaustion 的安全恢复与 repair 工具（health 已提供只读容量和完整性诊断，不自动恢复）；
-- 其他 Unix sentinel lock 的正式验证，以及非 Unix private-state/锁/进程语义设计；Windows 交叉编译不代表 v0.1 运行支持；
+- 其他 Unix sentinel lock 的正式验证，以及非 Unix private-state/锁/进程语义设计；Windows 交叉编译不代表 v0.3 运行支持；
 - 跨平台进程树 TERM/KILL、CPU/内存/文件/全局并发上限；
 - fd-exec 或受信 executable registry，关闭 hash/spawn swap 窗口；
 - Evidence/truth blob 的 scheduled/reference-aware retention、消毒/脱敏 export、显式 repair 与安全 GC；
 - accepted raw config tree archive、inspect/export/explicit restore；
-- 显式 state-directory migration 协议（v0.1 改变 state path 只会选中新 authority）；
+- 显式 state-directory migration 协议（v0.3 改变 state path 只会选中新 authority）；
 - Gate dependency DAG、TTL/always-run 语义；
 - 不可变 Gate input snapshot 与声明式 output；
 - safe compaction 或 SQLite authority migration（只在真实容量、并发、查询需求成立并经迁移/依赖授权后），保留 accepted truth blob 引用和跨段 hash-chain 可核验历史；
@@ -61,7 +61,7 @@ Phase 1 原计划的 Runner 纵深强化不再整体先行。除阻断真实 Pro
 
 目标：把当前 Assurance Kernel 扩展为 North Star 的最小完整语义闭环。
 
-状态：本地 Core/CLI、自包含四 Skill Codex Plugin runtime、自举 Project Pack 与自动化安全回归已实现，已安装副本的 launcher/version/status/显式 `ecp-check` 只读 smoke 已验证；完整 fresh-task host-routing matrix、升级/卸载、签名/公开发布、真实独立项目接手/长期迭代试点和受保护 CI consumer 尚未完成，因此本阶段还不能被描述为已通过产品退出标准。
+状态：本地 Core/CLI、自包含四 Skill Codex Plugin runtime、自举 Project Pack 与自动化安全回归已实现；此前 installed launcher/status/显式 `ecp-check` smoke 暴露了 stale Skill locator，因此只算诊断。canonical host-routing matrix 当前仍为 0/42；升级/卸载、签名/公开发布、真实独立项目接手/长期迭代试点和受保护 CI consumer 尚未完成。本阶段不能描述为已通过产品退出标准，canonical checkpoint 见 [../STATUS.md](../STATUS.md)。
 
 - 严格、版本化且项目独立的 Project Truth schema；
 - Capability、Invariant、Component、Decision、Contract reference 和 Unknown；
@@ -82,7 +82,7 @@ Phase 1 原计划的 Runner 纵深强化不再整体先行。除阻断真实 Pro
 
 ## Phase 1B — Real Project Pilot
 
-状态：下一阶段。先在独立可丢弃 Workspaces 完成四 Skill 的 fresh-task host-routing matrix，再同时选择一个真正的新项目和一个持续开发的旧项目做跨 task/newcomer 双轨试点；试点数据不能由 ECP 自己的测试或静态 Skill 文本检查代替。
+状态：尚未进入。必须先让 canonical validator 对 exact installed package 的 fresh-task host-routing matrix（42 个 required runs）返回 PASS，且没有保留的 required/extra failure；当前为 0/42。随后才同时选择一个真正的新项目和一个持续开发的旧项目做跨 task/newcomer 双轨试点；ECP 自身、ECP worktree、静态 Skill 文本检查或 Core 单测都不能代替这两个独立产品轨道。
 
 - 新旧两个项目都完整覆盖基线恢复、普通 Change、语义 Change、新人接手和故障演练，每个至少八个真实 Change，合计至少二十个；
 - 在新项目验证诚实 seed/established Truth 与 Unknown 保留，在旧项目验证历史合同恢复、dirty diff 保护和兼容边界；

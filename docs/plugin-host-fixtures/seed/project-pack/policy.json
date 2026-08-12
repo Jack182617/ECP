@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "default_risk": "moderate",
+  "acknowledgement_required_for": [
+    "high",
+    "critical"
+  ],
+  "denied_path_roots": [
+    ".ecp"
+  ],
+  "risk_rules": [
+    {
+      "path_root": "admin",
+      "risk": "high"
+    }
+  ],
+  "inherited_environment": [],
+  "max_gate_output_bytes": 65536,
+  "max_source_files": 1000,
+  "max_source_bytes": 10485760
+}

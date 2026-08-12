@@ -258,6 +258,7 @@ func VerifyAuthorityExport(ctx context.Context, bundlePath string) (AuthorityVer
 		return AuthorityVerifyResult{}, newError(KindIntegrity, "EXPORT_IDENTITY_MISMATCH", "exported Workspace binding does not match the manifest", nil)
 	}
 	bundleStore := &Store{
+		baseDir:     authorityDir,
 		projectID:   manifest.ProjectID,
 		workspaceID: manifest.WorkspaceID,
 		authorityID: manifest.AuthorityID,
@@ -288,10 +289,14 @@ func VerifyAuthorityExport(ctx context.Context, bundlePath string) (AuthorityVer
 	}
 	for _, changeID := range projection.ChangeOrder {
 		for _, evidence := range projection.Evidence[changeID] {
-			if err := bundleStore.VerifyArtifact(evidence.StdoutArtifact, evidence.StdoutStoredDigest); err != nil {
+			stdoutSize, stderrSize, err := expectedEvidenceArtifactSizes(projection, evidence)
+			if err != nil {
 				return AuthorityVerifyResult{}, err
 			}
-			if err := bundleStore.VerifyArtifact(evidence.StderrArtifact, evidence.StderrStoredDigest); err != nil {
+			if err := bundleStore.VerifyArtifact(evidence.StdoutArtifact, evidence.StdoutStoredDigest, stdoutSize); err != nil {
+				return AuthorityVerifyResult{}, err
+			}
+			if err := bundleStore.VerifyArtifact(evidence.StderrArtifact, evidence.StderrStoredDigest, stderrSize); err != nil {
 				return AuthorityVerifyResult{}, err
 			}
 		}
@@ -376,10 +381,14 @@ func collectAuthorityExportSources(ctx context.Context, service Service, workspa
 	}
 	for _, changeID := range projection.ChangeOrder {
 		for _, evidence := range projection.Evidence[changeID] {
-			if err := workspace.Store.VerifyArtifact(evidence.StdoutArtifact, evidence.StdoutStoredDigest); err != nil {
+			stdoutSize, stderrSize, err := expectedEvidenceArtifactSizes(projection, evidence)
+			if err != nil {
 				return nil, err
 			}
-			if err := workspace.Store.VerifyArtifact(evidence.StderrArtifact, evidence.StderrStoredDigest); err != nil {
+			if err := workspace.Store.VerifyArtifact(evidence.StdoutArtifact, evidence.StdoutStoredDigest, stdoutSize); err != nil {
+				return nil, err
+			}
+			if err := workspace.Store.VerifyArtifact(evidence.StderrArtifact, evidence.StderrStoredDigest, stderrSize); err != nil {
 				return nil, err
 			}
 			for _, relative := range []string{evidence.StdoutArtifact, evidence.StderrArtifact} {

@@ -336,6 +336,7 @@ func verifyReferencedTruthBlobs(ctx context.Context, store *Store, projection Pr
 
 type authorityEvidenceReference struct {
 	digest string
+	size   int64
 	valid  bool
 }
 
@@ -343,18 +344,23 @@ func verifyReferencedEvidence(ctx context.Context, store *Store, projection Proj
 	references := make(map[string]authorityEvidenceReference)
 	for _, changeID := range projection.ChangeOrder {
 		for _, evidence := range projection.Evidence[changeID] {
-			for _, item := range []struct{ path, digest string }{{evidence.StdoutArtifact, evidence.StdoutStoredDigest}, {evidence.StderrArtifact, evidence.StderrStoredDigest}} {
+			stdoutSize, stderrSize, sizeErr := expectedEvidenceArtifactSizes(projection, evidence)
+			for _, item := range []struct {
+				path   string
+				digest string
+				size   int64
+			}{{evidence.StdoutArtifact, evidence.StdoutStoredDigest, stdoutSize}, {evidence.StderrArtifact, evidence.StderrStoredDigest, stderrSize}} {
 				canonical := isCanonicalEvidenceArtifactPath(item.path)
 				validDigest := isSHA256Digest(item.digest)
 				current, exists := references[item.path]
-				if exists && current.digest != item.digest {
+				if exists && (current.digest != item.digest || current.size != item.size) {
 					current.valid = false
 					references[item.path] = current
 					builder.add(AuthorityHealthSeverityIndeterminate, "EVIDENCE_REFERENCE_COLLISION", "authority history references one Evidence path with different digests", item.path)
 					continue
 				}
-				references[item.path] = authorityEvidenceReference{digest: item.digest, valid: canonical && validDigest}
-				if !canonical || !validDigest {
+				references[item.path] = authorityEvidenceReference{digest: item.digest, size: item.size, valid: canonical && validDigest && sizeErr == nil}
+				if !canonical || !validDigest || sizeErr != nil {
 					builder.add(AuthorityHealthSeverityIndeterminate, "EVIDENCE_REFERENCE_INVALID", "authority history contains a non-canonical Evidence artifact reference", item.path)
 				}
 			}
@@ -421,7 +427,7 @@ func verifyReferencedEvidence(ctx context.Context, store *Store, projection Proj
 			builder.add(AuthorityHealthSeverityIndeterminate, "AUTHORITY_HEALTH_TOO_LARGE", "referenced Evidence artifacts exceed the supported aggregate inventory size", "artifacts")
 			break
 		}
-		if err := store.VerifyArtifact(relative, reference.digest); err != nil {
+		if err := store.VerifyArtifact(relative, reference.digest, reference.size); err != nil {
 			health.InvalidReferencedFiles++
 			addHealthError(builder, err, relative)
 			continue

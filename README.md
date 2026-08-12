@@ -1,5 +1,8 @@
 # ECP — Engineering Control Plane
 
+> 当前结论与下一步以 [STATUS.md](STATUS.md) 为准：真实 Plugin host-routing
+> matrix 仍是 0/42，尚未进入真实项目试点。ECP 自身不作为 fixture 或试点项目。
+
 ECP 是一套面向长期 AI 原生软件开发的、多项目通用、工具无关、local-first 的项目连续性与可信变更控制系统。它不替代 Codex、IDE、Git、测试框架或 CI；它让项目自身长期保存关键产品与工程事实，并把一次工程变更的目标、影响、风险、验证命令、执行证据和裁决绑定到同一个精确的软件状态上。
 
 长期产品目标见 [NORTH_STAR.md](NORTH_STAR.md)。当前仓库已把 Assurance Kernel 扩展为本地语义闭环：独立摘要和接受版本的 Project Truth、逐项 Requirement 决策/覆盖、结构化 Change Impact、路径反推影响、取消后 baseline 继承、受保护真相差异、选择性 Gate、Semantic Reconciliation、持久 GateRun 生命周期，以及与最终源码/真相精确绑定的 Evidence/Verdict 已实现。真实长期项目试点、跨平台隔离 Runner、可信外部 Evidence 导入和受保护 CI enforcement 仍未完成，因此不能把当前本地闭环外推为完整、不可绕过的长期零手写代码保证。
@@ -161,6 +164,7 @@ Future enforcement consumers
 更完整的产品合同、状态机和安全边界见：
 
 - [NORTH_STAR.md](NORTH_STAR.md)
+- [STATUS.md](STATUS.md)
 - [SPEC.md](SPEC.md)
 - [docs/project-pack.md](docs/project-pack.md)
 - [docs/verification-matrix.md](docs/verification-matrix.md)
