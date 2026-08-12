@@ -84,18 +84,25 @@ rerun.
 
 ## Current bounded evidence
 
-On 2026-08-12, an installed `ecp-codex` copy at Plugin version
-`0.3.0-dev+codex.20260812055614` was inspected in Codex Desktop. Its 21 packaged
-files matched the reviewed source byte-for-byte, its installed launcher returned
-Core identity
-`0.3.0-dev+sha256:0e716e999a01b1499fd820901bdc2314904d2b023dc18d05b4eb87a2b5b55335`,
-and an explicit `ecp-check` request read the ECP repository as disabled without
-changing project mode or Git state.
+On 2026-08-12, Plugin version
+`0.3.0-dev+codex.20260812072220` was installed from the configured `ecp-local`
+Marketplace. The installed cache matched the reviewed Plugin source
+byte-for-byte, and its launcher returned Core identity
+`0.3.0-dev+sha256:0e716e999a01b1499fd820901bdc2314904d2b023dc18d05b4eb87a2b5b55335`.
 
-That is installed-copy read-only smoke evidence only. The task carried prior
-context and did not execute the independent fresh-task inventory, upgrade,
-uninstall, reinstallation, `ecp-enable`, governed `ecp-change`, or
-`ecp-disable`. No other case in the inventory is recorded as passed.
+Two separately created fresh Codex Desktop worktree tasks then received the
+exact `check-direct-status-version` prompt. Tasks
+`019ff50a-2760-7d61-8854-532b393f7714` and
+`019ff50a-2760-7d61-8854-530b657b358d` both selected `ecp-check`, located the
+installed launcher, reported the same Core identity and authoritative
+`enabled: false` state, and left their Git worktrees clean.
+
+These runs are fresh-host discovery smoke evidence only. Their worktrees were
+derived from the ECP source repository rather than the required disposable
+`greenfield-disabled` fixture, so neither run is counted as an inventory pass.
+The independent 42-run fixture matrix, `ecp-enable`, governed `ecp-change`,
+`ecp-disable`, and uninstall/reinstallation lifecycle remain unverified; no
+inventory case is recorded as passed.
 
 ## Pilot precondition
 
