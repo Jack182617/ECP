@@ -1,6 +1,6 @@
 {
   "name": "ecp-codex",
-  "version": "0.3.0-dev+codex.20260813053446",
+  "version": "0.3.0-dev+codex.20260813053857",
   "description": "Check, enable, disable, and govern ECP projects through four focused Skills backed by one bundled local Core.",
   "author": {
     "name": "ECP Project"
