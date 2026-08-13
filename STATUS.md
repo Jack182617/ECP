@@ -21,9 +21,13 @@ fixture or a real-project pilot track.
 
 - The source candidate now stops greenfield enablement when Core reports
   `READY`, leaves Truth onboarding as a separately authorized later Change, and
-  carries the serial 12-qualification/9-extended host contract. Focused source,
-  fixture, validator, Core, and CLI checks pass locally. This is not yet a
-  frozen or installed exact candidate.
+  carries the serial 12-qualification/9-extended host contract. The frozen
+  source candidate is installed as Plugin version
+  `0.3.0-dev+codex.20260813053857`; its installed copy matches the source,
+  installed-launcher version/status readback passes, and the installed launcher
+  validates all five deterministic fixture profiles. The official Plugin/Skill
+  validators remain unexecuted because this host Python lacks `yaml`; no
+  dependency was installed.
 - Repository tests and static Skill checks remain useful mechanism evidence,
   but they do not prove that Codex Desktop selected the intended installed
   locator, loaded the dedicated authority, or followed the natural-language
@@ -47,23 +51,20 @@ fixture or a real-project pilot track.
 
 ## Next actions, in order
 
-1. Freeze all intended Core, Skill, reference, protocol, and manifest source at
-   one reproducible checkpoint before packaging. The current dirty working tree
-   is not that checkpoint; packaging still requires either an explicitly
-   authorized local commit or an explicitly revised clean-staging contract.
-2. Build and install one new cachebuster candidate. In a fresh read-only task,
-   freeze the exact installed Skill locator, Plugin version, bundled Core
-   identity, and unchanged default project mode.
-3. Execute the 12 canaries once each, serially and fail-fast, using a fresh
+1. Start a fresh Codex task after the installed Plugin is picked up. In that
+   task, freeze the exact installed Skill locator, Plugin version, bundled Core
+   identity, and unchanged default project mode; the current installation
+   cannot be proven by the task that preceded it.
+2. Execute the 12 canaries once each, serially and fail-fast, using a fresh
    disposable Git Workspace and dedicated `ECP_STATE_DIR` for every canary.
    Preserve every result in the durable external results root and require
    `12/12` for the exact unchanged candidate.
-4. Only after that gate passes, use safe copies of one genuinely new product
+3. Only after that gate passes, use safe copies of one genuinely new product
    and one established product. Complete two or three bounded real Changes and
    one fresh-task handoff in each track. Measure recovered context, useful
    catches, false blockers, interaction burden, validation time, and truth
    maintenance cost.
-5. Decide whether to expand, simplify, or stop the rollout from those
+4. Decide whether to expand, simplify, or stop the rollout from those
    value-versus-friction observations. Do not pre-commit to a larger matrix or a
    fixed Change count merely to manufacture completion.
 
