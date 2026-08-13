@@ -5,6 +5,13 @@ write the repository-external authority store directly. Never ask the user to
 transcribe an opaque field; copy it internally only from the named immediately
 preceding JSON result.
 
+For an ordinary repository or product task, establish current project and ECP
+facts from the canonical Git Workspace and the selected installed Plugin's
+public launcher operations. Do not substitute chat history, another checkout,
+or undocumented payload assumptions for those observations, and never open or
+traverse the live authority store. Work explicitly scoped to developing ECP
+may inspect the current canonical ECP source Workspace.
+
 Within the installed Plugin, every `ecp ...` command in this reference means
 the shared `scripts/ecp` launcher resolved from the selected ECP Skill's
 installed Plugin root. Never use an ambient PATH executable. The launcher selects the bundled
@@ -67,6 +74,56 @@ returns that same synopsis. All operation results other than help are JSON.
 Treat every ID and `sha256:...` value as opaque Core output. Preserve the whole
 string; never trim its prefix, recompute it, mix separate reads, or silently
 substitute a new value after mismatch.
+
+The exact `--requirement` JSON shape is:
+
+```json
+{
+  "id": "canonical-id",
+  "statement": "Exact behavior that applies now.",
+  "status": "DECIDED",
+  "verification": "AUTOMATED",
+  "rationale": "Why this decision is correct for the Change.",
+  "decision_source": "Accepted truth, current code, or explicit user decision.",
+  "revisit_condition": "Required only for DEFERRED_SAFE.",
+  "required_gate_ids": ["exact-gate-id"],
+  "covers": {
+    "acceptance_criteria": ["exact Change acceptance item"],
+    "user_journeys": ["exact Change journey item"],
+    "data_effects": ["exact Change data item"],
+    "operational_effects": ["exact Change operation item"],
+    "expected_changes": ["exact Change expected-change item"],
+    "expected_preservations": ["exact Change preservation item"],
+    "unknowns": ["exact Change unknown item"]
+  }
+}
+```
+
+Omit, rather than invent, optional empty fields. `status` is `DECIDED`,
+`NOT_APPLICABLE`, `DEFERRED_SAFE`, or `BLOCKING_UNKNOWN`; Core refuses to start
+on `BLOCKING_UNKNOWN`. `verification` is `AUTOMATED`, `REVIEW`, or `EXTERNAL`.
+`AUTOMATED` requires `DECIDED` plus one or more sorted exact
+`required_gate_ids`; `REVIEW` claims no Gate Evidence; `EXTERNAL` remains
+pending. Every string in `covers` must exactly equal an item supplied elsewhere
+in the same Change contract, and all such items must be covered. Requirements
+are unique and sorted by `id`.
+
+The exact `--requirement-result` JSON shape is:
+
+```json
+{
+  "requirement_id": "canonical-id",
+  "outcome": "VERIFIED",
+  "evidence_gate_ids": ["exact-gate-id"],
+  "summary": "How this exact requirement reconciled."
+}
+```
+
+Results are unique, sorted by `requirement_id`, and cover every Requirement.
+Use `NOT_APPLICABLE` for that status, `DEFERRED_SAFE` for that status,
+`EXTERNAL_PENDING` for external verification, and `VERIFIED` otherwise.
+`AUTOMATED` results carry the exact sorted `required_gate_ids` as
+`evidence_gate_ids`; reviewed results omit that field.
 
 - `project register` consumes one `project inspect` result:
   `authority_id`, `workspace_id`, `candidate_config_digest`, and
@@ -144,6 +201,15 @@ exact human-readable action:
   acknowledgement requires a new explicit confirmation after the adapter shows
   the human-readable change/risk. A general implementation request is
   insufficient for setting `--confirm-protected`.
+- A Gate plan whose effective risk is `high` or `critical` creates an earlier
+  human-confirmation barrier: show the concrete risk and obtain explicit
+  confirmation before the first repository write or Gate run. Without it,
+  leave the bounded Change ACTIVE with no product write, GateRun, or Evidence.
+  This is a human decision, not a premature Core acknowledgement. Only after
+  final source, reconciliation, and Evidence make `ACKNOWLEDGEMENT_REQUIRED`
+  the sole blocker may the adapter bind a still-applicable confirmation to the
+  exact current subject with `acknowledgement record`. Scope, risk, protected
+  semantics, or effect drift invalidates the earlier confirmation.
 
 Use `codex-local-adapter` as an origin label and preserve a concise reason from
 the current request. Never claim that the CLI proved a human identity.

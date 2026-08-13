@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Focused fail-closed tests for the canonical Plugin host result validator."""
+"""Focused fail-closed tests for Plugin host qualification results."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ import unittest
 
 
 SCRIPT = Path(__file__).with_name("validate-plugin-host-results.py")
+SCHEMA = SCRIPT.parents[1] / "docs" / "plugin-host-evaluation-result.schema.json"
 SPEC = importlib.util.spec_from_file_location("plugin_host_results", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 validator = importlib.util.module_from_spec(SPEC)
@@ -132,11 +133,11 @@ def passing_record(case: dict[str, object], run_number: int) -> dict[str, object
             "observed_project_mode_mutation": "none",
         }, final_turn]
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "campaign_id": "campaign-1",
         "case_id": case["id"],
         "run_number": run_number,
-        "required_run": run_number <= int(case["minimum_runs"]),
+        "required_run": case["suite"] == "qualification" and run_number == 1,
         "task_id": f"task-{case['id']}-{run_number}",
         "fixture_id": f"{case['id']}-run-{run_number:02d}",
         "fixture_profile": profile,
@@ -145,18 +146,13 @@ def passing_record(case: dict[str, object], run_number: int) -> dict[str, object
             "project_trusted": True,
             "project_config_loaded": True,
             "installed_launcher_only": True,
-            "task_authority_matches_operator": True,
             "fixture_state_dir_path_sha256": digest("5"),
-            "task_state_dir_path_sha256": digest("5"),
             "operator_state_dir_path_sha256": digest("5"),
             "fixture_authority_id_sha256": digest("6"),
-            "task_authority_id_sha256": digest("6"),
             "operator_authority_id_sha256": digest("6"),
             "fixture_plugin_version_sha256": validator.sha256_text("0.3.0-test"),
-            "task_plugin_version_sha256": validator.sha256_text("0.3.0-test"),
             "operator_plugin_version_sha256": validator.sha256_text("0.3.0-test"),
             "fixture_core_identity_sha256": validator.sha256_text("0.3.0-test+sha256:" + "8" * 64),
-            "task_core_identity_sha256": validator.sha256_text("0.3.0-test+sha256:" + "8" * 64),
             "operator_core_identity_sha256": validator.sha256_text("0.3.0-test+sha256:" + "8" * 64),
             "default_authority_before_sha256": digest("7"),
             "default_authority_after_sha256": digest("7"),
@@ -184,123 +180,138 @@ class ValidatorTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.cases = validator.load_cases(validator.DEFAULT_CASES)
+        cls.qualification = validator.qualification_cases(cls.cases)
 
-    def create_complete_campaign(self, root: Path) -> dict[tuple[str, int], dict[str, object]]:
-        records: dict[tuple[str, int], dict[str, object]] = {}
-        for case_id, case in self.cases.items():
-            for run_number in range(1, int(case["minimum_runs"]) + 1):
-                record = passing_record(case, run_number)
-                with contextlib.redirect_stdout(io.StringIO()):
-                    validator.record_result(root, self.write_draft(root.parent, record), self.cases)
-                records[(case_id, run_number)] = record
-        return records
-
-    def write_draft(self, parent: Path, record: dict[str, object]) -> Path:
+    @staticmethod
+    def write_draft(parent: Path, record: dict[str, object]) -> Path:
         drafts = parent / "drafts"
         drafts.mkdir(exist_ok=True)
         path = drafts / f"{record['case_id']}-{record['run_number']}-{len(list(drafts.iterdir()))}.json"
         path.write_text(json.dumps(record), encoding="utf-8")
         return path
 
-    def test_complete_42_run_matrix_passes(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary) / "results"
-            self.create_complete_campaign(root)
-            validator.validate_results(root, self.cases)
+    def append(self, root: Path, record: dict[str, object]) -> None:
+        with contextlib.redirect_stdout(io.StringIO()):
+            validator.record_result(root, self.write_draft(root.parent, record), self.cases)
 
-    def test_missing_required_run_fails(self) -> None:
+    def create_complete_campaign(self, root: Path) -> None:
+        for case in self.qualification:
+            self.append(root, passing_record(case, 1))
+
+    def test_complete_12_case_qualification_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "results"
             self.create_complete_campaign(root)
-            next((root / "runs").iterdir()).unlink()
-            with self.assertRaisesRegex(validator.ValidationError, "missing required runs"):
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                validator.validate_results(root, self.cases)
+            self.assertIn("QUALIFIED: 12 qualification cases passed", output.getvalue())
+
+    def test_invalid_attempt_can_retry_in_fresh_fixture(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "results"
+            first = passing_record(self.qualification[0], 1)
+            first.update(outcome="INVALID", failure_codes=["infra-dispatch-timeout"])
+            first["environment_probe"]["project_config_loaded"] = False
+            self.append(root, first)
+            self.append(root, passing_record(self.qualification[0], 2))
+            for case in self.qualification[1:]:
+                self.append(root, passing_record(case, 1))
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                validator.validate_results(root, self.cases)
+            self.assertIn("1 INVALID attempts", output.getvalue())
+
+    def test_second_invalid_is_terminal_for_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "results"
+            for run_number in (1, 2):
+                invalid = passing_record(self.qualification[0], run_number)
+                invalid.update(outcome="INVALID", failure_codes=["infra-dispatch-timeout"])
+                invalid["environment_probe"]["project_config_loaded"] = False
+                self.append(root, invalid)
+            with self.assertRaisesRegex(validator.ValidationError, "one fresh-fixture retry also failed"):
+                self.append(root, passing_record(self.qualification[0], 3))
+            with self.assertRaisesRegex(validator.ValidationError, "infrastructure failed twice"):
                 validator.validate_results(root, self.cases)
 
-    def test_inventory_with_one_case_removed_fails(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            inventory = validator.load_json(validator.DEFAULT_CASES)
-            inventory["cases"].pop()
-            path = Path(temporary) / "cases.json"
-            path.write_text(json.dumps(inventory), encoding="utf-8")
-            with self.assertRaisesRegex(validator.ValidationError, "exactly 21 cases"):
-                validator.load_cases(path)
-
-    def test_duplicate_logical_run_fails(self) -> None:
+    def test_product_fail_is_terminal(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "results"
-            self.create_complete_campaign(root)
-            source = next((root / "runs").iterdir())
-            (root / "runs" / "duplicate.json").write_bytes(source.read_bytes())
-            with self.assertRaisesRegex(validator.ValidationError, "duplicate logical run"):
-                validator.validate_results(root, self.cases)
-
-    def test_failed_required_run_cannot_be_overwritten(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary) / "results"
-            case = next(iter(self.cases.values()))
-            failed = passing_record(case, 1)
+            failed = passing_record(self.qualification[0], 1)
             failed.update(outcome="FAIL", failure_codes=["wrong-route"], selected_skill="none")
-            with contextlib.redirect_stdout(io.StringIO()):
-                validator.record_result(root, self.write_draft(Path(temporary), failed), self.cases)
-            replacement = passing_record(case, 1)
-            with self.assertRaisesRegex(validator.ValidationError, "refusing to overwrite"):
-                validator.record_result(root, self.write_draft(Path(temporary), replacement), self.cases)
+            self.append(root, failed)
+            with self.assertRaisesRegex(validator.ValidationError, "product FAIL is terminal"):
+                self.append(root, passing_record(self.qualification[1], 1))
+            with self.assertRaisesRegex(validator.ValidationError, "FAILED: product behavior failed"):
+                validator.validate_results(root, self.cases)
 
-    def test_default_authority_change_breaks_campaign_identity(self) -> None:
+    def test_qualification_is_serial(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "results"
-            cases = list(self.cases.values())
-            first = passing_record(cases[0], 1)
-            with contextlib.redirect_stdout(io.StringIO()):
-                validator.record_result(root, self.write_draft(Path(temporary), first), self.cases)
-            second = passing_record(cases[1], 1)
-            second["environment_probe"]["default_authority_before_sha256"] = digest("9")
-            second["environment_probe"]["default_authority_after_sha256"] = digest("9")
-            with self.assertRaisesRegex(validator.ValidationError, "differs from campaign"):
-                validator.record_result(root, self.write_draft(Path(temporary), second), self.cases)
+            with self.assertRaisesRegex(validator.ValidationError, "next case must be"):
+                self.append(root, passing_record(self.qualification[1], 1))
 
-    def test_unauthorized_authority_mutation_cannot_pass(self) -> None:
-        case = next(iter(self.cases.values()))
-        record = passing_record(case, 1)
-        record["observed_authority_mutation"] = "unauthorized"
-        self.assertTrue(any("observed_authority_mutation" in error for error in validator.validate_record(record, self.cases)))
+    def test_missing_case_is_incomplete(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "results"
+            self.append(root, passing_record(self.qualification[0], 1))
+            with self.assertRaisesRegex(validator.ValidationError, "INCOMPLETE"):
+                validator.validate_results(root, self.cases)
 
-    def test_follow_up_first_turn_cannot_prime_ecp(self) -> None:
-        case = self.cases["change-indirect-follow-up-implementation"]
-        record = passing_record(case, 1)
-        record["turn_observations"][0]["selected_skill"] = "ecp-change"
-        record["turn_observations"][0]["observed_status_probe"] = "installed-launcher-before-first-mutation"
-        errors = validator.validate_record(record, self.cases)
-        self.assertTrue(any("read-only pre-final prompt turn" in error for error in errors))
+    def test_inventory_has_12_qualification_and_9_extended_cases(self) -> None:
+        self.assertEqual(len(self.cases), 21)
+        self.assertEqual(len(self.qualification), 12)
+        self.assertEqual(sum(case["suite"] == "extended" for case in self.cases.values()), 9)
+        self.assertEqual([case["qualification_order"] for case in self.qualification], list(range(1, 13)))
 
-    def test_established_enablement_must_preserve_existing_dirty_content(self) -> None:
+    def test_extended_case_requires_completed_qualification(self) -> None:
+        extended = next(case for case in self.cases.values() if case["suite"] == "extended")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "results"
+            with self.assertRaisesRegex(validator.ValidationError, "only after qualification is QUALIFIED"):
+                self.append(root, passing_record(extended, 1))
+
+    def test_established_enablement_preserves_existing_dirty_content(self) -> None:
         case = self.cases["enable-direct-established"]
         record = passing_record(case, 1)
         record["after"]["repository"]["changed_path_states"][0]["sha256"] = digest("9")
         errors = validator.validate_record(record, self.cases)
         self.assertTrue(any("pre-existing repository change was not preserved" in error for error in errors))
 
-    def test_task_and_operator_package_identity_must_match_fixture(self) -> None:
-        case = next(iter(self.cases.values()))
-        record = passing_record(case, 1)
-        record["environment_probe"]["task_core_identity_sha256"] = digest("9")
+    def test_operator_package_identity_must_match_fixture(self) -> None:
+        record = passing_record(self.qualification[0], 1)
+        record["environment_probe"]["operator_core_identity_sha256"] = digest("9")
         errors = validator.validate_record(record, self.cases)
         self.assertTrue(any("different Core identities" in error for error in errors))
 
-    def test_cancelled_change_cannot_masquerade_as_governed_completion(self) -> None:
-        case = self.cases["change-direct-enabled-edit"]
-        record = passing_record(case, 1)
-        authority_after = record["after"]["authority"]
-        authority_after["completed_change_count"] = 0
-        authority_after["cancelled_change_count"] = 1
+    def test_invalid_requires_infrastructure_failure_code(self) -> None:
+        record = passing_record(self.qualification[0], 1)
+        record.update(outcome="INVALID", failure_codes=["wrong-route"])
         errors = validator.validate_record(record, self.cases)
-        self.assertTrue(any("COMPLETED Change" in error for error in errors))
+        self.assertIn("INVALID must include an infra- failure code", errors)
 
-    def test_results_root_must_be_absolute_and_outside_source(self) -> None:
-        with self.assertRaises(validator.ValidationError):
+    def test_result_schema_exposes_three_attempt_outcomes(self) -> None:
+        schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+        self.assertEqual(schema["properties"]["schema_version"]["const"], 2)
+        self.assertEqual(schema["properties"]["outcome"]["enum"], ["PASS", "FAIL", "INVALID"])
+
+    def test_results_root_rejects_source_temp_authority_and_cache(self) -> None:
+        with self.assertRaisesRegex(validator.ValidationError, "absolute"):
             validator.results_root("relative/results")
-        with self.assertRaises(validator.ValidationError):
-            validator.results_root(str(validator.REPO_ROOT / "results"))
+        for path in (
+            validator.REPO_ROOT / "results",
+            Path(tempfile.gettempdir()) / "ecp-results",
+            Path("/var/lib/authority/ecp-results"),
+            Path("/var/lib/cache/ecp-results"),
+        ):
+            with self.subTest(path=path):
+                with self.assertRaises(validator.ValidationError):
+                    validator.results_root(str(path))
+        self.assertEqual(
+            validator.results_root("/var/lib/ecp-plugin-results/campaign-1"),
+            Path("/var/lib/ecp-plugin-results/campaign-1").resolve(),
+        )
 
 
 if __name__ == "__main__":

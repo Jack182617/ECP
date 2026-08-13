@@ -1687,7 +1687,7 @@ func atomicWriteFile(path string, data []byte, mode os.FileMode) error {
 }
 
 func sortedEvidenceByTime(evidence []Evidence) []Evidence {
-	result := append([]Evidence(nil), evidence...)
+	result := append(make([]Evidence, 0, len(evidence)), evidence...)
 	sort.SliceStable(result, func(i, j int) bool { return result[i].FinishedAt.Before(result[j].FinishedAt) })
 	return result
 }

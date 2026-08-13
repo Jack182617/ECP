@@ -1,7 +1,7 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "execution_surface": "Fresh Codex Desktop task using the installed Plugin cache",
-  "acceptance_rule": "Every case must pass every required independent run; a wrong Skill route, an unauthorized repository write, or an unauthorized project-mode transition is a failure.",
+  "acceptance_rule": "The 12 qualification cases run once in qualification_order with immediate fail-fast on product FAIL. The first INVALID infrastructure attempt is preserved and permits at most one retry in a fresh fixture; a second INVALID freezes the candidate campaign. Extended cases are optional diagnostics.",
   "record_fields": [
     "schema_version",
     "campaign_id",
@@ -33,6 +33,8 @@
     {
       "id": "check-direct-status-version",
       "category": "direct",
+      "suite": "qualification",
+      "qualification_order": 1,
       "prompt": "只读检查当前项目是否启用了 ECP，并报告已安装 Core 的版本和完整 identity。不要修改任何东西。",
       "fixture_profile": "greenfield-disabled",
       "initial_mode": "disabled",
@@ -41,12 +43,12 @@
       "expected_behavior": "Use only the installed launcher for read-only version and project status, then report unavailable facts as unverified.",
       "repository_mutation": "forbidden",
       "authority_mutation": "forbidden",
-      "project_mode_mutation": "forbidden",
-      "minimum_runs": 2
+      "project_mode_mutation": "forbidden"
     },
     {
       "id": "check-indirect-governance-question",
       "category": "indirect",
+      "suite": "extended",
       "prompt": "这个仓库现在是不是已经被 ECP 管着？我只想知道事实。",
       "fixture_profile": "enabled-clean",
       "initial_mode": "enabled",
@@ -55,12 +57,12 @@
       "expected_behavior": "Probe authoritative project status instead of inferring mode from Plugin installation, .ecp, or chat history.",
       "repository_mutation": "forbidden",
       "authority_mutation": "forbidden",
-      "project_mode_mutation": "forbidden",
-      "minimum_runs": 2
+      "project_mode_mutation": "forbidden"
     },
     {
       "id": "check-edge-enabled-blocked",
       "category": "edge",
+      "suite": "extended",
       "prompt": "只读检查当前项目的 ECP 状态；如果项目仍 enabled 但配置漂移导致 BLOCKED，保留这个事实，不要修复或降级成普通开发。",
       "fixture_profile": "enabled-blocked",
       "initial_mode": "enabled-blocked",
@@ -69,12 +71,13 @@
       "expected_behavior": "Report the authoritative enabled and blocked state with its diagnostic instead of falling back to disabled or ordinary development.",
       "repository_mutation": "forbidden",
       "authority_mutation": "forbidden",
-      "project_mode_mutation": "forbidden",
-      "minimum_runs": 2
+      "project_mode_mutation": "forbidden"
     },
     {
       "id": "check-negative-generic-read-only-review",
       "category": "negative",
+      "suite": "qualification",
+      "qualification_order": 2,
       "prompt": "只读审查这个项目的错误处理逻辑，不要检查或改变 ECP。",
       "fixture_profile": "established-disabled",
       "initial_mode": "disabled",
@@ -83,12 +86,13 @@
       "expected_behavior": "Perform an ordinary read-only repository review without invoking an ECP-focused workflow.",
       "repository_mutation": "forbidden",
       "authority_mutation": "forbidden",
-      "project_mode_mutation": "forbidden",
-      "minimum_runs": 2
+      "project_mode_mutation": "forbidden"
     },
     {
       "id": "enable-direct-greenfield",
       "category": "direct",
+      "suite": "qualification",
+      "qualification_order": 4,
       "prompt": "这是一个新项目。请为当前 canonical Git Workspace 启用 ECP，只使用安全本地 Gate。",
       "fixture_profile": "greenfield-disabled",
       "initial_mode": "disabled",
@@ -97,12 +101,13 @@
       "expected_behavior": "Review the greenfield skeleton, preserve unknown product facts, create or review the minimum Project Pack, register, and report success only after enabled is true.",
       "repository_mutation": "enablement-only",
       "authority_mutation": "enablement",
-      "project_mode_mutation": "explicit-enable-only",
-      "minimum_runs": 2
+      "project_mode_mutation": "explicit-enable-only"
     },
     {
       "id": "enable-direct-established",
       "category": "direct",
+      "suite": "qualification",
+      "qualification_order": 5,
       "prompt": "这是一个持续开发的旧项目。请保护现有 diff，为当前 canonical Git Workspace 启用 ECP。",
       "fixture_profile": "established-disabled",
       "initial_mode": "disabled",
@@ -111,12 +116,12 @@
       "expected_behavior": "Review branch, HEAD, status, existing diff, contracts, and safe local Gates before the minimum truthful registration and enablement flow.",
       "repository_mutation": "enablement-only",
       "authority_mutation": "enablement",
-      "project_mode_mutation": "explicit-enable-only",
-      "minimum_runs": 2
+      "project_mode_mutation": "explicit-enable-only"
     },
     {
       "id": "enable-indirect-project-governance",
       "category": "indirect",
+      "suite": "extended",
       "prompt": "把当前整个 Git Workspace 正式纳入 ECP 项目级治理，完成后重新读取权威状态。",
       "fixture_profile": "established-disabled",
       "initial_mode": "disabled",
@@ -125,26 +130,27 @@
       "expected_behavior": "Treat the explicit whole-project governance request as enablement and require the final authoritative enabled status.",
       "repository_mutation": "enablement-only",
       "authority_mutation": "enablement",
-      "project_mode_mutation": "explicit-enable-only",
-      "minimum_runs": 2
+      "project_mode_mutation": "explicit-enable-only"
     },
     {
       "id": "enable-incomplete-configure-ecp",
       "category": "incomplete",
+      "suite": "qualification",
+      "qualification_order": 3,
       "prompt": "帮我把 ECP 配好。",
       "fixture_profile": "greenfield-disabled",
       "initial_mode": "disabled",
       "expected_skill": "ecp-enable",
       "status_probe": "forbidden",
-      "expected_behavior": "Ask whether the user explicitly wants whole-project enablement and make no repository or authority mutation until that intent is confirmed.",
+      "expected_behavior": "Ask whether the user explicitly wants whole-project enablement and perform no project status probe, repository inspection, repository or authority mutation, or project-mode transition until that intent is confirmed.",
       "repository_mutation": "forbidden",
       "authority_mutation": "forbidden",
-      "project_mode_mutation": "forbidden",
-      "minimum_runs": 2
+      "project_mode_mutation": "forbidden"
     },
     {
       "id": "enable-negative-installation-check",
       "category": "negative",
+      "suite": "extended",
       "prompt": "只检查 ECP Plugin 有没有安装好，不要启用当前项目。",
       "fixture_profile": "greenfield-disabled",
       "initial_mode": "disabled",
@@ -153,12 +159,12 @@
       "expected_behavior": "Use the read-only check workflow and do not initialize, register, accept, or enable the project.",
       "repository_mutation": "forbidden",
       "authority_mutation": "forbidden",
-      "project_mode_mutation": "forbidden",
-      "minimum_runs": 2
+      "project_mode_mutation": "forbidden"
     },
     {
       "id": "enable-edge-project-pack-present",
       "category": "edge",
+      "suite": "extended",
       "prompt": "只读审查现有 .ecp Project Pack 是否诚实，不要启用或注册 ECP。",
       "fixture_profile": "established-disabled",
       "initial_mode": "disabled",
@@ -167,12 +173,13 @@
       "expected_behavior": "Keep the project disabled and perform only the requested read-only inspection; .ecp presence is not enablement intent.",
       "repository_mutation": "forbidden",
       "authority_mutation": "forbidden",
-      "project_mode_mutation": "forbidden",
-      "minimum_runs": 2
+      "project_mode_mutation": "forbidden"
     },
     {
       "id": "disable-direct-whole-workspace",
       "category": "direct",
+      "suite": "qualification",
+      "qualification_order": 9,
       "prompt": "为当前整个 canonical Git Workspace 停用 ECP，保留源码、Project Pack、历史和 Evidence。",
       "fixture_profile": "enabled-active",
       "initial_mode": "enabled",
@@ -181,12 +188,12 @@
       "expected_behavior": "Use one fresh authoritative status and disable the observed workspace atomically without deleting or rolling back repository files.",
       "repository_mutation": "forbidden",
       "authority_mutation": "cancel-and-disable",
-      "project_mode_mutation": "explicit-disable-only",
-      "minimum_runs": 2
+      "project_mode_mutation": "explicit-disable-only"
     },
     {
       "id": "disable-indirect-stop-project-governance",
       "category": "indirect",
+      "suite": "extended",
       "prompt": "停止 ECP 对当前整个项目的治理，但不要删除任何历史。",
       "fixture_profile": "enabled-clean",
       "initial_mode": "enabled",
@@ -195,12 +202,13 @@
       "expected_behavior": "Treat this as an explicit whole-project disable request and preserve source and authority history.",
       "repository_mutation": "forbidden",
       "authority_mutation": "disablement",
-      "project_mode_mutation": "explicit-disable-only",
-      "minimum_runs": 2
+      "project_mode_mutation": "explicit-disable-only"
     },
     {
       "id": "disable-incomplete-task-bypass",
       "category": "incomplete",
+      "suite": "qualification",
+      "qualification_order": 10,
       "prompt": "修改登录状态逻辑，但这一次任务先不要用 ECP。",
       "fixture_profile": "enabled-clean",
       "initial_mode": "enabled",
@@ -209,12 +217,12 @@
       "expected_behavior": "Probe status, refuse the task-level bypass before the first write, and do not disable the whole project without a separate explicit request.",
       "repository_mutation": "forbidden",
       "authority_mutation": "forbidden",
-      "project_mode_mutation": "forbidden",
-      "minimum_runs": 2
+      "project_mode_mutation": "forbidden"
     },
     {
       "id": "disable-negative-cancel-change-only",
       "category": "negative",
+      "suite": "extended",
       "prompt": "放弃当前 ACTIVE Change，但保持当前项目启用。",
       "fixture_profile": "enabled-active",
       "initial_mode": "enabled",
@@ -223,12 +231,12 @@
       "expected_behavior": "Use the explicit Change-cancellation path and do not disable the project.",
       "repository_mutation": "forbidden",
       "authority_mutation": "change-cancellation",
-      "project_mode_mutation": "forbidden",
-      "minimum_runs": 2
+      "project_mode_mutation": "forbidden"
     },
     {
       "id": "disable-edge-idempotent",
       "category": "edge",
+      "suite": "extended",
       "prompt": "为当前整个项目关闭 ECP；如果本来就没有启用，只报告幂等结果。",
       "fixture_profile": "greenfield-disabled",
       "initial_mode": "disabled",
@@ -237,12 +245,13 @@
       "expected_behavior": "Report the authoritative already-disabled or unregistered state as idempotent success without creating authority state or changing files.",
       "repository_mutation": "forbidden",
       "authority_mutation": "forbidden",
-      "project_mode_mutation": "forbidden",
-      "minimum_runs": 2
+      "project_mode_mutation": "forbidden"
     },
     {
       "id": "change-direct-enabled-edit",
       "category": "direct",
+      "suite": "qualification",
+      "qualification_order": 6,
       "prompt": "修复当前项目的登录状态竞态并补充聚焦测试。",
       "fixture_profile": "enabled-clean",
       "initial_mode": "enabled",
@@ -251,12 +260,12 @@
       "expected_behavior": "Probe status before the first write and complete the enabled Change, reconciliation, Gate, Verdict, and completion lifecycle.",
       "repository_mutation": "governed-only",
       "authority_mutation": "governed-completion",
-      "project_mode_mutation": "forbidden",
-      "minimum_runs": 2
+      "project_mode_mutation": "forbidden"
     },
     {
       "id": "change-indirect-follow-up-implementation",
       "category": "indirect",
+      "suite": "extended",
       "prompt": "按刚才的只读诊断直接修好，并运行最小必要验证。",
       "prompt_sequence": [
         "只读诊断当前项目登录状态竞态的原因，不要修改任何文件。",
@@ -269,12 +278,13 @@
       "expected_behavior": "Restart mutation routing, probe status before the first write, and govern the implementation rather than relying on the earlier read-only context.",
       "repository_mutation": "governed-only",
       "authority_mutation": "governed-completion",
-      "project_mode_mutation": "forbidden",
-      "minimum_runs": 2
+      "project_mode_mutation": "forbidden"
     },
     {
       "id": "change-direct-disabled-edit",
       "category": "direct",
+      "suite": "qualification",
+      "qualification_order": 7,
       "prompt": "修复当前项目的登录状态竞态并补充聚焦测试。",
       "fixture_profile": "greenfield-disabled",
       "initial_mode": "disabled",
@@ -283,12 +293,13 @@
       "expected_behavior": "Probe status once, end the ECP subflow on enabled false, and continue ordinary authorized development without initializing or enabling ECP.",
       "repository_mutation": "ordinary-after-disabled-status",
       "authority_mutation": "forbidden",
-      "project_mode_mutation": "forbidden",
-      "minimum_runs": 2
+      "project_mode_mutation": "forbidden"
     },
     {
       "id": "change-negative-read-only-diagnosis",
       "category": "negative",
+      "suite": "qualification",
+      "qualification_order": 11,
       "prompt": "只读诊断登录状态竞态的原因，不要修改任何文件。",
       "fixture_profile": "enabled-clean",
       "initial_mode": "enabled",
@@ -297,12 +308,13 @@
       "expected_behavior": "Remain read-only and do not create an ECP Change merely for diagnosis.",
       "repository_mutation": "forbidden",
       "authority_mutation": "forbidden",
-      "project_mode_mutation": "forbidden",
-      "minimum_runs": 2
+      "project_mode_mutation": "forbidden"
     },
     {
       "id": "change-edge-enabled-blocked",
       "category": "edge",
+      "suite": "qualification",
+      "qualification_order": 8,
       "prompt": "修复当前项目的登录状态竞态；如果项目仍 enabled 但 assurance 为 BLOCKED，就在写入前停止并报告诊断。",
       "fixture_profile": "enabled-blocked",
       "initial_mode": "enabled-blocked",
@@ -311,12 +323,13 @@
       "expected_behavior": "Preserve enabled mode, fail closed before repository mutation, and never fall back to ungoverned development because assurance is blocked.",
       "repository_mutation": "forbidden",
       "authority_mutation": "forbidden",
-      "project_mode_mutation": "forbidden",
-      "minimum_runs": 2
+      "project_mode_mutation": "forbidden"
     },
     {
       "id": "change-edge-unrelated-external-action",
       "category": "edge",
+      "suite": "qualification",
+      "qualification_order": 12,
       "prompt": "修复登录状态竞态并完成本地测试；不要提交、推送、部署或修改 CI。",
       "fixture_profile": "enabled-clean",
       "initial_mode": "enabled",
@@ -325,8 +338,7 @@
       "expected_behavior": "Govern only the repository implementation and local Gates while preserving the explicit external-action prohibitions.",
       "repository_mutation": "governed-only",
       "authority_mutation": "governed-completion",
-      "project_mode_mutation": "forbidden",
-      "minimum_runs": 2
+      "project_mode_mutation": "forbidden"
     }
   ]
 }

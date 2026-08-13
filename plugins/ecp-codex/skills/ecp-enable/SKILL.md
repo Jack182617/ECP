@@ -1,13 +1,30 @@
 ---
 name: ecp-enable
-description: Enable ECP for the current canonical Git Workspace only after an explicit user request. Use for both new projects and already-developed projects that need reviewed local Gates, an evidence-backed minimal Project Pack, registration or initial acceptance, and a final authoritative enabled status. Do not trigger for ordinary implementation work or merely because the Plugin or .ecp exists.
+description: Enable ECP for the current canonical Git Workspace only after an explicit user request, or clarify an ambiguous request to configure or set up ECP without treating read-only observations as authorization. Use for both new projects and already-developed projects that need reviewed local Gates, an evidence-backed minimal Project Pack, registration or initial acceptance, and a final authoritative enabled status. Do not trigger for ordinary implementation work or merely because the Plugin or .ecp exists.
 ---
 
 # Enable ECP
 
-Enter this flow only when the user explicitly asks to enable ECP for the whole
-current project. Plugin installation, `.ecp`, another enabled clone/worktree,
-or an ordinary coding request is never enablement intent.
+Enter the mutating portion of this flow only when the user explicitly asks to
+enable ECP for the whole current project. Plugin installation, `.ecp`, another
+enabled clone/worktree, or an ordinary coding request is never enablement
+intent.
+
+## Confirm whole-project intent first
+
+Treat a request that only says to configure, set up, prepare, or "get ECP
+ready" as ambiguous. Select this Skill only to ask one short question: does the
+user explicitly want to enable ECP governance for the whole current canonical
+Git Workspace? Before that confirmation, limit work to the read-only inspection
+needed to answer or clarify the request; use the applicable check flow when an
+ECP status, installation, or version observation is needed. Reading repository
+content or a documented read-only ECP result does not authorize writing
+`.ecp`, registration, acceptance, activation, or any other repository,
+authority, or project-mode mutation.
+
+After an explicit whole-project confirmation, continue below. The confirmation
+authorizes only the reviewed local setup and enablement described by this
+Skill; it does not authorize an ordinary product change or an external action.
 
 ECP Core is the only authority for project mode, registration, accepted Control
 Config, accepted Project Truth, and activation. Read both the
@@ -72,15 +89,15 @@ CLI or copy opaque protocol values.
    `ecp project enable` with only the exact authority ID, Workspace ID,
    activation token, accepted config digest, and accepted truth digest from
    that one status. Core preflight must not execute a Gate during enablement.
-10. If initialization left accepted seed truth and repository evidence can now
-    establish durable facts, read `../ecp-change/SKILL.md` completely and use
-    one bounded onboarding Change. Show the exact protected truth delta in
-    product language and require explicit confirmation before reconciliation.
-    If evidence is insufficient, retain the seed Unknown and report it.
-11. Re-run `ecp project status`. Report success only when Core explicitly
-    returns `enabled: true` for this canonical Workspace. Summarize Project
-    Truth maturity/Unknowns, local Gate categories, and platform boundaries;
-    keep opaque values internal.
+10. Re-run `ecp project status`. Report success only when Core explicitly
+    returns `enabled: true`, `operational: true`, and `assurance: READY` for
+    this canonical Workspace. Summarize Project Truth maturity/Unknowns, local
+    Gate categories, and platform boundaries; keep opaque values internal.
+
+End the enablement flow at `READY`. If accepted seed truth still contains
+Unknowns, report them without starting another Change. Truth maturation or
+onboarding is a separate product change that requires its own explicit user
+authorization and fresh routing through `ecp-change`.
 
 If review, registration, acceptance, preflight, or the final transition fails,
 state that enablement is incomplete. Do not claim success, run unsafe Gates,

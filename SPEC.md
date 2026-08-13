@@ -68,6 +68,8 @@ Project 的一个具体 Git clone/worktree。`workspace_id` 必须由 canonical 
 
 显式 enable 必须绑定 immediately preceding status 的 exact authority ID、Workspace ID、activation token、已接受 candidate config digest 和 accepted truth digest。在记录 enabled event 前，Core 必须要求 default risk 至少一个 Required Gate，并解析/preflight 其 cwd、executable 与 environment，但不得执行 Gate。任何初始化、注册、接受、预检或最终 transition 失败都必须保持 authoritative mode disabled；Draft Config、Project Truth 或 registration 的部分准备不是启用。
 
+仅说“配置、设置或准备好 ECP”而未明确要求为当前整个项目/Workspace 启用，不构成 enablement intent。Adapter 可以进行回答或澄清该请求所必需的只读检查，包括适用的只读 ECP operation；这些观察不得被解释为 mutation 授权。取得 whole-project enablement 的明确意图前，不得创建或修改 Draft Config、authority、registration、activation 或其他项目状态。安装、版本或状态检查必须保持只读且不得隐式转入 enablement。
+
 显式 project disable 必须绑定 immediately preceding status 的 exact authority ID、Workspace ID 与 activation token，在与 Gate/terminal transition 共用的 Workspace lease 内重新加载 authority。若该 status 观察到 ACTIVE Change，Core 必须在同一次原子 append 中先记录 `change_cancelled`、再记录 `project_disabled`；保留源码、Draft Config、Evidence 与全部历史，不产生 PASS。关闭已关闭或未注册 Workspace 是不追加 event 的幂等成功。Draft Config malformed 不得阻止 authority-only disable。
 
 受支持的 Codex Adapter 在任何普通仓库写请求前必须先读取 project status。未启用时退出 ECP 子流程并继续普通开发，不提示启用；已启用时所有受支持的仓库 mutation 必须先建立/恢复 ECP Change，不提供单 task bypass。用户可显式关闭整个当前 Workspace。该自动路由仍是可禁用的 Skill-based workflow adapter，不是 shell、其他 Agent、同用户进程、CI 或 release enforcement。
@@ -281,8 +283,9 @@ Evidence 只有在以下字段与当前 Requirement 完全匹配时才适用：
 - 当前采用 Evidence 的 subject digest；
 - actor、reason、timestamp。
 
-任一绑定变化后 acknowledgement 失效。Adapter 不得因普通实现请求自动接受后续 policy drift 或风险 acknowledgement；只有在解释人类可读变化/风险并取得当前用户的明确确认后才可内部调用相应 operation。项目初次注册/配置接受只可由明确的项目 enablement 请求授权。
-CLI acknowledgement 请求必须携带 exact Change ID 与调用者刚审阅的 subject digest；Core 重算当前 subject 后不匹配即 conflict，不得把对旧 subject 的确认转移到新 subject。
+任一绑定变化后 acknowledgement 失效。Adapter 不得因普通实现请求自动接受后续 policy drift 或风险 acknowledgement。Gate plan 一旦表明 effective risk 为 `high` 或 `critical`，Adapter 必须在第一次产品文件写入或 Gate 执行前解释具体人类可读风险并取得当前用户的明确确认；未确认时可以保留已经建立并计划的 bounded Change 为 `ACTIVE`，但不得写产品文件、创建 GateRun 或 Evidence。项目初次注册/配置接受仍只可由明确的项目 enablement 请求授权。
+
+前置人类风险确认不等于 Core acknowledgement 事件。CLI acknowledgement 请求只能在最终源码、Semantic Assessment 和 Required Evidence 已就绪，且当前 Verdict 的唯一 blocker 为 `ACKNOWLEDGEMENT_REQUIRED` 后发出；它必须携带 exact Change ID 与调用者刚审阅的最终 subject digest。Core 重算当前 subject 后不匹配即 conflict，不得把对旧 subject 的确认转移到新 subject。目标、范围、Impact、Requirements、effective risk 或已展示的人类可读风险发生漂移时，前置确认失效，Adapter 必须重新说明并取得 fresh confirmation 后才可记录新的 exact-subject acknowledgement。
 
 ## 10. 权威状态与审计
 

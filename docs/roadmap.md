@@ -61,7 +61,7 @@ Phase 1 原计划的 Runner 纵深强化不再整体先行。除阻断真实 Pro
 
 目标：把当前 Assurance Kernel 扩展为 North Star 的最小完整语义闭环。
 
-状态：本地 Core/CLI、自包含四 Skill Codex Plugin runtime、自举 Project Pack 与自动化安全回归已实现；此前 installed launcher/status/显式 `ecp-check` smoke 暴露了 stale Skill locator，因此只算诊断。canonical host-routing matrix 当前仍为 0/42；升级/卸载、签名/公开发布、真实独立项目接手/长期迭代试点和受保护 CI consumer 尚未完成。本阶段不能描述为已通过产品退出标准，canonical checkpoint 见 [../STATUS.md](../STATUS.md)。
+状态：本地 Core/CLI、自包含四 Skill Codex Plugin runtime、自举 Project Pack 与自动化安全回归已实现。旧 host-routing campaign 已终止，其观察只算诊断而不构成 qualification；当前还必须修复 greenfield enable 在 `READY` 后自动开始 onboarding 的产品边界。下一 exact candidate 需通过 12 个串行、单次、fail-fast host canary。升级/卸载、签名/公开发布、真实独立项目接手/长期价值和受保护 CI consumer 仍未验证。本阶段不能描述为已通过产品退出标准，canonical checkpoint 见 [../STATUS.md](../STATUS.md)。
 
 - 严格、版本化且项目独立的 Project Truth schema；
 - Capability、Invariant、Component、Decision、Contract reference 和 Unknown；
@@ -82,13 +82,13 @@ Phase 1 原计划的 Runner 纵深强化不再整体先行。除阻断真实 Pro
 
 ## Phase 1B — Real Project Pilot
 
-状态：尚未进入。必须先让 canonical validator 对 exact installed package 的 fresh-task host-routing matrix（42 个 required runs）返回 PASS，且没有保留的 required/extra failure；当前为 0/42。随后才同时选择一个真正的新项目和一个持续开发的旧项目做跨 task/newcomer 双轨试点；ECP 自身、ECP worktree、静态 Skill 文本检查或 Core 单测都不能代替这两个独立产品轨道。
+状态：尚未进入。先让 exact installed package 的 12 个 fresh-task host canary 串行通过；第一个产品 `FAIL` 即停止 qualification，基础设施问题保留为 `INVALID` 并只在原因修复后使用全新 fixture 重跑。随后选择一个真正的新产品安全副本和一个持续开发的旧产品安全副本做小规模双轨试点；ECP 自身、ECP worktree、静态 Skill 文本检查或 Core 单测都不能代替这两个独立产品轨道。
 
-- 新旧两个项目都完整覆盖基线恢复、普通 Change、语义 Change、新人接手和故障演练，每个至少八个真实 Change，合计至少二十个；
-- 在新项目验证诚实 seed/established Truth 与 Unknown 保留，在旧项目验证历史合同恢复、dirty diff 保护和兼容边界；
-- 测量实际捕获的问题、错误阻断、交互负担、知识 freshness 和跨 task 接手效果；
-- 证明 Project Pack 没有退化成重复代码文档或泛化 AI 摘要；
-- 只有试点证明复利价值后，才恢复 Runner、MCP、签名或多项目表面的扩大投入。
+- 每条轨道只完成两到三个真实 bounded Change 与一次没有旧聊天上下文的 fresh-task handoff；
+- 在新项目观察诚实 seed/established Truth 与 Unknown 保留，在旧项目观察历史合同恢复、dirty diff 保护和兼容边界；
+- 测量真实有价值捕获、错误阻断、交互负担、Truth 维护成本、验证耗时和跨 task 接手效果；
+- 从价值与摩擦证据明确选择扩大、简化后再试或停止，不用预先设定的大矩阵或 Change 数量为设计辩护；
+- 只有试点显示可复现净价值后，才考虑 Runner、MCP、签名或多项目表面的扩大投入。
 
 执行协议与失败标准见 [real-project-pilot.md](real-project-pilot.md)。
 

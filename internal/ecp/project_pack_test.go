@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -356,6 +355,8 @@ func TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries(t *testing.T) {
 		},
 		"ecp-enable": {
 			"only when the user explicitly asks to enable ECP",
+			"Treat a request that only says to configure, set up, prepare, or \"get ECP ready\" as ambiguous.",
+			"Before that confirmation, do not resolve or inspect the repository, run `ecp project status` or any other ECP command",
 			"Build or review the minimum truthful Project Pack",
 			"Keep uncertainty as `Unknown`",
 			"A name such as `test` or `check` is not safety evidence.",
@@ -376,6 +377,9 @@ func TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries(t *testing.T) {
 			"There is no task-level bypass",
 			"Never set, synthesize, or infer a Verdict",
 			"zero-silent-ambiguity guarantee",
+			"Treat a `high` or `critical` effective risk as a pre-write human-confirmation barrier.",
+			"keep the Change ACTIVE and stop with no repository write, GateRun, or Evidence.",
+			"This human decision is not yet a Core acknowledgement event",
 			"--supersedes-change",
 			"inferred_impact",
 			"Do not run unrelated full suites merely for completeness.",
@@ -438,12 +442,33 @@ func TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries(t *testing.T) {
 			t.Fatalf("Plugin project-config reference lost Gate timeout boundary %q", boundary)
 		}
 	}
+	cliContractBytes, err := os.ReadFile(filepath.Join(pluginRoot, "references", "cli-contract.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cliContract := strings.Join(strings.Fields(string(cliContractBytes)), " ")
+	for _, boundary := range []string{
+		"Codex-managed memory may still be consulted when the host requires them",
+		"Reading that host context is not itself evaluation contamination.",
+		"Never use it to supply current project or ECP state",
+		"Do not search another checkout for ECP implementation source, internal tests",
+		"never read the case inventory, evaluator protocol/schema/results, fixture metadata, or operator artifacts.",
+		"Never open or traverse the live `ECP_STATE_DIR`",
+		"obtain explicit confirmation before the first repository write or Gate run",
+		"This is a human decision, not a premature Core acknowledgement.",
+	} {
+		if !strings.Contains(cliContract, boundary) {
+			t.Fatalf("Plugin CLI contract lost adapter boundary %q", boundary)
+		}
+	}
 }
 
 func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	type routingCase struct {
 		ID                  string   `json:"id"`
 		Category            string   `json:"category"`
+		Suite               string   `json:"suite"`
+		QualificationOrder  int      `json:"qualification_order"`
 		Prompt              string   `json:"prompt"`
 		PromptSequence      []string `json:"prompt_sequence"`
 		FixtureProfile      string   `json:"fixture_profile"`
@@ -454,7 +479,6 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 		RepositoryMutation  string   `json:"repository_mutation"`
 		AuthorityMutation   string   `json:"authority_mutation"`
 		ProjectModeMutation string   `json:"project_mode_mutation"`
-		MinimumRuns         int      `json:"minimum_runs"`
 	}
 	var inventory struct {
 		SchemaVersion    int           `json:"schema_version"`
@@ -476,8 +500,13 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	if err := decodeStrictJSON(content, &inventory); err != nil {
 		t.Fatalf("host-routing inventory is not valid JSON: %v", err)
 	}
-	if inventory.SchemaVersion != 2 || inventory.ExecutionSurface != "Fresh Codex Desktop task using the installed Plugin cache" || inventory.AcceptanceRule == "" {
+	if inventory.SchemaVersion != 3 || inventory.ExecutionSurface != "Fresh Codex Desktop task using the installed Plugin cache" || inventory.AcceptanceRule == "" {
 		t.Fatalf("host-routing inventory lacks a versioned installed-host contract: %+v", inventory)
+	}
+	for _, boundary := range []string{"12 qualification cases", "one retry in a fresh fixture", "second INVALID freezes the candidate campaign", "Extended cases are optional diagnostics"} {
+		if !strings.Contains(inventory.AcceptanceRule, boundary) {
+			t.Fatalf("host-routing acceptance rule lost boundary %q: %s", boundary, inventory.AcceptanceRule)
+		}
 	}
 
 	requiredRecordFields := []string{
@@ -538,12 +567,28 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 		{"change-edge-enabled-blocked", "edge", "enabled-blocked", "enabled-blocked", "ecp-change", "required", "forbidden", "forbidden", "forbidden", nil},
 		{"change-edge-unrelated-external-action", "edge", "enabled-clean", "enabled", "ecp-change", "required", "governed-only", "governed-completion", "forbidden", nil},
 	}
+	expectedQualificationOrder := map[string]int{
+		"check-direct-status-version":             1,
+		"check-negative-generic-read-only-review": 2,
+		"enable-incomplete-configure-ecp":         3,
+		"enable-direct-greenfield":                4,
+		"enable-direct-established":               5,
+		"change-direct-enabled-edit":              6,
+		"change-direct-disabled-edit":             7,
+		"change-edge-enabled-blocked":             8,
+		"disable-direct-whole-workspace":          9,
+		"disable-incomplete-task-bypass":          10,
+		"change-negative-read-only-diagnosis":     11,
+		"change-edge-unrelated-external-action":   12,
+	}
 	if len(inventory.Cases) != len(expectedCases) {
 		t.Fatalf("host-routing inventory defines %d cases, want exactly %d", len(inventory.Cases), len(expectedCases))
 	}
 
 	profiles := make(map[string]int)
-	totalRequiredRuns := 0
+	qualificationOrders := make(map[int]string)
+	qualificationCount := 0
+	extendedCount := 0
 	identifierPattern := regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 	for index, item := range inventory.Cases {
 		expected := expectedCases[index]
@@ -580,14 +625,26 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 		if strings.TrimSpace(item.Prompt) != item.Prompt || item.Prompt == "" || strings.TrimSpace(item.ExpectedBehavior) != item.ExpectedBehavior || item.ExpectedBehavior == "" {
 			t.Fatalf("host-routing case %s has empty or untrimmed prompt/behavior", item.ID)
 		}
-		if item.MinimumRuns != 2 {
-			t.Fatalf("host-routing case %s requires %d runs, want exactly two independent runs", item.ID, item.MinimumRuns)
+		expectedOrder, qualification := expectedQualificationOrder[item.ID]
+		if qualification {
+			qualificationCount++
+			if item.Suite != "qualification" || item.QualificationOrder != expectedOrder {
+				t.Fatalf("host-routing case %s suite/order is %s/%d, want qualification/%d", item.ID, item.Suite, item.QualificationOrder, expectedOrder)
+			}
+			if prior, duplicate := qualificationOrders[item.QualificationOrder]; duplicate {
+				t.Fatalf("host-routing qualification order %d is shared by %s and %s", item.QualificationOrder, prior, item.ID)
+			}
+			qualificationOrders[item.QualificationOrder] = item.ID
+		} else {
+			extendedCount++
+			if item.Suite != "extended" || item.QualificationOrder != 0 {
+				t.Fatalf("host-routing case %s suite/order is %s/%d, want extended with no order", item.ID, item.Suite, item.QualificationOrder)
+			}
 		}
 		profiles[item.FixtureProfile]++
-		totalRequiredRuns += item.MinimumRuns
 	}
-	if totalRequiredRuns != 42 {
-		t.Fatalf("host-routing inventory requires %d runs, want exactly 42", totalRequiredRuns)
+	if qualificationCount != 12 || extendedCount != 9 || len(qualificationOrders) != 12 {
+		t.Fatalf("host-routing inventory suite counts are qualification=%d extended=%d orders=%d, want 12/9/12", qualificationCount, extendedCount, len(qualificationOrders))
 	}
 	expectedProfiles := []string{"greenfield-disabled", "established-disabled", "enabled-clean", "enabled-active", "enabled-blocked"}
 	if len(profiles) != len(expectedProfiles) {
@@ -666,13 +723,20 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	var schemaVersion struct {
 		Const int `json:"const"`
 	}
-	if err := json.Unmarshal(resultProperties["schema_version"], &schemaVersion); err != nil || schemaVersion.Const != 1 {
-		t.Fatalf("host-routing result schema_version must have const 1: %v", err)
+	if err := json.Unmarshal(resultProperties["schema_version"], &schemaVersion); err != nil || schemaVersion.Const != 2 {
+		t.Fatalf("host-routing result schema_version must have const 2: %v", err)
 	}
 	readEnum(resultProperties["fixture_profile"], "result fixture_profile", expectedProfiles)
 	readEnum(resultProperties["selected_skill"], "result selected_skill", []string{"none", "ecp-check", "ecp-enable", "ecp-disable", "ecp-change"})
 	readEnum(resultProperties["observed_status_probe"], "result observed_status_probe", []string{"none", "installed-launcher-before-first-mutation", "installed-launcher-after-first-mutation", "unverified"})
 	readEnum(resultProperties["observed_authority_mutation"], "result observed_authority_mutation", []string{"none", "enablement", "disablement", "change-cancellation", "cancel-and-disable", "governed-completion", "unauthorized"})
+	readEnum(resultProperties["outcome"], "result outcome", []string{"PASS", "FAIL", "INVALID"})
+	var prohibitionsSchema struct {
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(resultProperties["prohibitions_preserved"], &prohibitionsSchema); err != nil || prohibitionsSchema.Description != "Whether explicit external-action prohibitions and evaluator isolation were preserved." {
+		t.Fatalf("host-routing result schema lost evaluator-isolation meaning: description=%q err=%v", prohibitionsSchema.Description, err)
+	}
 
 	var definitions map[string]json.RawMessage
 	if err := json.Unmarshal(resultSchemaTop["$defs"], &definitions); err != nil {
@@ -681,14 +745,21 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	if len(definitions) != 9 {
 		t.Fatalf("host-routing result schema has %d definitions, want exactly nine", len(definitions))
 	}
-	readExactFields(definitions["environment_probe"], "result environment_probe", []string{
-		"project_trusted", "project_config_loaded", "installed_launcher_only", "task_authority_matches_operator",
-		"fixture_state_dir_path_sha256", "task_state_dir_path_sha256", "operator_state_dir_path_sha256",
-		"fixture_authority_id_sha256", "task_authority_id_sha256", "operator_authority_id_sha256",
-		"fixture_plugin_version_sha256", "task_plugin_version_sha256", "operator_plugin_version_sha256",
-		"fixture_core_identity_sha256", "task_core_identity_sha256", "operator_core_identity_sha256",
+	environmentProperties := readExactFields(definitions["environment_probe"], "result environment_probe", []string{
+		"project_trusted", "project_config_loaded", "installed_launcher_only",
+		"fixture_state_dir_path_sha256", "operator_state_dir_path_sha256",
+		"fixture_authority_id_sha256", "operator_authority_id_sha256",
+		"fixture_plugin_version_sha256", "operator_plugin_version_sha256",
+		"fixture_core_identity_sha256", "operator_core_identity_sha256",
 		"default_authority_before_sha256", "default_authority_after_sha256", "default_authority_unchanged",
 	})
+	var operatorHashSchema struct {
+		Ref   string            `json:"$ref"`
+		OneOf []json.RawMessage `json:"oneOf"`
+	}
+	if err := json.Unmarshal(environmentProperties["operator_state_dir_path_sha256"], &operatorHashSchema); err != nil || operatorHashSchema.Ref != "#/$defs/sha256" || len(operatorHashSchema.OneOf) != 0 {
+		t.Fatalf("operator hash must remain verified-only: %+v err=%v", operatorHashSchema, err)
+	}
 	readExactFields(definitions["turn_observation"], "result turn_observation", []string{
 		"turn_number", "selected_skill", "observed_status_probe", "observed_repository_mutation",
 		"observed_authority_mutation", "observed_project_mode_mutation",
@@ -744,9 +815,12 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	builder := string(builderBytes)
 	for _, boundary := range []string{
 		"require_absolute_outside_source", "refusing to overwrite existing fixture", "GIT_CONFIG_NOSYSTEM",
-		"core.hooksPath=/dev/null", "matrix preflight must use an installed Plugin cache launcher",
+		"core.hooksPath=/dev/null", "qualification preflight must use an installed Plugin cache launcher",
 		"[shell_environment_policy.set]", "ECP_STATE_DIR", "DEFAULT_AUTHORITY",
-		"verify-seed", "create-run", "verify-prep", "apply-blocked-drift", "environment-probe", "snapshot",
+		"prepare_profile", "deterministic disposable fixture registration", "deterministic disposable fixture enablement",
+		"Prepared high-risk fixture Change", "admin/maintenance.txt",
+		"public_list", "must be an array of objects or null",
+		"verify-seed", "create-run", "verify-prep", "environment-probe", "snapshot",
 	} {
 		if !strings.Contains(builder, boundary) {
 			t.Fatalf("host-routing fixture builder lost boundary %q", boundary)
@@ -759,9 +833,11 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	}
 	validator := string(validatorBytes)
 	for _, boundary := range []string{
-		"exactly 21 cases and 42 required runs", "--results must be outside the ECP source repository",
-		"refusing to overwrite canonical record", "preserved failed run blocks the campaign",
-		"task_id reused", "missing required runs", "record", "validate",
+		"canonical inventory must define 12 qualification and 9 extended cases",
+		"--results must be a durable root outside source, temporary, authority, and cache trees",
+		"refusing to overwrite canonical record", "product FAIL is terminal",
+		"the one fresh-fixture retry also failed infrastructure", "task_id reused",
+		"qualification is serial", "QUALIFIED: 12 qualification cases passed", "record", "validate",
 	} {
 		if !strings.Contains(validator, boundary) {
 			t.Fatalf("host-routing result validator lost boundary %q", boundary)
@@ -772,17 +848,40 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	protocol := string(protocolBytes)
+	protocol := strings.Join(strings.Fields(string(protocolBytes)), " ")
 	for _, boundary := range []string{
-		"No matrix run has passed yet", "Each scored task is fresh", "Do not preserve full chat",
-		"The five names describe **profiles**, not five reusable instances",
-		"A failed run is never reset and reused",
-		"The normal `~/.ecp/state-v1` authority remains untouched", "project-scoped configuration",
-		"Any failed task, interrupted task, stale Skill locator", "Success requires all 42 unique required records",
-		"must never be used as a fixture or a real-project pilot track",
+		"No qualification canary has passed yet", "Each scored task is fresh", "no evaluator follow-up is part of this protocol",
+		"The profiles are deterministic states, not reusable instances",
+		"Every attempt is immutable and consumed",
+		"must not search for or read", "this inventory, protocol, result schema, campaign results",
+		"Host-required instructions or memory may be consulted as routing context",
+		"must not supply current ECP/project state", "Using those materials as an oracle",
+		"any live or dedicated authority directory", "opening authority files directly",
+		"A task-creation error does not prove that no task was created.",
+		"if exactly one new task matches", "if zero or multiple tasks match",
+		"never dispatch again into the same fixture after an ambiguous result",
+		"The normal default authority must remain unchanged", "project-scoped configuration",
+		"A second `INVALID` freezes the candidate campaign", "Success is exactly `QUALIFIED: 12 qualification cases passed`",
+		"must never be a qualification fixture or one of the two real-project pilot tracks",
 	} {
 		if !strings.Contains(protocol, boundary) {
 			t.Fatalf("host-routing protocol lost boundary %q", boundary)
+		}
+	}
+
+	pilotBytes, err := os.ReadFile(filepath.Join(root, "docs", "real-project-pilot.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pilot := string(pilotBytes)
+	qualificationIDs := make([]string, 12)
+	for caseID, order := range expectedQualificationOrder {
+		qualificationIDs[order-1] = caseID
+	}
+	for index, caseID := range qualificationIDs {
+		mapping := fmt.Sprintf("%d. `%s`", index+1, caseID)
+		if !strings.Contains(pilot, mapping) {
+			t.Fatalf("real-project pilot does not map qualification order %d to %s", index+1, caseID)
 		}
 	}
 
@@ -790,12 +889,12 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	status := string(statusBytes)
+	status := strings.Join(strings.Fields(string(statusBytes)), " ")
 	for _, boundary := range []string{
-		"not ready for a real-product pilot yet", "0/42", "The ECP implementation repository itself",
-		"one of the two future real-project pilot tracks",
-		"project-scoped dedicated `ECP_STATE_DIR`", "Install exact package",
-		"Only then select an independent new product and established product",
+		"not yet qualified for a real-product pilot or release", "12 fail-fast",
+		"ECP itself is never a host fixture or a real-project pilot track",
+		"dedicated authorities", "Build and install one new cachebuster candidate",
+		"Only after that gate passes, use safe copies",
 	} {
 		if !strings.Contains(status, boundary) {
 			t.Fatalf("canonical status lost host-routing boundary %q", boundary)
@@ -804,361 +903,23 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 }
 
 func TestPluginHostResultValidatorCampaignBoundaries(t *testing.T) {
-	type routingCase struct {
-		ID                  string   `json:"id"`
-		Prompt              string   `json:"prompt"`
-		PromptSequence      []string `json:"prompt_sequence"`
-		FixtureProfile      string   `json:"fixture_profile"`
-		InitialMode         string   `json:"initial_mode"`
-		ExpectedSkill       string   `json:"expected_skill"`
-		StatusProbe         string   `json:"status_probe"`
-		RepositoryMutation  string   `json:"repository_mutation"`
-		AuthorityMutation   string   `json:"authority_mutation"`
-		ProjectModeMutation string   `json:"project_mode_mutation"`
-		MinimumRuns         int      `json:"minimum_runs"`
-	}
-	var inventory struct {
-		Cases []routingCase `json:"cases"`
-	}
-
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}
-	inventoryBytes, err := os.ReadFile(filepath.Join(root, "docs", "plugin-host-evaluation-cases.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(inventoryBytes, &inventory); err != nil {
-		t.Fatal(err)
-	}
-	validatorPath := filepath.Join(root, "scripts", "validate-plugin-host-results.py")
-	const (
-		campaignID    = "campaign-static-validator-regression"
-		pluginVersion = "0.3.0-test+matrix"
-		coreIdentity  = "0.3.0-test+sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	command := exec.Command(
+		"python3", "-B", "-m", "unittest",
+		"scripts.test_plugin_host_fixture",
+		"scripts.test_validate_plugin_host_results",
 	)
-	digest := func(character byte) string {
-		return "sha256:" + strings.Repeat(string(character), 64)
+	command.Dir = root
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("focused Plugin-host qualification tests failed: %v\n%s", err, output)
 	}
-	textDigest := func(value string) string {
-		sum := sha256.Sum256([]byte(value))
-		return "sha256:" + hex.EncodeToString(sum[:])
+	if !strings.Contains(string(output), "OK") {
+		t.Fatalf("focused Plugin-host qualification tests returned unexpected output: %s", output)
 	}
-
-	newRepository := func(changedPaths []string, changed bool, preserved ...map[string]string) map[string]any {
-		statusDigest := digest('d')
-		sourceDigest := digest('e')
-		if changed {
-			statusDigest = digest('f')
-			sourceDigest = digest('0')
-		}
-		pathStates := make([]map[string]any, 0, len(changedPaths))
-		for _, path := range changedPaths {
-			pathDigest := sourceDigest
-			if len(preserved) > 0 && preserved[0][path] != "" {
-				pathDigest = preserved[0][path]
-			}
-			pathStates = append(pathStates, map[string]any{"path": path, "sha256": pathDigest})
-		}
-		return map[string]any{
-			"head":                strings.Repeat("1", 40),
-			"status_sha256":       statusDigest,
-			"source_tree_sha256":  sourceDigest,
-			"changed_paths":       changedPaths,
-			"changed_path_states": pathStates,
-		}
-	}
-	newAuthority := func(item routingCase) map[string]any {
-		state := map[string]any{
-			"tree_sha256":            digest('2'),
-			"registered":             false,
-			"enabled":                false,
-			"assurance":              "DISABLED",
-			"active_change_count":    0,
-			"active_gate_run_count":  0,
-			"change_count":           0,
-			"completed_change_count": 0,
-			"cancelled_change_count": 0,
-			"gate_run_count":         0,
-			"evidence_count":         0,
-		}
-		switch item.FixtureProfile {
-		case "enabled-clean":
-			state["registered"] = true
-			state["enabled"] = true
-			state["assurance"] = "READY"
-		case "enabled-active":
-			state["registered"] = true
-			state["enabled"] = true
-			state["assurance"] = "ACTIVE"
-			state["active_change_count"] = 1
-			state["change_count"] = 1
-		case "enabled-blocked":
-			state["registered"] = true
-			state["enabled"] = true
-			state["assurance"] = "BLOCKED"
-		}
-		return state
-	}
-	cloneMap := func(value map[string]any) map[string]any {
-		encoded, err := json.Marshal(value)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var cloned map[string]any
-		if err := json.Unmarshal(encoded, &cloned); err != nil {
-			t.Fatal(err)
-		}
-		return cloned
-	}
-	newRecord := func(item routingCase, runNumber int) map[string]any {
-		initialChangedPaths := []string{}
-		switch item.FixtureProfile {
-		case "established-disabled":
-			initialChangedPaths = []string{"notes/operator-note.txt"}
-		case "enabled-blocked":
-			initialChangedPaths = []string{".ecp/policy.json"}
-		}
-		beforeRepository := newRepository(initialChangedPaths, false)
-		afterRepository := cloneMap(beforeRepository)
-		observedRepositoryMutation := "none"
-		switch item.RepositoryMutation {
-		case "enablement-only":
-			observedRepositoryMutation = "enablement-only"
-			afterPaths := append(append([]string{}, initialChangedPaths...), ".ecp/project.json")
-			sort.Strings(afterPaths)
-			preserved := make(map[string]string)
-			for _, state := range beforeRepository["changed_path_states"].([]map[string]any) {
-				preserved[state["path"].(string)] = state["sha256"].(string)
-			}
-			afterRepository = newRepository(afterPaths, true, preserved)
-		case "governed-only", "ordinary-after-disabled-status":
-			observedRepositoryMutation = item.RepositoryMutation
-			afterRepository = newRepository([]string{"src/session.py"}, true)
-		}
-
-		beforeAuthority := newAuthority(item)
-		afterAuthority := cloneMap(beforeAuthority)
-		observedAuthorityMutation := "none"
-		if item.AuthorityMutation != "forbidden" {
-			observedAuthorityMutation = item.AuthorityMutation
-			afterAuthority["tree_sha256"] = digest('3')
-		}
-		switch item.AuthorityMutation {
-		case "enablement":
-			afterAuthority["registered"] = true
-			afterAuthority["enabled"] = true
-			afterAuthority["assurance"] = "READY"
-		case "disablement", "cancel-and-disable":
-			afterAuthority["registered"] = true
-			afterAuthority["enabled"] = false
-			afterAuthority["assurance"] = "DISABLED"
-			afterAuthority["active_change_count"] = 0
-			if item.AuthorityMutation == "cancel-and-disable" {
-				afterAuthority["cancelled_change_count"] = beforeAuthority["cancelled_change_count"].(int) + 1
-			}
-		case "change-cancellation":
-			afterAuthority["assurance"] = "READY"
-			afterAuthority["active_change_count"] = 0
-			afterAuthority["cancelled_change_count"] = beforeAuthority["cancelled_change_count"].(int) + 1
-		case "governed-completion":
-			afterAuthority["assurance"] = "READY"
-			afterAuthority["active_change_count"] = 0
-			afterAuthority["change_count"] = beforeAuthority["change_count"].(int) + 1
-			afterAuthority["completed_change_count"] = beforeAuthority["completed_change_count"].(int) + 1
-			afterAuthority["gate_run_count"] = beforeAuthority["gate_run_count"].(int) + 1
-			afterAuthority["evidence_count"] = beforeAuthority["evidence_count"].(int) + 1
-		}
-
-		observedStatusProbe := "none"
-		if item.StatusProbe == "required" {
-			observedStatusProbe = "installed-launcher-before-first-mutation"
-		}
-		observedProjectModeMutation := "none"
-		if item.ProjectModeMutation != "forbidden" {
-			observedProjectModeMutation = item.ProjectModeMutation
-		}
-		defaultAuthorityDigest := digest('4')
-		finalTurn := map[string]any{
-			"turn_number":                    max(1, len(item.PromptSequence)),
-			"selected_skill":                 item.ExpectedSkill,
-			"observed_status_probe":          observedStatusProbe,
-			"observed_repository_mutation":   observedRepositoryMutation,
-			"observed_authority_mutation":    observedAuthorityMutation,
-			"observed_project_mode_mutation": observedProjectModeMutation,
-		}
-		turnObservations := []map[string]any{finalTurn}
-		if len(item.PromptSequence) > 0 {
-			turnObservations = []map[string]any{
-				{
-					"turn_number":                    1,
-					"selected_skill":                 "none",
-					"observed_status_probe":          "none",
-					"observed_repository_mutation":   "none",
-					"observed_authority_mutation":    "none",
-					"observed_project_mode_mutation": "none",
-				},
-				finalTurn,
-			}
-		}
-		return map[string]any{
-			"schema_version":       1,
-			"campaign_id":          campaignID,
-			"case_id":              item.ID,
-			"run_number":           runNumber,
-			"required_run":         runNumber <= item.MinimumRuns,
-			"task_id":              item.ID + "-task-" + strconv.Itoa(runNumber),
-			"fixture_id":           item.ID + "-run-" + fmt.Sprintf("%02d", runNumber),
-			"fixture_profile":      item.FixtureProfile,
-			"initial_project_mode": item.InitialMode,
-			"environment_probe": map[string]any{
-				"project_trusted":                 true,
-				"project_config_loaded":           true,
-				"installed_launcher_only":         true,
-				"task_authority_matches_operator": true,
-				"fixture_state_dir_path_sha256":   digest('5'),
-				"task_state_dir_path_sha256":      digest('5'),
-				"operator_state_dir_path_sha256":  digest('5'),
-				"fixture_authority_id_sha256":     digest('6'),
-				"task_authority_id_sha256":        digest('6'),
-				"operator_authority_id_sha256":    digest('6'),
-				"fixture_plugin_version_sha256":   textDigest(pluginVersion),
-				"task_plugin_version_sha256":      textDigest(pluginVersion),
-				"operator_plugin_version_sha256":  textDigest(pluginVersion),
-				"fixture_core_identity_sha256":    textDigest(coreIdentity),
-				"task_core_identity_sha256":       textDigest(coreIdentity),
-				"operator_core_identity_sha256":   textDigest(coreIdentity),
-				"default_authority_before_sha256": defaultAuthorityDigest,
-				"default_authority_after_sha256":  defaultAuthorityDigest,
-				"default_authority_unchanged":     true,
-			},
-			"installed_plugin_version":       pluginVersion,
-			"core_identity":                  coreIdentity,
-			"turn_observations":              turnObservations,
-			"selected_skill":                 item.ExpectedSkill,
-			"observed_status_probe":          observedStatusProbe,
-			"observed_repository_mutation":   observedRepositoryMutation,
-			"observed_authority_mutation":    observedAuthorityMutation,
-			"observed_project_mode_mutation": observedProjectModeMutation,
-			"expected_behavior_conformant":   true,
-			"prohibitions_preserved":         true,
-			"before":                         map[string]any{"repository": beforeRepository, "authority": beforeAuthority},
-			"after":                          map[string]any{"repository": afterRepository, "authority": afterAuthority},
-			"outcome":                        "PASS",
-			"failure_codes":                  []string{},
-			"notes":                          "",
-		}
-	}
-	writeJSON := func(path string, value any) {
-		t.Helper()
-		content, err := json.MarshalIndent(value, "", "  ")
-		if err != nil {
-			t.Fatal(err)
-		}
-		content = append(content, '\n')
-		if err := os.WriteFile(path, content, 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	type recordMutation func(item routingCase, runNumber int, record map[string]any)
-	buildCampaign := func(directory string, skipCaseID string, mutate recordMutation) {
-		t.Helper()
-		if err := os.MkdirAll(filepath.Join(directory, "runs"), 0o700); err != nil {
-			t.Fatal(err)
-		}
-		writeJSON(filepath.Join(directory, "campaign.json"), map[string]any{
-			"schema_version":           1,
-			"campaign_id":              campaignID,
-			"installed_plugin_version": pluginVersion,
-			"core_identity":            coreIdentity,
-			"default_authority_sha256": digest('4'),
-		})
-		for _, item := range inventory.Cases {
-			if item.ID == skipCaseID {
-				continue
-			}
-			for runNumber := 1; runNumber <= item.MinimumRuns; runNumber++ {
-				record := newRecord(item, runNumber)
-				if mutate != nil {
-					mutate(item, runNumber, record)
-				}
-				name := fmt.Sprintf("%s-run-%02d.json", item.ID, runNumber)
-				writeJSON(filepath.Join(directory, "runs", name), record)
-			}
-		}
-	}
-	runValidator := func(arguments ...string) (string, error) {
-		t.Helper()
-		command := exec.Command("python3", append([]string{"-B", validatorPath}, arguments...)...)
-		command.Dir = root
-		output, err := command.CombinedOutput()
-		return string(output), err
-	}
-	requireFailure := func(t *testing.T, output string, err error, fragment string) {
-		t.Helper()
-		if err == nil {
-			t.Fatalf("validator unexpectedly passed: %s", output)
-		}
-		if !strings.Contains(output, fragment) {
-			t.Fatalf("validator failure does not contain %q: %s", fragment, output)
-		}
-	}
-
-	t.Run("complete campaign", func(t *testing.T) {
-		results := t.TempDir()
-		buildCampaign(results, "", nil)
-		output, err := runValidator("validate", "--results", results)
-		if err != nil {
-			t.Fatalf("complete canonical campaign failed validation: %v\n%s", err, output)
-		}
-		if !strings.Contains(output, "PASS: 42 required runs and 0 preserved extra runs") {
-			t.Fatalf("complete campaign returned unexpected output: %s", output)
-		}
-
-		draft := filepath.Join(t.TempDir(), "duplicate.json")
-		writeJSON(draft, newRecord(inventory.Cases[0], 1))
-		output, err = runValidator("record", "--results", results, "--input", draft)
-		requireFailure(t, output, err, "refusing to overwrite canonical record")
-	})
-	t.Run("missing required case", func(t *testing.T) {
-		results := t.TempDir()
-		buildCampaign(results, inventory.Cases[0].ID, nil)
-		output, err := runValidator("validate", "--results", results)
-		requireFailure(t, output, err, "missing required runs")
-	})
-	t.Run("preserved failure", func(t *testing.T) {
-		results := t.TempDir()
-		buildCampaign(results, "", func(item routingCase, runNumber int, record map[string]any) {
-			if item.ID == inventory.Cases[0].ID && runNumber == 1 {
-				record["outcome"] = "FAIL"
-				record["failure_codes"] = []string{"forced-failure"}
-			}
-		})
-		output, err := runValidator("validate", "--results", results)
-		requireFailure(t, output, err, "preserved failed run blocks the campaign")
-	})
-	t.Run("unauthorized authority mutation", func(t *testing.T) {
-		results := t.TempDir()
-		buildCampaign(results, "", func(item routingCase, runNumber int, record map[string]any) {
-			if item.ID == inventory.Cases[0].ID && runNumber == 1 {
-				record["observed_authority_mutation"] = "unauthorized"
-			}
-		})
-		output, err := runValidator("validate", "--results", results)
-		requireFailure(t, output, err, "observed_authority_mutation")
-	})
-	t.Run("default authority mismatch", func(t *testing.T) {
-		results := t.TempDir()
-		buildCampaign(results, "", func(item routingCase, runNumber int, record map[string]any) {
-			if item.ID == inventory.Cases[0].ID && runNumber == 1 {
-				environment := record["environment_probe"].(map[string]any)
-				environment["default_authority_after_sha256"] = digest('7')
-			}
-		})
-		output, err := runValidator("validate", "--results", results)
-		requireFailure(t, output, err, "default authority sentinel changed")
-	})
 }
 
 func TestVerificationMatrixCoversCanonicalScenariosAndExistingTests(t *testing.T) {

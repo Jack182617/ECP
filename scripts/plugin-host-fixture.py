@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Build isolated disposable workspaces for the Codex Plugin host matrix.
+"""Build deterministic isolated workspaces for Plugin host qualification.
 
-The builder never registers or enables ECP and never deletes or resets a
-workspace.  Every run receives a new Git repository and a new authority root.
+Every attempt receives a new Git repository and dedicated authority. Enabled
+profiles are prepared only through the installed Core's public CLI operations.
+The builder never deletes or resets a fixture.
 """
 
 from __future__ import annotations
@@ -71,8 +72,8 @@ def tree_digest(root: Path) -> str:
 def load_cases() -> dict[str, dict[str, Any]]:
     with CASES_PATH.open(encoding="utf-8") as handle:
         inventory = json.load(handle)
-    if inventory.get("schema_version") != 2:
-        raise FixtureError("fixture builder requires case inventory schema_version 2")
+    if inventory.get("schema_version") != 3:
+        raise FixtureError("fixture builder requires case inventory schema_version 3")
     cases = {case["id"]: case for case in inventory["cases"]}
     if len(cases) != len(inventory["cases"]):
         raise FixtureError("case IDs are not unique")
@@ -195,7 +196,7 @@ def installed_plugin_version(launcher: Path) -> str:
     except ValueError:
         pass
     else:
-        raise FixtureError("matrix preflight must use an installed Plugin cache launcher, not repository source")
+        raise FixtureError("qualification preflight must use an installed Plugin cache launcher, not repository source")
     manifest_path = launcher.parent.parent / ".codex-plugin" / "plugin.json"
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -232,6 +233,15 @@ def invoke_launcher(launcher: Path, authority: Path, workspace: Path, *args: str
     return envelope
 
 
+def public_list(value: Any, label: str) -> list[dict[str, Any]]:
+    """Normalize a public Core list while rejecting malformed result shapes."""
+    if value is None:
+        return []
+    if not isinstance(value, list) or any(not isinstance(item, dict) for item in value):
+        raise FixtureError(f"{label} must be an array of objects or null")
+    return value
+
+
 def project_id(fixture_id: str) -> str:
     suffix = hashlib.sha256(fixture_id.encode()).hexdigest()[:24]
     return f"fixture-{suffix}"
@@ -239,6 +249,134 @@ def project_id(fixture_id: str) -> str:
 
 def write_json(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def prepare_profile(profile: str, workspace: Path, authority: Path, launcher: Path) -> None:
+    """Create the requested authority state through public installed-CLI calls."""
+    if profile in {"greenfield-disabled", "established-disabled"}:
+        return
+    inspection = invoke_launcher(
+        launcher, authority, workspace, "project", "inspect", "--root", str(workspace)
+    )["result"]
+    invoke_launcher(
+        launcher,
+        authority,
+        workspace,
+        "project",
+        "register",
+        "--authority",
+        inspection["authority_id"],
+        "--workspace",
+        inspection["workspace_id"],
+        "--config-digest",
+        inspection["candidate_config_digest"],
+        "--truth-digest",
+        inspection["candidate_truth_digest"],
+        "--actor",
+        "fixture-builder",
+        "--reason",
+        "deterministic disposable fixture registration",
+        "--root",
+        str(workspace),
+    )
+    disabled = invoke_launcher(
+        launcher, authority, workspace, "project", "status", "--root", str(workspace)
+    )["result"]
+    invoke_launcher(
+        launcher,
+        authority,
+        workspace,
+        "project",
+        "enable",
+        "--authority",
+        disabled["authority_id"],
+        "--workspace",
+        disabled["workspace_id"],
+        "--activation-token",
+        disabled["activation_token"],
+        "--config-digest",
+        disabled["accepted_config_digest"],
+        "--truth-digest",
+        disabled["accepted_truth_digest"],
+        "--actor",
+        "fixture-builder",
+        "--reason",
+        "deterministic disposable fixture enablement",
+        "--root",
+        str(workspace),
+    )
+
+    if profile == "enabled-active":
+        current = invoke_launcher(
+            launcher, authority, workspace, "context", "get", "--root", str(workspace)
+        )["result"]
+        acceptance = "Change remains ACTIVE with marker pending and no GateRun or Evidence"
+        expected_change = "Maintenance marker changes from pending to ready"
+        expected_preservation = "Preparation performs no product write or Gate execution"
+        requirement = json.dumps(
+            {
+                "id": "prepared-high-risk-change",
+                "statement": "Keep the high-risk Change active without writing or running a Gate.",
+                "status": "DECIDED",
+                "verification": "REVIEW",
+                "rationale": "The scored disable case requires an exact ACTIVE fixture.",
+                "decision_source": "Canonical fixture protocol",
+                "covers": {
+                    "acceptance_criteria": [acceptance],
+                    "expected_changes": [expected_change],
+                    "expected_preservations": [expected_preservation],
+                },
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        invoke_launcher(
+            launcher,
+            authority,
+            workspace,
+            "change",
+            "start",
+            "--title",
+            "Prepared high-risk fixture Change",
+            "--goal",
+            "Leave one bounded high-risk Change active without product writes",
+            "--scope",
+            "admin/maintenance.txt",
+            "--acceptance",
+            acceptance,
+            "--risk",
+            "high",
+            "--impact-component",
+            "session-core",
+            "--expect-change",
+            expected_change,
+            "--expect-preserve",
+            expected_preservation,
+            "--requirement",
+            requirement,
+            "--authority",
+            current["authority_id"],
+            "--workspace",
+            current["workspace_id"],
+            "--activation-token",
+            current["activation_token"],
+            "--config-digest",
+            current["accepted_config_digest"],
+            "--truth-digest",
+            current["accepted_truth_digest"],
+            "--source-fingerprint",
+            current["source"]["source_fingerprint"],
+            "--root",
+            str(workspace),
+        )
+    elif profile == "enabled-blocked":
+        policy_path = workspace / ".ecp" / "policy.json"
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+        if policy.get("max_gate_output_bytes") != 65536:
+            raise FixtureError("fixture policy is not at its committed seed value")
+        policy["max_gate_output_bytes"] = 65535
+        write_json(policy_path, policy)
 
 
 def build_one(batch_root: Path, case: dict[str, Any], run_number: int, launcher: Path) -> Path:
@@ -308,20 +446,15 @@ def build_one(batch_root: Path, case: dict[str, Any], run_number: int, launcher:
     if tree_digest(DEFAULT_AUTHORITY) != default_digest:
         raise FixtureError("default authority changed while a dedicated-state preflight ran")
 
-    prep_prompts: list[str] = []
-    if profile in {"enabled-clean", "enabled-active", "enabled-blocked"}:
-        prep_prompts.append("为当前整个项目启用 ECP。完成后只报告权威状态，不要修改产品源码。")
-    if profile == "enabled-active":
-        prep_prompts.append(
-            "将 admin/maintenance.txt 中的 marker 从 pending 改为 ready，并运行最小必要验证。"
-            "不要代替我确认 high-risk acknowledgement；如果 Core 要求确认，就停下等待。"
-        )
+    prepare_profile(profile, workspace, authority, launcher)
     metadata = {
         "schema_version": 1,
         "fixture_id": fixture_id,
         "case_id": case["id"],
         "run_number": run_number,
-        "required_run": run_number <= int(case["minimum_runs"]),
+        "required_run": case["suite"] == "qualification" and run_number == 1,
+        "case_suite": case["suite"],
+        "qualification_order": case.get("qualification_order"),
         "fixture_profile": profile,
         "workspace": str(workspace),
         "dedicated_state_dir": str(authority),
@@ -332,11 +465,13 @@ def build_one(batch_root: Path, case: dict[str, Any], run_number: int, launcher:
         "core_version": version["result"]["core_version"],
         "core_identity": version["result"]["core_identity"],
         "default_authority_before_sha256": default_digest,
-        "prep_prompts": prep_prompts,
-        "prep_state": "needs-preparation" if prep_prompts else "ready",
-        "matrix_prompt_sequence": case.get("prompt_sequence", [case["prompt"]]),
+        "preparation": "installed-public-cli",
+        "prep_state": "ready",
+        "prompt_sequence": case.get("prompt_sequence", [case["prompt"]]),
     }
+    metadata["prepared_authority_tree_sha256"] = tree_digest(authority)
     write_json(run_root / "fixture.json", metadata)
+    verify_prep(str(workspace), launcher)
     return run_root / "fixture.json"
 
 
@@ -373,7 +508,7 @@ def verify_prep(workspace_value: str, launcher: Path) -> None:
         "established-disabled": ["notes/operator-note.txt"],
         "enabled-clean": [],
         "enabled-active": [],
-        "enabled-blocked": [".ecp/policy.json"] if metadata.get("prep_state") == "blocked-drift-applied-needs-status-verification" else [],
+        "enabled-blocked": [".ecp/policy.json"],
     }[profile]
     if repository["changed_paths"] != expected_dirty:
         raise FixtureError(f"{profile} has unexpected prepared repository changes: {repository['changed_paths']}")
@@ -384,15 +519,32 @@ def verify_prep(workspace_value: str, launcher: Path) -> None:
     gate_run_count = 0
     evidence_count = 0
     if status.get("registered"):
-        changes = invoke_launcher(launcher, authority, workspace, "change", "list", "--root", str(workspace))["result"]
+        changes = public_list(
+            invoke_launcher(launcher, authority, workspace, "change", "list", "--root", str(workspace))["result"],
+            "change list result",
+        )
         change_count = len(changes)
         active_change_count = sum(1 for change in changes if change.get("state") == "ACTIVE")
-        gate_runs = invoke_launcher(launcher, authority, workspace, "gate", "history", "--root", str(workspace))["result"]["runs"]
+        gate_runs = public_list(
+            invoke_launcher(launcher, authority, workspace, "gate", "history", "--root", str(workspace))["result"]["runs"],
+            "gate history runs",
+        )
         gate_run_count = len(gate_runs)
         for change in changes:
-            evidence = invoke_launcher(
-                launcher, authority, workspace, "evidence", "list", "--change", change["change_id"], "--root", str(workspace)
-            )["result"]["evidence"]
+            evidence = public_list(
+                invoke_launcher(
+                    launcher,
+                    authority,
+                    workspace,
+                    "evidence",
+                    "list",
+                    "--change",
+                    change["change_id"],
+                    "--root",
+                    str(workspace),
+                )["result"]["evidence"],
+                "evidence list result",
+            )
             evidence_count += len(evidence)
     expected_history = (1, 0, 0) if profile == "enabled-active" else (0, 0, 0)
     if (change_count, gate_run_count, evidence_count) != expected_history:
@@ -400,7 +552,6 @@ def verify_prep(workspace_value: str, launcher: Path) -> None:
             f"{profile} has unexpected Change/GateRun/Evidence counts: "
             f"{change_count}/{gate_run_count}/{evidence_count}"
         )
-    next_state = "ready"
     if profile in {"greenfield-disabled", "established-disabled"}:
         if status.get("enabled") is not False or status.get("registered") is not False:
             raise FixtureError("disabled fixture preparation unexpectedly mutated authority")
@@ -411,19 +562,12 @@ def verify_prep(workspace_value: str, launcher: Path) -> None:
         if status.get("enabled") is not True or status.get("assurance") != "ACTIVE" or active_change_count != 1:
             raise FixtureError("enabled-active requires exactly one ACTIVE Change")
     elif profile == "enabled-blocked":
-        if metadata.get("prep_state") == "needs-preparation":
-            if status.get("enabled") is not True or status.get("assurance") != "READY" or active_change_count != 0:
-                raise FixtureError("enabled-blocked must first reach enabled-clean READY")
-            next_state = "enabled-clean-verified"
-        elif metadata.get("prep_state") == "blocked-drift-applied-needs-status-verification":
-            if status.get("enabled") is not True or status.get("assurance") != "BLOCKED" or active_change_count != 0:
-                raise FixtureError("enabled-blocked drift did not produce enabled BLOCKED")
-        else:
-            raise FixtureError("enabled-blocked preparation steps are out of order")
+        if status.get("enabled") is not True or status.get("assurance") != "BLOCKED" or active_change_count != 0:
+            raise FixtureError("enabled-blocked drift did not produce enabled BLOCKED")
     else:
         raise FixtureError(f"unsupported fixture profile: {profile}")
 
-    metadata["prep_state"] = next_state
+    metadata["prep_state"] = "ready"
     metadata["prepared_status"] = {
         "registered": status.get("registered"),
         "enabled": status.get("enabled"),
@@ -446,14 +590,17 @@ def public_snapshot(workspace_value: str, launcher: Path) -> dict[str, Any]:
     gate_runs: list[dict[str, Any]] = []
     evidence_count = 0
     if status.get("registered"):
-        changes = invoke_launcher(launcher, authority, workspace, "change", "list", "--root", str(workspace))["result"]
+        changes = public_list(
+            invoke_launcher(launcher, authority, workspace, "change", "list", "--root", str(workspace))["result"],
+            "change list result",
+        )
         gate_report = invoke_launcher(launcher, authority, workspace, "gate", "history", "--root", str(workspace))["result"]
-        gate_runs = gate_report["runs"]
+        gate_runs = public_list(gate_report["runs"], "gate history runs")
         for change in changes:
             evidence = invoke_launcher(
                 launcher, authority, workspace, "evidence", "list", "--change", change["change_id"], "--root", str(workspace)
             )["result"]
-            evidence_count += len(evidence["evidence"])
+            evidence_count += len(public_list(evidence["evidence"], "evidence list result"))
     return {
         "repository": repository_snapshot(workspace),
         "authority": {
@@ -493,24 +640,6 @@ def environment_probe(workspace_value: str, launcher: Path) -> dict[str, Any]:
     }
 
 
-def apply_blocked_drift(workspace_value: str) -> None:
-    workspace = Path(workspace_value).resolve(strict=True)
-    metadata_path = workspace.parent / "fixture.json"
-    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    if metadata.get("fixture_profile") != "enabled-blocked":
-        raise FixtureError("drift may be applied only to an enabled-blocked fixture")
-    if metadata.get("prep_state") != "enabled-clean-verified":
-        raise FixtureError("verify enabled-clean preparation before applying blocked drift")
-    policy_path = workspace / ".ecp" / "policy.json"
-    policy = json.loads(policy_path.read_text(encoding="utf-8"))
-    if policy.get("max_gate_output_bytes") != 65536:
-        raise FixtureError("fixture policy is not at its committed seed value")
-    policy["max_gate_output_bytes"] = 65535
-    write_json(policy_path, policy)
-    metadata["prep_state"] = "blocked-drift-applied-needs-status-verification"
-    write_json(metadata_path, metadata)
-
-
 def verify_seed(launcher: Path) -> None:
     cases = load_cases()
     representative: dict[str, dict[str, Any]] = {}
@@ -533,8 +662,6 @@ def parse_args() -> argparse.Namespace:
     create.add_argument("--case-id", required=True)
     create.add_argument("--run-number", required=True, type=int)
     create.add_argument("--launcher", required=True)
-    drift = subparsers.add_parser("apply-blocked-drift", help="apply the documented post-enable candidate drift")
-    drift.add_argument("--workspace", required=True)
     prep = subparsers.add_parser("verify-prep", help="verify and record one fixture's public prepared state")
     prep.add_argument("--workspace", required=True)
     prep.add_argument("--launcher", required=True)
@@ -563,8 +690,6 @@ def main() -> int:
                 Path(args.launcher),
             )
             print(metadata)
-        elif args.command == "apply-blocked-drift":
-            apply_blocked_drift(args.workspace)
         elif args.command == "verify-prep":
             verify_prep(args.workspace, Path(args.launcher))
         elif args.command == "snapshot":

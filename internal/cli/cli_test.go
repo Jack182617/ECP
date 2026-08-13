@@ -604,6 +604,57 @@ func TestCompletedAndCancelledHistoryRemainQueryable(t *testing.T) {
 	}
 }
 
+func TestEvidenceListEncodesEmptyArray(t *testing.T) {
+	ctx := context.Background()
+	repo := createCLIRepository(t)
+	service := ecp.Service{StateDir: filepath.Join(t.TempDir(), "state"), CoreIdentity: "cli-empty-evidence-core"}
+	if _, err := service.InitProject(ctx, repo, "cli-empty-evidence"); err != nil {
+		t.Fatal(err)
+	}
+	gate := ecp.GateConfig{
+		ID: "passing", Description: "pass deterministically", Command: []string{"git", "diff", "--check"}, WorkingDirectory: ".",
+		TimeoutSeconds: 5, AllowedExitCodes: []int{0}, RequiredFor: []ecp.Risk{ecp.RiskModerate}, Environment: map[string]string{},
+		InheritEnvironment: []string{}, MaxOutputBytes: 4096,
+	}
+	writeCLIGates(t, repo, ecp.GatesConfig{SchemaVersion: ecp.SchemaVersion, Gates: []ecp.GateConfig{gate}})
+	candidate, err := ecp.LoadConfig(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := acceptCLIPolicy(t, ctx, service, repo, candidate.Digest, "owner", "accept empty Evidence Gate"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := enableCLIProject(t, ctx, service, repo, candidate.Digest, "owner", "enable empty Evidence project"); err != nil {
+		t.Fatal(err)
+	}
+	change, err := startCLIChange(t, ctx, service, repo, ecp.StartChangeInput{
+		Title: "Empty Evidence JSON", Goal: "Encode an empty array", Scope: []string{"src"},
+		AcceptanceCriteria: []string{"Evidence JSON is an array"}, Risk: ecp.RiskModerate,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	application := CLI{Service: service, Stdout: &stdout, Stderr: &stderr}
+	if code := application.Run(ctx, []string{"evidence", "list", "--change", change.ChangeID, "--root", repo}); code != 0 {
+		t.Fatalf("empty Evidence query exit=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var envelope struct {
+		Operation string `json:"operation"`
+		OK        bool   `json:"ok"`
+		Result    struct {
+			Evidence json.RawMessage `json:"evidence"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil {
+		t.Fatalf("invalid empty Evidence envelope: %v\n%s", err, stdout.String())
+	}
+	if !envelope.OK || envelope.Operation != "evidence.list" || !bytes.Equal(bytes.TrimSpace(envelope.Result.Evidence), []byte("[]")) {
+		t.Fatalf("empty Evidence must encode as []: operation=%q ok=%t evidence=%s", envelope.Operation, envelope.OK, envelope.Result.Evidence)
+	}
+}
+
 func TestGateSequenceErrorReturnsPartialEvidence(t *testing.T) {
 	ctx := context.Background()
 	repo := createCLIRepository(t)

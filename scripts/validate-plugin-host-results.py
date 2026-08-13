@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Record and validate the append-only 42-run Plugin host matrix."""
+"""Record and validate the append-only fail-fast Plugin host qualification."""
 
 from __future__ import annotations
 
@@ -30,11 +30,10 @@ TOP_KEYS = {
 }
 ENV_KEYS = {
     "project_trusted", "project_config_loaded", "installed_launcher_only",
-    "task_authority_matches_operator", "fixture_state_dir_path_sha256", "task_state_dir_path_sha256",
-    "operator_state_dir_path_sha256",
-    "fixture_authority_id_sha256", "task_authority_id_sha256", "operator_authority_id_sha256",
-    "fixture_plugin_version_sha256", "task_plugin_version_sha256", "operator_plugin_version_sha256",
-    "fixture_core_identity_sha256", "task_core_identity_sha256", "operator_core_identity_sha256",
+    "fixture_state_dir_path_sha256", "operator_state_dir_path_sha256",
+    "fixture_authority_id_sha256", "operator_authority_id_sha256",
+    "fixture_plugin_version_sha256", "operator_plugin_version_sha256",
+    "fixture_core_identity_sha256", "operator_core_identity_sha256",
     "default_authority_before_sha256", "default_authority_after_sha256",
     "default_authority_unchanged",
 }
@@ -55,6 +54,7 @@ PROFILES = {
     "enabled-active", "enabled-blocked",
 }
 ASSURANCES = {"DISABLED", "READY", "ACTIVE", "BLOCKED", "INDETERMINATE"}
+MAX_QUALIFICATION_ATTEMPTS = 2
 
 
 class ValidationError(RuntimeError):
@@ -71,8 +71,8 @@ def load_json(path: Path) -> Any:
 
 def load_cases(path: Path) -> dict[str, dict[str, Any]]:
     inventory = load_json(path)
-    if not isinstance(inventory, dict) or inventory.get("schema_version") != 2:
-        raise ValidationError("case inventory must use schema_version 2")
+    if not isinstance(inventory, dict) or inventory.get("schema_version") != 3:
+        raise ValidationError("case inventory must use schema_version 3")
     cases: dict[str, dict[str, Any]] = {}
     for case in inventory.get("cases", []):
         if not isinstance(case, dict) or not isinstance(case.get("id"), str):
@@ -80,9 +80,33 @@ def load_cases(path: Path) -> dict[str, dict[str, Any]]:
         if case["id"] in cases:
             raise ValidationError(f"duplicate case ID: {case['id']}")
         cases[case["id"]] = case
-    if len(cases) != 21 or sum(int(case["minimum_runs"]) for case in cases.values()) != 42:
-        raise ValidationError("canonical inventory must define exactly 21 cases and 42 required runs")
+    if len(cases) != 21:
+        raise ValidationError("canonical inventory must define exactly 21 cases")
+    qualification = [case for case in cases.values() if case.get("suite") == "qualification"]
+    extended = [case for case in cases.values() if case.get("suite") == "extended"]
+    if len(qualification) != 12 or len(extended) != 9:
+        raise ValidationError("canonical inventory must define 12 qualification and 9 extended cases")
+    orders = sorted(case.get("qualification_order") for case in qualification)
+    if orders != list(range(1, 13)):
+        raise ValidationError("qualification_order must contain each integer from 1 through 12 exactly once")
+    if any("qualification_order" in case for case in extended):
+        raise ValidationError("extended cases must not define qualification_order")
     return cases
+
+
+def qualification_cases(cases: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(
+        (case for case in cases.values() if case["suite"] == "qualification"),
+        key=lambda case: case["qualification_order"],
+    )
+
+
+def is_within(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
 
 
 def results_root(value: str) -> Path:
@@ -90,11 +114,19 @@ def results_root(value: str) -> Path:
     if not path.is_absolute():
         raise ValidationError("--results must be an absolute path")
     resolved = path.resolve(strict=False)
-    try:
-        resolved.relative_to(REPO_ROOT)
-    except ValueError:
-        return resolved
-    raise ValidationError("--results must be outside the ECP source repository")
+    forbidden_roots = {
+        REPO_ROOT.resolve(),
+        Path(tempfile.gettempdir()).resolve(),
+        Path("/tmp").resolve(),
+        Path("/private/tmp").resolve(),
+        (Path.home() / ".ecp").resolve(),
+        (Path.home() / ".codex" / "plugins" / "cache").resolve(),
+    }
+    if any(is_within(resolved, root) for root in forbidden_roots):
+        raise ValidationError("--results must be a durable root outside source, temporary, authority, and cache trees")
+    if any(part.lower() in {"authority", "cache"} for part in resolved.parts):
+        raise ValidationError("--results must not be inside an authority or cache directory")
+    return resolved
 
 
 def exact_keys(value: Any, expected: set[str], label: str, errors: list[str]) -> bool:
@@ -203,14 +235,12 @@ def validate_environment(value: Any, label: str, errors: list[str]) -> None:
     if not exact_keys(value, ENV_KEYS, label, errors):
         return
     for field in (
-        "project_trusted", "project_config_loaded", "installed_launcher_only",
-        "task_authority_matches_operator", "default_authority_unchanged",
+        "project_trusted", "project_config_loaded", "installed_launcher_only", "default_authority_unchanged",
     ):
         if type(value[field]) is not bool:
             errors.append(f"{label}.{field} must be boolean")
     for field in ENV_KEYS - {
-        "project_trusted", "project_config_loaded", "installed_launcher_only",
-        "task_authority_matches_operator", "default_authority_unchanged",
+        "project_trusted", "project_config_loaded", "installed_launcher_only", "default_authority_unchanged",
     }:
         check_sha(value[field], f"{label}.{field}", errors)
 
@@ -228,7 +258,7 @@ def initial_authority_expected(profile: str) -> dict[str, Any]:
 def semantic_errors(record: dict[str, Any], case: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     run_number = record["run_number"]
-    required_run = run_number <= int(case["minimum_runs"])
+    required_run = case["suite"] == "qualification" and run_number == 1
     expected_fixture_id = f"{case['id']}-run-{run_number:02d}"
     exact = {
         "case_id": case["id"],
@@ -283,19 +313,18 @@ def semantic_errors(record: dict[str, Any], case: dict[str, Any]) -> list[str]:
 
     environment = record["environment_probe"]
     for field in (
-        "project_trusted", "project_config_loaded", "installed_launcher_only",
-        "task_authority_matches_operator", "default_authority_unchanged",
+        "project_trusted", "project_config_loaded", "installed_launcher_only", "default_authority_unchanged",
     ):
         if environment[field] is not True:
             errors.append(f"environment_probe.{field} must be true for PASS")
-    if len({environment["fixture_authority_id_sha256"], environment["task_authority_id_sha256"], environment["operator_authority_id_sha256"]}) != 1:
-        errors.append("fresh task and operator status selected different authority IDs")
-    if len({environment["fixture_state_dir_path_sha256"], environment["task_state_dir_path_sha256"], environment["operator_state_dir_path_sha256"]}) != 1:
-        errors.append("fresh task and operator selected different ECP_STATE_DIR paths")
-    if len({environment["fixture_plugin_version_sha256"], environment["task_plugin_version_sha256"], environment["operator_plugin_version_sha256"]}) != 1:
-        errors.append("fixture, fresh task, and operator selected different Plugin versions")
-    if len({environment["fixture_core_identity_sha256"], environment["task_core_identity_sha256"], environment["operator_core_identity_sha256"]}) != 1:
-        errors.append("fixture, fresh task, and operator selected different Core identities")
+    if environment["fixture_authority_id_sha256"] != environment["operator_authority_id_sha256"]:
+        errors.append("fixture and operator status selected different authority IDs")
+    if environment["fixture_state_dir_path_sha256"] != environment["operator_state_dir_path_sha256"]:
+        errors.append("fixture and operator selected different ECP_STATE_DIR paths")
+    if environment["fixture_plugin_version_sha256"] != environment["operator_plugin_version_sha256"]:
+        errors.append("fixture and operator selected different Plugin versions")
+    if environment["fixture_core_identity_sha256"] != environment["operator_core_identity_sha256"]:
+        errors.append("fixture and operator selected different Core identities")
     if environment["fixture_plugin_version_sha256"] != sha256_text(record["installed_plugin_version"]):
         errors.append("installed_plugin_version does not match the three-way environment proof")
     if environment["fixture_core_identity_sha256"] != sha256_text(record["core_identity"]):
@@ -394,8 +423,8 @@ def validate_record(record: Any, cases: dict[str, dict[str, Any]]) -> list[str]:
     errors: list[str] = []
     if not exact_keys(record, TOP_KEYS, "record", errors):
         return errors
-    if record["schema_version"] != 1:
-        errors.append("schema_version must be 1")
+    if record["schema_version"] != 2:
+        errors.append("schema_version must be 2")
     for field in ("campaign_id", "task_id", "installed_plugin_version", "core_identity"):
         if not isinstance(record[field], str) or not record[field].strip():
             errors.append(f"{field} must be a non-empty string")
@@ -423,8 +452,8 @@ def validate_record(record: Any, cases: dict[str, dict[str, Any]]) -> list[str]:
     for field in ("expected_behavior_conformant", "prohibitions_preserved"):
         if type(record[field]) is not bool:
             errors.append(f"{field} must be boolean")
-    if record["outcome"] not in {"PASS", "FAIL"}:
-        errors.append("outcome must be PASS or FAIL")
+    if record["outcome"] not in {"PASS", "FAIL", "INVALID"}:
+        errors.append("outcome must be PASS, FAIL, or INVALID")
     failures = record["failure_codes"]
     if not isinstance(failures, list) or any(not isinstance(code, str) or IDENTIFIER.fullmatch(code) is None for code in failures):
         errors.append("failure_codes must contain lowercase identifiers")
@@ -451,9 +480,14 @@ def validate_record(record: Any, cases: dict[str, dict[str, Any]]) -> list[str]:
         if failures:
             errors.append("PASS must have an empty failure_codes array")
         errors.extend(semantics)
-    else:
+    elif record["outcome"] == "FAIL":
         if not failures:
             errors.append("FAIL must preserve at least one failure code")
+    else:
+        if not failures:
+            errors.append("INVALID must preserve at least one failure code")
+        elif not any(code.startswith("infra-") for code in failures):
+            errors.append("INVALID must include an infra- failure code")
     return errors
 
 
@@ -482,57 +516,27 @@ def install_exclusive(path: Path, value: Any) -> None:
 
 def campaign_from(record: dict[str, Any]) -> dict[str, Any]:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "campaign_id": record["campaign_id"],
         "installed_plugin_version": record["installed_plugin_version"],
         "core_identity": record["core_identity"],
         "default_authority_sha256": record["environment_probe"]["default_authority_before_sha256"],
+        "protocol": "serial-fail-fast-qualification-v1",
+        "qualification_case_count": 12,
     }
 
 
-def record_result(results: Path, input_path: Path, cases: dict[str, dict[str, Any]]) -> None:
-    record = load_json(input_path)
-    errors = validate_record(record, cases)
-    if errors:
-        raise ValidationError("input record is invalid:\n  - " + "\n  - ".join(errors))
-    campaign_path = results / "campaign.json"
-    campaign = campaign_from(record)
-    if campaign_path.exists():
-        if load_json(campaign_path) != campaign:
-            raise ValidationError("record identity/default-authority sentinel differs from campaign.json")
-    else:
-        install_exclusive(campaign_path, campaign)
-    destination = results / "runs" / f"{record['case_id']}-run-{record['run_number']:02d}.json"
-    install_exclusive(destination, record)
-    print(destination)
-
-
-def validate_results(results: Path, cases: dict[str, dict[str, Any]]) -> None:
-    if results.is_symlink() or not results.is_dir():
-        raise ValidationError("results root must be a real directory")
-    if (results / "campaign.json").is_symlink():
-        raise ValidationError("campaign.json must not be a symlink")
-    campaign = load_json(results / "campaign.json")
-    expected_campaign_keys = {"schema_version", "campaign_id", "installed_plugin_version", "core_identity", "default_authority_sha256"}
-    errors: list[str] = []
-    exact_keys(campaign, expected_campaign_keys, "campaign", errors)
-    if campaign.get("schema_version") != 1:
-        errors.append("campaign.schema_version must be 1")
-    check_sha(campaign.get("default_authority_sha256"), "campaign.default_authority_sha256", errors)
-    if isinstance(campaign, dict):
-        for field in ("campaign_id", "installed_plugin_version", "core_identity"):
-            if not isinstance(campaign.get(field), str) or not campaign[field].strip():
-                errors.append(f"campaign.{field} must be a non-empty string")
-    if results.is_dir():
-        expected_entries = {"campaign.json", "runs"}
-        for entry in sorted(set(path.name for path in results.iterdir()) - expected_entries):
-            errors.append(f"unexpected entry in results root: {entry}")
-    run_directory = results / "runs"
-    if not run_directory.is_dir():
-        errors.append("results/runs directory is missing")
-        raise ValidationError("\n".join(errors))
+def scan_records(
+    results: Path, cases: dict[str, dict[str, Any]], require_directory: bool = False
+) -> tuple[dict[tuple[str, int], dict[str, Any]], list[str]]:
     records: dict[tuple[str, int], dict[str, Any]] = {}
+    errors: list[str] = []
     task_ids: set[str] = set()
+    run_directory = results / "runs"
+    if not run_directory.exists() and not require_directory:
+        return records, errors
+    if run_directory.is_symlink() or not run_directory.is_dir():
+        return records, ["results/runs directory must be a real directory"]
     for path in sorted(run_directory.iterdir()):
         if path.is_symlink() or not path.is_file() or path.suffix != ".json":
             errors.append(f"unexpected entry in runs directory: {path.name}")
@@ -552,21 +556,183 @@ def validate_results(results: Path, cases: dict[str, dict[str, Any]]) -> None:
         if record["task_id"] in task_ids:
             errors.append(f"task_id reused: {record['task_id']}")
         task_ids.add(record["task_id"])
-        if campaign_from(record) != campaign:
-            errors.append(f"{path.name}: package identity or default authority differs from campaign")
-        if record["outcome"] == "FAIL":
-            errors.append(f"{path.name}: preserved failed run blocks the campaign")
+    return records, errors
 
-    required = {(case_id, run) for case_id, case in cases.items() for run in range(1, int(case["minimum_runs"]) + 1)}
-    missing = sorted(required - set(records))
-    if missing:
-        errors.append("missing required runs: " + ", ".join(f"{case}-run-{run:02d}" for case, run in missing))
-    for key, record in records.items():
-        if record["required_run"] != (key in required):
-            errors.append(f"{key[0]}-run-{key[1]:02d}: required_run flag is inconsistent")
+
+def qualification_state(
+    records: dict[tuple[str, int], dict[str, Any]], cases: dict[str, dict[str, Any]]
+) -> tuple[str, str | None, list[str]]:
+    errors: list[str] = []
+    blocker: str | None = None
+    failed_case: str | None = None
+    invalid_case: str | None = None
+    completed = 0
+    stopped = False
+    for case in qualification_cases(cases):
+        case_id = case["id"]
+        attempts = sorted(
+            (record for (record_case, _), record in records.items() if record_case == case_id),
+            key=lambda record: record["run_number"],
+        )
+        numbers = [record["run_number"] for record in attempts]
+        if numbers and numbers != list(range(1, len(numbers) + 1)):
+            errors.append(f"{case_id}: attempts must use contiguous run numbers starting at 1")
+        if len(attempts) > MAX_QUALIFICATION_ATTEMPTS:
+            errors.append(f"{case_id}: qualification allows at most one fresh-fixture retry after INVALID")
+        if attempts:
+            for index, attempt in enumerate(attempts):
+                expected_required = index == 0
+                if attempt["required_run"] is not expected_required:
+                    errors.append(f"{case_id}-run-{attempt['run_number']:02d}: required_run flag is inconsistent")
+            terminal_indexes = [
+                index for index, attempt in enumerate(attempts)
+                if attempt["outcome"] in {"PASS", "FAIL"}
+            ]
+            if len(terminal_indexes) > 1 or (terminal_indexes and terminal_indexes[0] != len(attempts) - 1):
+                errors.append(f"{case_id}: PASS or FAIL must be the final attempt; only INVALID may precede it")
+            if any(attempt["outcome"] != "INVALID" for attempt in attempts[:-1]):
+                errors.append(f"{case_id}: only INVALID attempts may precede the final attempt")
+        if stopped and attempts:
+            errors.append(f"{case_id}: qualification is serial and cannot start after an earlier incomplete or failed case")
+            continue
+        if not attempts:
+            stopped = True
+            if blocker is None:
+                blocker = case_id
+            continue
+        final = attempts[-1]["outcome"]
+        if final == "PASS":
+            completed += 1
+            continue
+        stopped = True
+        blocker = case_id
+        if final == "FAIL":
+            failed_case = case_id
+        elif len(attempts) == MAX_QUALIFICATION_ATTEMPTS:
+            invalid_case = case_id
+    if failed_case is not None:
+        return "FAILED", failed_case, errors
+    if invalid_case is not None:
+        return "INVALID", invalid_case, errors
+    if completed == len(qualification_cases(cases)):
+        return "QUALIFIED", None, errors
+    return "INCOMPLETE", blocker, errors
+
+
+def enforce_next_record(
+    record: dict[str, Any], records: dict[tuple[str, int], dict[str, Any]], cases: dict[str, dict[str, Any]]
+) -> None:
+    state, blocker, errors = qualification_state(records, cases)
     if errors:
-        raise ValidationError("matrix validation failed:\n  - " + "\n  - ".join(errors))
-    print(f"PASS: {len(required)} required runs and {len(records) - len(required)} preserved extra runs")
+        raise ValidationError("existing qualification history is invalid:\n  - " + "\n  - ".join(errors))
+    if state == "FAILED":
+        raise ValidationError("qualification is already FAILED; product FAIL is terminal")
+    if state == "INVALID":
+        raise ValidationError(
+            "qualification is already INVALID; the one fresh-fixture retry also failed infrastructure"
+        )
+    case = cases[record["case_id"]]
+    existing_numbers = sorted(run for case_id, run in records if case_id == record["case_id"])
+    expected_number = (existing_numbers[-1] + 1) if existing_numbers else 1
+    if record["run_number"] != expected_number:
+        raise ValidationError(
+            f"{record['case_id']}: next append must use run {expected_number:02d}, got {record['run_number']:02d}"
+        )
+    expected_required = case["suite"] == "qualification" and record["run_number"] == 1
+    if record["required_run"] is not expected_required:
+        raise ValidationError("required_run must be true only for a qualification case's first attempt")
+    if case["suite"] == "qualification":
+        if state == "QUALIFIED":
+            raise ValidationError("qualification is already QUALIFIED; no further qualification attempt is allowed")
+        if record["case_id"] != blocker:
+            raise ValidationError(f"qualification is serial; next case must be {blocker}")
+        prior = [records[(record["case_id"], run)] for run in existing_numbers]
+        if prior and prior[-1]["outcome"] != "INVALID":
+            raise ValidationError("a fresh retry is allowed only after INVALID")
+    elif state != "QUALIFIED":
+        raise ValidationError("extended diagnostics may run only after qualification is QUALIFIED")
+
+
+def record_result(results: Path, input_path: Path, cases: dict[str, dict[str, Any]]) -> None:
+    record = load_json(input_path)
+    errors = validate_record(record, cases)
+    if errors:
+        raise ValidationError("input record is invalid:\n  - " + "\n  - ".join(errors))
+    records, existing_errors = scan_records(results, cases)
+    if existing_errors:
+        raise ValidationError("existing result records are invalid:\n  - " + "\n  - ".join(existing_errors))
+    enforce_next_record(record, records, cases)
+    campaign_path = results / "campaign.json"
+    campaign = campaign_from(record)
+    if campaign_path.exists():
+        if campaign_path.is_symlink() or load_json(campaign_path) != campaign:
+            raise ValidationError("record identity/default-authority sentinel differs from campaign.json")
+    else:
+        install_exclusive(campaign_path, campaign)
+    destination = results / "runs" / f"{record['case_id']}-run-{record['run_number']:02d}.json"
+    install_exclusive(destination, record)
+    records[(record["case_id"], record["run_number"])] = record
+    state, blocker, _ = qualification_state(records, cases)
+    suffix = f"; next={blocker}" if blocker else ""
+    print(f"{destination}\n{state}{suffix}")
+
+
+def validate_results(results: Path, cases: dict[str, dict[str, Any]]) -> None:
+    if results.is_symlink() or not results.is_dir():
+        raise ValidationError("results root must be a real directory")
+    if (results / "campaign.json").is_symlink():
+        raise ValidationError("campaign.json must not be a symlink")
+    campaign = load_json(results / "campaign.json")
+    expected_campaign_keys = {
+        "schema_version", "campaign_id", "installed_plugin_version", "core_identity",
+        "default_authority_sha256", "protocol", "qualification_case_count",
+    }
+    errors: list[str] = []
+    exact_keys(campaign, expected_campaign_keys, "campaign", errors)
+    if campaign.get("schema_version") != 2:
+        errors.append("campaign.schema_version must be 2")
+    if campaign.get("protocol") != "serial-fail-fast-qualification-v1":
+        errors.append("campaign.protocol is invalid")
+    if campaign.get("qualification_case_count") != 12:
+        errors.append("campaign.qualification_case_count must be 12")
+    check_sha(campaign.get("default_authority_sha256"), "campaign.default_authority_sha256", errors)
+    if isinstance(campaign, dict):
+        for field in ("campaign_id", "installed_plugin_version", "core_identity"):
+            if not isinstance(campaign.get(field), str) or not campaign[field].strip():
+                errors.append(f"campaign.{field} must be a non-empty string")
+    if results.is_dir():
+        expected_entries = {"campaign.json", "runs"}
+        for entry in sorted(set(path.name for path in results.iterdir()) - expected_entries):
+            errors.append(f"unexpected entry in results root: {entry}")
+    records, record_errors = scan_records(results, cases, require_directory=True)
+    errors.extend(record_errors)
+    for key, record in records.items():
+        if campaign_from(record) != campaign:
+            errors.append(f"{key[0]}-run-{key[1]:02d}: package identity or default authority differs from campaign")
+        case = cases[record["case_id"]]
+        expected_required = case["suite"] == "qualification" and record["run_number"] == 1
+        if record["required_run"] is not expected_required:
+            errors.append(f"{key[0]}-run-{key[1]:02d}: required_run flag is inconsistent")
+    state, blocker, sequence_errors = qualification_state(records, cases)
+    errors.extend(sequence_errors)
+    if state != "QUALIFIED" and any(cases[case_id]["suite"] == "extended" for case_id, _ in records):
+        errors.append("extended diagnostics were recorded before qualification reached QUALIFIED")
+    if errors:
+        raise ValidationError("qualification validation failed:\n  - " + "\n  - ".join(errors))
+    invalid_count = sum(record["outcome"] == "INVALID" for record in records.values())
+    extended_count = sum(cases[case_id]["suite"] == "extended" for case_id, _ in records)
+    if state == "FAILED":
+        raise ValidationError(f"FAILED: product behavior failed at {blocker}; no later qualification case may run")
+    if state == "INVALID":
+        raise ValidationError(
+            f"INVALID: infrastructure failed twice at {blocker}; freeze this candidate campaign"
+        )
+    if state == "INCOMPLETE":
+        raise ValidationError(f"INCOMPLETE: next qualification case is {blocker}")
+    print(
+        f"QUALIFIED: 12 qualification cases passed; "
+        f"{invalid_count} INVALID attempts and {extended_count} extended diagnostics preserved"
+    )
 
 
 def parse_args() -> argparse.Namespace:

@@ -104,13 +104,18 @@ or deletion.
    identity. Success requires the expected installed Plugin version, the exact
    packaged Core identity, and an unchanged project mode. A source/cache check
    in the task that performed installation does not prove fresh-task pickup.
-6. Before any real-product pilot write, complete the independent disposable-
-   fixture matrix in [Codex Plugin host-routing evaluation](plugin-host-evaluation.md).
-   A successful explicit check does not prove enable, change, disable, negative,
-   incomplete, or edge-case routing. The matrix uses a new Git Workspace and a
-   new dedicated authority for every scored/preparation run. It is accepted
-   only when the canonical result validator returns `PASS` for all 42 required
-   runs without a preserved failed retry.
+6. Before any real-product pilot write, complete the 12 independent host
+   canaries in [Codex Plugin host-routing evaluation](plugin-host-evaluation.md).
+   Freeze one exact installed Plugin version and bundled Core identity, then run
+   one fresh task per canary, serially and fail-fast, with a new disposable Git
+   Workspace and dedicated authority each time. Acceptance is `12/12` for that
+   unchanged candidate. A product `FAIL` stops qualification; a fixture, host,
+   or dispatch failure is preserved as `INVALID` and may be rerun once in a new
+   fixture after its infrastructure cause is corrected. A second `INVALID`
+   freezes that candidate campaign. Store the campaign
+   manifest, task ledger, identities, observations, and every failed, invalid,
+   or retry record in a durable external results root; `/tmp` and
+   `/private/tmp` are not acceptable as the only copy.
 
 ### Upgrade
 
@@ -170,18 +175,19 @@ signature: an attacker able to replace the Plugin can replace the launcher,
 binary, checksum, and manifest together. The Core binary digest provides exact
 Evidence compatibility identity, not publisher provenance.
 
-The installed-copy read-only smoke recorded in
-`docs/plugin-host-evaluation.md` is diagnostic only. Fresh tasks selected the
-check workflow but the host supplied a removed older Skill locator, and the
-worktrees were derived from ECP rather than canonical disposable fixtures. The
-canonical status is therefore 0/42, not a partially passed matrix.
+The terminated host-routing campaign recorded in
+`docs/plugin-host-evaluation.md` is diagnostic only. Its observations and
+disposable fixtures do not qualify any current package and must not be resumed
+to reach a historical run count. Qualification restarts only after the
+greenfield `READY` boundary is fixed and a new exact candidate is packaged,
+installed, identity-checked, and frozen for the 12-canary gate.
 
 The current source package is still unsigned, unnotarized, and unpublished in
-the universal directory. Fresh-task enable/change/disable routing, the trusted
-project-scoped dedicated-state handoff, upgrade, uninstall, reinstallation,
-and a governed Change have not been validated. Keep
-these independent claims separate: read-only installed-copy discovery is
-observed, while host routing, lifecycle compatibility, and publisher provenance
-remain unverified release requirements. A separate release decision is also
-required for keeping Linux packages in the same Plugin versus platform-specific
-distribution.
+the universal directory. A complete 12-canary exact-candidate result, the
+trusted project-scoped dedicated-state handoff, upgrade, uninstall,
+reinstallation, and longitudinal real-project value have not been validated.
+Keep these claims separate: source and repository checks are mechanism
+evidence, while host routing, lifecycle compatibility, publisher provenance,
+and product value remain independent release requirements. A separate release
+decision is also required for keeping Linux packages in the same Plugin versus
+platform-specific distribution.

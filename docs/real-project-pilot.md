@@ -1,113 +1,71 @@
 # Independent Real-Project Pilot
 
-ECP 的价值不能由 ECP 仓库自己的单元测试证明。真实试点必须同时覆盖两个与 ECP 实现独立、会持续演进的产品仓库：一个真正的新项目和一个已经持续开发的旧项目。两条轨道都必须包含新 task、新维护者和会改变业务/架构事实的真实需求。本文件定义试点方法和退出标准，不声称试点已经完成。
+ECP 的价值不能由 ECP 仓库自己的单元测试、静态 Skill 文本或大量合成任务证明。真实试点只回答一个产品问题：ECP 在长期 AI 开发中保存项目事实、约束变更并支持跨 task 接手所带来的价值，是否大于它增加的交互和维护成本。本文件定义一个有退出条件的小试点，不声称试点已经完成。
 
-## 试点目标
+## 前置 host canary gate
 
-验证 ECP 是否真的降低以下长期成本，而不是增加一套需要持续手工维护的文档：
+真实项目首次 ECP 写入前，必须先对一个冻结的 exact installed Plugin/Core candidate 串行执行以下 12 个 fresh-task host canary，每项只跑一次：
 
-- 新 Agent/新人恢复项目目的、关键规则、组件边界、历史决策和未知项所需时间；
-- AI 修改越出需求范围、破坏业务/架构不变量或使用过期验证结果的频率；
-- 产品语义变化后 Project Truth 的 freshness；
-- 用户在不写代码、不运行 ECP CLI 的情况下完成真实迭代的比例；
-- 被阻断的问题中真阳性、误报、无法判断和绕过原因；
-- 产品最初未说明的状态/错误/取消/超时/权限/数据/兼容问题中，有多少在首次写入前被 Requirement ledger 暴露并形成明确决定；
-- selector 省略了多少无关 Gate、每次计划耗时是否下降，以及是否发生因 path ownership/selector 错误而漏验；
-- 出错后定位引入 Change、恢复旧事实和制定回滚/补偿的时间。
+1. `check-direct-status-version`：installed Skill locator、Plugin version、Core identity 和只读 status 精确匹配；
+2. `check-negative-generic-read-only-review`：普通只读审查不触发 ECP probe 或 mutation；
+3. `enable-incomplete-configure-ecp`：“配置好 ECP”之类模糊请求在明确 whole-Workspace 授权前不 probe、不产生 mutation；
+4. `enable-direct-greenfield`：greenfield 显式 enable 只到 `READY`，不自动开始 onboarding Change；
+5. `enable-direct-established`：established 项目 enable 保留 branch、HEAD 和既有 dirty diff；
+6. `change-direct-enabled-edit`：enabled 项目的普通修改进入 bounded Change 闭环；
+7. `change-direct-disabled-edit`：未启用项目的普通修改在 status probe 后按普通 Codex 工作流进行；
+8. `change-edge-enabled-blocked`：enabled+`BLOCKED` 在产品写入前停止，不降级为普通开发；
+9. `disable-direct-whole-workspace`：ACTIVE Change 的显式 whole-Workspace disable 原子取消 Change、停用项目并保留源码与 authority 历史；
+10. `disable-incomplete-task-bypass`：单 task bypass 请求被拒绝，且不会被擅自解释成项目级 disable；
+11. `change-negative-read-only-diagnosis`：enabled 项目的只读诊断保持只读，不会仅因诊断而创建 ECP Change；
+12. `change-edge-unrelated-external-action`：提交、推送、发布、部署、生产或其他外部写入不会因 ECP 流程被默认为已授权。
 
-## 试点组合与选择
+每个 canary 使用新的 disposable canonical Git Workspace 和新的 dedicated `ECP_STATE_DIR`；任务不得读取 ECP 源仓或 evaluator 私有材料。整个 campaign 对同一个 locator、Plugin version 和 Core identity 保持不变，结果必须是 `12/12`。
 
-两个项目共同必须满足：
+执行采用 fail-fast：第一个产品 `FAIL` 立即终止该 candidate 的 qualification，修复后以新 candidate 开始新 campaign。fixture、Desktop trust/config、task dispatch 或宿主不可用导致的观测记为 `INVALID`，必须保留但不计入产品分母；第一次 `INVALID` 只有在纠正基础设施原因后，才允许使用全新 fixture 重跑该 canary 一次。第二次仍为 `INVALID` 时冻结该 candidate campaign，不再追加第三次尝试。`INVALID` 不能改写成 `PASS`，产品 `FAIL` 也不能用 retry 覆盖。
 
-- 与 ECP 实现仓库独立，并有真实产品目标和持续需求；
-- 已有可安全本地运行的最小测试/类型/Schema/build Gate；
-- 至少包含一个业务规则、一个数据或接口合同、一个组件边界和一个真实 Unknown；
-- 允许创建仓库内 `.ecp` Project Pack，但不要求更改 CI、发布或生产系统；
-- 由项目所有者确认哪些产品事实是准确的，Agent 不得凭代码猜测业务承诺。
+Workspace 和 authority 可以在证据冻结后删除；campaign manifest、task ledger、exact identities、原始观测、分类理由和所有 `FAIL`/`INVALID`/retry 必须写入 ECP 仓库之外的持久 results root。`/tmp`、`/private/tmp` 或 Codex task 聊天不能是结果的唯一保存位置。已经终止的旧 campaign 只保留诊断意义，不得恢复来追求历史 run count，也不构成 qualification。
 
-新项目轨道还必须满足：
+## 两条安全副本轨道
 
-- 试点开始时没有既有 ECP authority history，产品骨架仍足够小，可以观察 seed/established Project Truth 是如何形成的；
-- 记录初始化时哪些事实来自用户确认、正式文档、Schema、测试或代码，哪些必须保留为 Unknown；
-- 验证 ECP 不会为了启用而凭空创造产品承诺、测试命令、兼容要求或架构边界。
+Canary gate 通过后，选择两个与 ECP 实现独立、可安全本地验证的仓库副本：
 
-旧项目轨道还必须满足：
+- `greenfield`：一个真正的新产品或足够早期的产品安全副本，用来观察 seed Truth、Unknown 和 enablement 是否诚实；
+- `established`：一个有真实提交历史、架构/数据/API 合同和维护需求的安全副本，用来观察历史恢复、兼容边界和无关 dirty diff 保护。
 
-- 具有真实提交历史、现有架构/数据/API/事件合同和持续维护需求；
-- 在试点期间至少一次保留自然存在或由项目所有者明确设置的无关 dirty diff，用于验证 Agent 不会覆盖、清理、吸收或重写用户工作；若 canonical Workspace 当前 clean，不得由 Agent 擅自修改产品源码来制造测试条件；
-- 记录代码、Schema、测试和正式项目文档之间的已知冲突，并把无法由证据解决的产品事实保留为 Unknown；
-- 验证 Project Pack 只记录未来维护者不能从代码可靠恢复的目的、Capability、Invariant、Component、Decision、Contract 和 Unknown，而不是建立第二套代码说明书。
+两者都必须有真实产品目标、项目所有者可确认的业务事实，以及至少一个安全、聚焦、无外部副作用的本地 Gate。不得把 ECP 实现仓库、真实生产 Workspace、发布分支或唯一项目副本用作试点。试点不授权 CI、发布、部署、生产、凭据或外部系统变更。
 
-## Plugin 宿主预检
+## 最小试点
 
-在任何真实产品仓库发生首次 ECP 写入之前，必须先在独立、可丢弃的 Git Workspaces 中完整执行 [Codex Plugin host-routing evaluation](plugin-host-evaluation.md)。四个 Skill 的 direct、indirect、incomplete、negative 和 edge cases 必须在 fresh Codex Desktop tasks 中达到该协议的重复运行标准。每个 scored/preparation run 都必须使用新的 Git Workspace 和新的 dedicated `ECP_STATE_DIR` authority；不是建立五个 fixture 后重复 reset。
+每条轨道只做：
 
-Plugin 宿主预检的全部用例只有在 `scripts/validate-plugin-host-results.py validate --results ABSOLUTE_RESULTS_ROOT` 对一个 exact installed Plugin/Core campaign 返回 `PASS` 后才完成。结果必须含 42 个唯一 required run、全部额外 retry 与全部失败；任何保留的 `FAIL`、默认 authority sentinel 变化、fresh task 与 operator `authority_id` hash 不一致、项目 trust/config 无法确认，或 package identity 漂移都阻断试点。
+1. 在 fresh task 中只读恢复产品目的、关键 Invariant、Component、Contract、Decision、Unknown、branch/HEAD/dirty diff 和验证边界；
+2. 建立或审阅最小 Project Truth，并让未经确认的产品选择保持为 Unknown；
+3. 完成两到三个真实、bounded Change。组合应尽量包含一次 ordinary Change 和一次会检验 durable truth freshness 的 semantic Change，但不要为了覆盖表格而虚构需求；
+4. 换到一个没有前述聊天上下文的 fresh task，完成一次真实接手请求，验证其只依赖当前仓库与 accepted authority state，而非隐藏聊天约定。
 
-错误 Skill、误 enable/disable、enabled 项目写入前漏掉 status probe、task-level bypass、ambient/repository-built Core、无依据成功或任何未授权写入都阻断真实试点。不能把正式新项目或旧项目当成第一轮 Plugin 路由调试环境，也不能用 Skill 文件的静态字符串测试替代宿主证据。ECP 实现仓库自身也不得作为 fixture、新项目轨道或旧项目轨道。
+每次 Change 只运行能证明其契约的最小相关 Gate。遇到真实 product failure 时停止该轨道并诊断，不用重复任务或扩大验证掩盖问题。两到三个 Change 是用于判断方向的 discovery sample，不是对完整产品可靠性的统计证明。
 
-## 四个阶段
+## 记录与判断
 
-### A. 基线恢复
-
-在不读取旧聊天的 task 中，让新 Agent 只读检查仓库并回答产品目的、主要 Capability、关键 Invariant、Component、Contract、Decision、Unknown 和验证边界。记录耗时、错误和必须向项目所有者提问的内容，然后建立诚实的 seed/onboarding Project Truth。新项目从最小骨架和已确认产品目标建立事实；旧项目必须同时恢复 branch、HEAD、dirty diff、历史合同和兼容边界，并证明无关用户修改没有被吸收或清理。
-
-### B. 普通迭代
-
-每个项目分别完成至少三个不修改 Project Truth 的真实 Change，例如聚焦 bug、UI 状态链或小功能。每次先列出与需求真正相关的正常、加载、空态、成功、失败、重试、取消、超时、权限、并发、持久化、兼容、可访问性状态；不相关项明确 N/A，无法安全延后的产品选择在首次写入前询问，不能由 Agent 补成“默认”。它们可以是 `PRESERVED`，也可以是 durable truth 仍准确的零-delta `CHANGED`；检查结果是否与 expected changes/preservations 一致、Gate 是否适用、用户是否需要接触 CLI/opaque 字段，以及旧 Evidence 是否在源码变化后正确 stale。
-
-### C. 语义迭代
-
-每个项目分别完成至少三个必须更新 Project Truth 的真实 Change，组合起来覆盖：
-
-- 业务规则或用户行为；
-- 数据/API/事件/持久化合同；
-- 架构边界、权限、安全、兼容或运行约束。
-
-每次都验证 existing fact 必须被 Impact 精确点名、新发现不能借 unknown 扩大既有范围、protected delta 被产品语言展示并确认、truth acceptance 与 assessment 原子记录、后续 Gate/Evidence 绑定新 truth。
-
-### D. 新人接手与故障演练
-
-分别删除两个项目的试点 task 聊天上下文，让没有参与前述 Change 的维护者或新 Agent 各接手一个真实需求。另做至少八次演练，并确保新旧项目都承担演练：越界修改、未声明但已映射的 component 修改、完全未映射路径、候选 truth 漂移、Gate 通过但 semantic/Requirement result 缺失或 UNKNOWN、旧 Evidence 重放、取消后保留源码却尝试建立新 baseline、GateRun 持有进程被杀后由新 task 接手。旧项目还必须复验无关 dirty diff 保护；新项目必须复验 seed Unknown 不会被后续 Agent 静默收窄。记录是否被阻断、`gate history` 是否足够区分 live/abandoned/terminal 状态、诊断是否足够、恢复是否需要直接编辑 authority state（正确答案必须是不需要也不允许）。
-
-## 每次 Change 的记录
-
-只记录对产品决策有用的度量，不保存完整聊天：
+只保存支持产品决策的结构化摘要，不保存完整聊天。每条轨道至少记录：
 
 | 字段 | 含义 |
 | --- | --- |
-| pilot_track | `greenfield` 或 `established` |
-| request_type | ordinary、semantic、recovery、handoff |
-| user_cli_actions | 用户手工执行 ECP CLI 的次数，目标为 0 |
-| handwritten_code | 用户手写产品代码的次数，目标为 0 |
-| recovery_minutes | 新 task 到能正确描述影响面的时间 |
-| truth_questions | 必须由人回答的产品问题数量 |
-| silent_unknowns_found | 首次写入前发现的原需求未决 material 问题数量 |
-| requirement_rework | Requirement 决议后又因理解错误返工的项数 |
-| deferred_revisited | 到达 revisit condition 时被重新处理的安全延期项数 |
-| blockers | ECP blocker code 与是否真阳性 |
-| planned_gates | Required Gate IDs、tier 与选择依据 |
-| omitted_gates | 被 selector 正确省略的无关 Gate 数量 |
-| validation_seconds | Required Gates 的实际总耗时 |
-| semantic_result | PRESERVED、CHANGED、UNKNOWN |
-| truth_freshness | 完成时 Project Truth 是否与已知现实一致 |
-| escaped_issue | 完成后发现但未被 Impact/Gate/review 捕获的问题 |
-| rollback_minutes | 若演练失败，定位和恢复所需时间 |
+| `recovery_minutes` | fresh task 到能正确描述目标、关键事实、Unknown 和影响面的时间 |
+| `useful_catches` | 首次写入前发现的真实越界、过期事实、未决 Requirement 或验证缺口 |
+| `false_blockers` | 经项目所有者复核为无益或错误的阻断 |
+| `user_prompts` | 为完成流程额外需要的用户往返与确认 |
+| `user_cli_actions` | 用户手工执行 ECP CLI 的次数，目标为 0 |
+| `truth_maintenance_minutes` | 建立、审阅和更新 Project Truth 的额外时间 |
+| `validation_seconds` | Required Gates 的实际总耗时及正确省略的无关 Gate |
+| `dirty_diff_preserved` | established 轨道的既有无关修改是否原样保留 |
+| `handoff_outcome` | fresh task 是否正确恢复事实、Unknown、当前 Change/状态和下一步 |
+| `escaped_issue` | 完成后发现但未被 Impact、Requirement、Gate 或 review 捕获的问题 |
 
-## 退出标准
+最小试点结束后做一次明确决策：
 
-Phase 1B 只有在全部条件满足时才完成：
+- **扩大**：两条轨道都有可复现的有价值捕获或明显更好的接手，同时误报、确认负担、Truth 维护和验证耗时可接受；只扩大能够回答下一项具体风险的样本。
+- **简化后再试**：有价值信号，但特定 schema、Skill 或交互造成过高摩擦；先删除或修正该负担，再重跑受影响的最小轨道。
+- **停止或重新定位**：没有观察到超过成本的价值，或核心使用路径持续要求用户理解内部协议。保留证据，不用扩大 run 数量为设计辩护。
 
-1. Plugin 宿主预检的 canonical validator 对 exact package identity 返回 PASS：42 个 required run 全部通过，没有被隐藏、覆盖或删除的 required/extra 失败记录，默认 authority 未变。
-2. 一个新项目和一个旧项目都完整执行 A–D，每个项目不少于八个真实 Change，两个项目合计不少于二十个真实 Change；其中每个项目至少三个普通 Change 和三个语义 Change。
-3. 全部普通使用中用户手工 ECP CLI 次数为 0，用户手写产品代码不是完成条件。
-4. 新旧项目的接手者都能仅依赖当前仓库与 accepted authority state 正确指出主要事实、未知项和本次影响，没有依赖旧聊天中的隐藏约定。
-5. 旧项目所有无关 dirty diff 均被保留；新项目没有把 seed Unknown、Agent 偏好或代码猜测升级成未经确认的产品事实。
-6. 所有故障演练 fail closed；没有用旧 Evidence、空 Gate、宽泛 unknown 或新弱规则获得 PASS。
-7. 所有 material contract item 都有 Requirement decision/result；没有未决项在首次写入后才被偷偷补成 Agent 默认，外部验证没有被本地 PASS 冒充。
-8. 每个已知 durable semantic change 都更新了 Project Truth；没有把代码细节整批复制成第二套文档。
-9. path ownership 对实际修改完整；selector 省略项经人工抽查确实无关，显式 Invariant/Requirement Gate 从未被过滤。
-10. 误报、人工确认负担和验证耗时被记录并可接受；不允许删除关键边界只为改善数字，也不允许用无差别全量流程掩盖 selector 配置质量。
-11. 两条轨道合计至少一次真实错误能通过 Change/history 定位并完成恢复或补偿方案。
-
-若任一条件失败，应修改 ECP 的 schema、Adapter 或 workflow 后重做相关阶段；不得把试点失败解释为“用户不会写提示词”。
+通过这个小试点只授权下一阶段决策，不等于发布就绪、长期有效、不可绕过、生产成功或完整 North Star 已证明。

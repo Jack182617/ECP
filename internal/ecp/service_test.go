@@ -671,6 +671,28 @@ func TestOutOfScopePathBlocksVerdict(t *testing.T) {
 	}
 }
 
+func TestListEvidenceReturnsNonNilEmptyCollection(t *testing.T) {
+	ctx := context.Background()
+	repo := createTestRepository(t)
+	service := newTestService(t)
+	bootstrapProjectWithGate(t, ctx, service, repo, passingGitGate())
+	change, err := startTestChange(t, ctx, service, repo, StartChangeInput{
+		Title: "Empty Evidence history", Goal: "Expose an empty collection", Scope: []string{"src"},
+		AcceptanceCriteria: []string{"Evidence list is an array"}, Risk: RiskModerate,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := service.ListEvidence(ctx, repo, change.ChangeID)
+	if err != nil {
+		t.Fatalf("list empty Evidence: %v", err)
+	}
+	if report.Evidence == nil || len(report.Evidence) != 0 {
+		t.Fatalf("empty Evidence history must be a non-nil empty collection: %#v", report.Evidence)
+	}
+}
+
 func TestHighRiskAcknowledgementBindsExactSubject(t *testing.T) {
 	ctx := context.Background()
 	repo := createTestRepository(t)
@@ -682,6 +704,29 @@ func TestHighRiskAcknowledgementBindsExactSubject(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	preGate, err := service.Verdict(ctx, repo)
+	if err != nil || preGate.Status != VerdictBlocked || !hasReason(preGate, "ACKNOWLEDGEMENT_REQUIRED") || !hasReason(preGate, "GATE_EVIDENCE_MISSING") {
+		t.Fatalf("expected pre-Gate non-acknowledgeable Verdict: %+v %v", preGate, err)
+	}
+	_, beforeAcknowledgement, err := service.loadAuthority(ctx, repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeRevision := beforeAcknowledgement.Projection.Revision
+	beforeEventHead := beforeAcknowledgement.Projection.EventHead
+	beforeCount := len(beforeAcknowledgement.Projection.Acknowledgements[change.ChangeID])
+	if _, err := service.RecordAcknowledgement(ctx, repo, change.ChangeID, preGate.SubjectDigest, "owner", "premature acknowledgement"); err == nil || !isErrorCode(err, "SUBJECT_NOT_ACKNOWLEDGEABLE") {
+		t.Fatalf("expected pre-Gate acknowledgement to be rejected, got %v", err)
+	}
+	_, afterAcknowledgement, err := service.loadAuthority(ctx, repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterAcknowledgement.Projection.Revision != beforeRevision || afterAcknowledgement.Projection.EventHead != beforeEventHead || len(afterAcknowledgement.Projection.Acknowledgements[change.ChangeID]) != beforeCount {
+		t.Fatalf("rejected pre-Gate acknowledgement wrote authority state: before_revision=%d after_revision=%d before_head=%q after_head=%q before_count=%d after_count=%d",
+			beforeRevision, afterAcknowledgement.Projection.Revision, beforeEventHead, afterAcknowledgement.Projection.EventHead,
+			beforeCount, len(afterAcknowledgement.Projection.Acknowledgements[change.ChangeID]))
 	}
 	appendFile(t, filepath.Join(repo, "src", "app.txt"), "high risk\n")
 	if _, err := runTestGates(t, ctx, service, repo, change.ChangeID, nil); err != nil {

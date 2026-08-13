@@ -113,11 +113,18 @@ Complete lifecycle setup before the first repository write.
    Impacted invariant Gates and automated Requirement Gates remain mandatory.
    Stop if any effect exceeds authorization. Do not run unrelated full suites
    merely for completeness.
-9. Implement only the bounded Change, preserving unrelated user work and the
+9. Treat a `high` or `critical` effective risk as a pre-write human-confirmation
+   barrier. Explain the concrete human-readable risk, bounded scope, and planned
+   local Gates, then obtain fresh explicit confirmation before the first write
+   or Gate run. If confirmation is absent, keep the Change ACTIVE and stop with
+   no repository write, GateRun, or Evidence. This confirmation covers only the
+   displayed action; it is not a Core acknowledgement. Scope, effective risk,
+   protected semantics, or authorized-effect drift requires fresh confirmation.
+10. Implement only the bounded Change, preserving unrelated user work and the
    repository architecture. Do not edit Control Config during an ordinary
    product Change. Edit candidate Project Truth/contracts only for intentional,
    declared durable semantic changes.
-10. After material edits, run a fresh `ecp context get`, then `ecp truth diff`,
+11. After material edits, run a fresh `ecp context get`, then `ecp truth diff`,
     and reconcile every Requirement:
 
     - `PRESERVED` requires no expected semantic change and an empty truth delta.
@@ -130,19 +137,22 @@ Complete lifecycle setup before the first repository write.
 
     Include one sorted result for every Requirement. Never omit a difficult
     item or convert review/external verification into fake automated Evidence.
-11. Run a fresh `ecp gate plan`. Confirm `inferred_impact` has no undeclared
+12. Run a fresh `ecp gate plan`. Confirm `inferred_impact` has no undeclared
     component, capability, invariant, or unmapped final path. Use only the exact
     Change ID and plan digest from that plan for `ecp gate run`. Never execute a
-    configured command directly and call it ECP Evidence.
-12. Treat GateRun as durable. `COMPLETED` means every selected Gate produced
+    configured command directly and call it ECP Evidence. If this final plan
+    introduces or changes a high/critical risk, stop before the Gate run and
+    obtain a fresh human confirmation under step 9.
+13. Treat GateRun as durable. `COMPLETED` means every selected Gate produced
     Evidence, not that every item passed. Preserve any structured
     `partial_result` after a run error. Never silently refresh and retry a stale
     Change, activation, source, config, or plan.
-13. Invoke `ecp verdict` and trust only its current structured result. If the
-    sole blocker is `ACKNOWLEDGEMENT_REQUIRED`, explain the exact risk and wait
-    for explicit acknowledgement before recording it with the immediately
-    preceding Change ID and subject digest.
-14. For an immediately preceding current `PASS`, automatically invoke
+14. Invoke `ecp verdict` and trust only its current structured result. If the
+    sole blocker is `ACKNOWLEDGEMENT_REQUIRED`, record the immediately returned
+    exact subject only when the step 9 confirmation still applies. Otherwise
+    explain the current risk and wait. Never infer acknowledgement from Change
+    start, a Gate plan, the implementation request, or stale confirmation.
+15. For an immediately preceding current `PASS`, automatically invoke
     `ecp change complete` with its exact Change ID and subject digest. For
     `BLOCKED` or `INDETERMINATE`, do not complete or auto-cancel; report the
     smallest evidence-backed blocker and leave the Change ACTIVE.

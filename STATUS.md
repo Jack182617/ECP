@@ -1,74 +1,72 @@
 # ECP Current Status
 
-Canonical status as of 2026-08-12. This file answers “where are we and what is
+Canonical status as of 2026-08-13. This file answers “where are we and what is
 next”; detailed contracts remain in the linked documents.
 
 ## Verdict
 
 ECP v0.3 has a local Core/CLI, a four-Skill self-contained Codex Plugin source,
-and automated repository-level coverage for the local assurance lifecycle. It
-is **not ready for a real-product pilot yet**. No canonical Plugin host-routing
-case has passed: the required result remains 0/42. Signing, public distribution,
-upgrade/uninstall/reinstallation, protected CI enforcement, and real-project
-longitudinal evidence also remain unverified.
+and automated repository-level coverage for the bounded local assurance
+lifecycle. It is **not yet qualified for a real-product pilot or release**.
+Signing, public distribution, protected CI enforcement, isolated execution,
+and longitudinal real-project value remain unverified.
 
-Earlier fresh Desktop smoke tasks selected `ecp-check`, but the running host
-supplied a stale removed Skill-cache locator and the tasks used ECP-derived
-worktrees rather than isolated fixtures. Those observations are diagnostics,
-not matrix passes. The ECP implementation repository itself is never a host
-fixture or one of the two future real-project pilot tracks.
+The previous duplicated host-routing campaign is terminated. Its completed
+observations may be retained as diagnostic records, but the campaign and its
+disposable Workspaces/authorities do not constitute qualification evidence and
+must not be resumed to reach a historical run count. ECP itself is never a host
+fixture or a real-project pilot track.
 
 ## Current checkpoint
 
-- Current uninstalled local package candidate:
-  `0.3.0-dev+codex.20260812095321`, with bundled Core identity
-  `0.3.0-dev+sha256:5a2d80647fc02f81b53d8a855a42d8c8e593c720e27d50838964f92a98ff29b5`.
-  All four runtime targets were rebuilt; manifest checksums, target
-  architectures, cache-like launcher discovery, the five-profile packaged-Core
-  seed preflight, `go vet ./...`, and the final full `go test ./...` pass. This
-  candidate has not been installed into Codex Desktop, so none of those checks
-  is a host-routing pass.
-- The source fixes close authority-directory ancestor symlink traversal,
-  order-dependent duplicate contract paths, near-capacity unterminated
-  GateRuns, incomplete Evidence replay validation, and interrupted package-swap
-  recovery. The matrix protocol now also detects per-turn routing preheating,
-  changed pre-existing dirty content, authority-only side effects, cancelled
-  Changes masquerading as completion, and fixture/task/operator package or
-  authority identity mismatch.
-- Canonical 21-case/42-required-run inventory: defined, with every case bound
-  to one of five exact fixture profiles and explicit repository, authority,
-  project-mode, per-turn routing, and status-probe expectations.
-- Disposable fixture contract: seed, independent Git/authority builder,
-  project-scoped dedicated `ECP_STATE_DIR`, preparation states, and default
-  authority sentinel are defined. They have not been used to create or enable a
-  persistent fixture in this review.
-- Canonical result contract: versioned schema, no-overwrite recorder, whole-
-  campaign validator, preserved retries/failures, and exact package identity
-  checks are defined.
-- Real Desktop matrix: blocked pending installation and Desktop refresh of the
-  exact local candidate, a five-profile installed-cache seed preflight, and
-  proof that the current Desktop build loads the trusted project config in the
-  post-run readback,
-  reproducible preparation of
-  `enabled-active`, and 42 independent scored fresh tasks.
+- The source candidate now stops greenfield enablement when Core reports
+  `READY`, leaves Truth onboarding as a separately authorized later Change, and
+  carries the serial 12-qualification/9-extended host contract. Focused source,
+  fixture, validator, Core, and CLI checks pass locally. This is not yet a
+  frozen or installed exact candidate.
+- Repository tests and static Skill checks remain useful mechanism evidence,
+  but they do not prove that Codex Desktop selected the intended installed
+  locator, loaded the dedicated authority, or followed the natural-language
+  lifecycle in a fresh task.
+- The replacement Desktop gate is a **single serial campaign of 12 fail-fast
+  host canaries**, one fresh run per canary, against one exact installed Plugin
+  version and one exact bundled Core identity. Qualification requires `12/12`
+  for that unchanged candidate.
+- A canary outcome is either `PASS`, product `FAIL`, or infrastructure
+  `INVALID`. The first product `FAIL` stops the campaign and requires a product
+  fix, rebuilt exact candidate, and a new campaign. `INVALID` records an
+  unusable fixture/host/dispatch observation; it is preserved, does not count
+  as a product pass or failure. After correcting the infrastructure cause, the
+  same canary may be retried once in a fresh fixture; a second `INVALID` freezes
+  that candidate campaign.
+- Disposable Workspaces and dedicated authorities remain isolated and may be
+  removed after evidence capture. The campaign manifest, task ledger, exact
+  identities, observations, scores, failures, invalid runs, and retries must
+  live in a durable external results root outside the ECP repository and must
+  not use `/tmp` or `/private/tmp` as their only copy.
 
 ## Next actions, in order
 
-1. Install exact package `0.3.0-dev+codex.20260812095321`, restart/refresh
-   Desktop, and confirm a fresh task's Skill locator directly resolves that
-   cache instead of the removed `20260812055614` cache.
-2. Run the five-profile installed-cache seed preflight, then create each
-   disposable scored/preparation run under an absolute batch root outside ECP.
-   Confirm each workspace is trusted and its project-scoped dedicated
-   `ECP_STATE_DIR` is loaded. In every scored task, make the exact scored prompt
-   the first input; only after freezing its observations, use the evaluator
-   postlude to prove the current locator and trusted project config selected the
-   dedicated state directory.
-3. Execute the full [Plugin host-routing evaluation](docs/plugin-host-evaluation.md)
-   and require `scripts/validate-plugin-host-results.py validate` to return
-   `PASS` for all 42 required runs with no preserved failure.
-4. Only then select an independent new product and established product for the
-   [real-project pilot](docs/real-project-pilot.md). Do not use ECP itself.
+1. Freeze all intended Core, Skill, reference, protocol, and manifest source at
+   one reproducible checkpoint before packaging. The current dirty working tree
+   is not that checkpoint; packaging still requires either an explicitly
+   authorized local commit or an explicitly revised clean-staging contract.
+2. Build and install one new cachebuster candidate. In a fresh read-only task,
+   freeze the exact installed Skill locator, Plugin version, bundled Core
+   identity, and unchanged default project mode.
+3. Execute the 12 canaries once each, serially and fail-fast, using a fresh
+   disposable Git Workspace and dedicated `ECP_STATE_DIR` for every canary.
+   Preserve every result in the durable external results root and require
+   `12/12` for the exact unchanged candidate.
+4. Only after that gate passes, use safe copies of one genuinely new product
+   and one established product. Complete two or three bounded real Changes and
+   one fresh-task handoff in each track. Measure recovered context, useful
+   catches, false blockers, interaction burden, validation time, and truth
+   maintenance cost.
+5. Decide whether to expand, simplify, or stop the rollout from those
+   value-versus-friction observations. Do not pre-commit to a larger matrix or a
+   fixed Change count merely to manufacture completion.
 
-The roadmap is [docs/roadmap.md](docs/roadmap.md); package and installation
-boundaries are [docs/distribution.md](docs/distribution.md).
+The pilot protocol is [docs/real-project-pilot.md](docs/real-project-pilot.md),
+the roadmap is [docs/roadmap.md](docs/roadmap.md), and package boundaries are
+[docs/distribution.md](docs/distribution.md).

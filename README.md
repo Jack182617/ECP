@@ -1,7 +1,8 @@
 # ECP — Engineering Control Plane
 
-> 当前结论与下一步以 [STATUS.md](STATUS.md) 为准：真实 Plugin host-routing
-> matrix 仍是 0/42，尚未进入真实项目试点。ECP 自身不作为 fixture 或试点项目。
+> 当前结论与下一步以 [STATUS.md](STATUS.md) 为准：旧 host-routing campaign
+> 已终止且不构成 qualification。下一候选先通过 12 个串行 fail-fast host
+> canary，再进入一新一旧两个安全副本的最小真实试点。ECP 自身不作为 fixture 或试点项目。
 
 ECP 是一套面向长期 AI 原生软件开发的、多项目通用、工具无关、local-first 的项目连续性与可信变更控制系统。它不替代 Codex、IDE、Git、测试框架或 CI；它让项目自身长期保存关键产品与工程事实，并把一次工程变更的目标、影响、风险、验证命令、执行证据和裁决绑定到同一个精确的软件状态上。
 
@@ -44,6 +45,8 @@ ECP v0.3 要回答的不是“AI 说完成了吗”，而是：
 4. 重新读取项目状态，并由 Core 对默认风险的 Required Gates 做不执行项目代码的 cwd/executable/environment 预检；
 5. 只有全部前置成立时，原子记录新的 enabled activation epoch。
 
+“帮我把 ECP 配好”之类只表达配置或准备、却没有明确覆盖当前整个项目/Workspace 的请求，不构成 enablement 授权。`ecp-enable` 可以接住这类请求并先询问是否要启用整个当前项目；在用户明确确认前，Adapter 不读取项目状态或内容，不调用 `project status`/`project inspect`，也不修改仓库、authority 或项目模式。纯安装检查仍走 `ecp-check`，不会启用项目。
+
 启用失败或中断时，权威模式仍是未启用；中间产生的 Draft Config 或注册状态不能被描述为已启用。新建 `.ecp/` 的初始 Gate 集为空，因此 adapter 必须先建立并审阅至少一个适用于默认风险的 Gate，Core 才允许最终启用。已有 `.ecp/` 不会因被 clone 到本地或被读取而自动接受。
 
 Project 注册、配置接受与 enablement 使用 `codex-local-adapter` 作为透明 origin label，并记录当前启用请求的原因。它们是可审计的本地 acknowledgement，不是经过认证的人类身份或远程审批。
@@ -60,12 +63,13 @@ Project 注册、配置接受与 enablement 使用 `codex-local-adapter` 作为�
 2. 恢复与请求目标/范围/Requirement 一致的 ACTIVE Change，或为当前请求创建一个最小 Change；
 3. 用已接受的 Project Truth 建立结构化 Impact，并把相关的正常、加载、空态、成功、失败、重试、取消、超时、权限、并发、持久化、兼容、无障碍等 material 问题逐项确定为 `DECIDED`、`NOT_APPLICABLE`、`DEFERRED_SAFE` 或 `BLOCKING_UNKNOWN`；每个验收/保持/旅程/数据/运行/预期变化/未知项都必须有精确 Requirement 覆盖，阻塞未知在首次写入前询问产品而不是由 AI 猜测；
 4. 审阅 Core 根据 scope/path ownership、声明 Impact、风险、Invariant 和 Requirement 关系选择的最小充分 Gate plan，确认它没有超出用户授权，也没有为了“完整”运行无关全量流程；
-5. 在 Change 范围内实现修改并保留无关工作；
-6. 对最终源码执行 Semantic Reconciliation，并逐项记录 Requirement result：人工决定不伪装成自动 Evidence，自动项映射 exact Gate IDs，外部项在没有可信导入机制时保持 `EXTERNAL_PENDING`；预期语义确实保持时记录精确 `PRESERVED`，语义改变时记录 `CHANGED`，无法判断时记录 `UNKNOWN` 并保持阻断；
-7. 重新计算 context/plan，仅通过 Core 执行 Required Gates；Core 在项目代码运行前先记录 `IN_PROGRESS` GateRun，把每条 Evidence 绑定到该 run，并记录可审计终态；
-8. 获取当前 Verdict；只有当前源码、已接受 Project Truth、语义对账和 Required Evidence 全部适用时才可能 `PASS`，随后自动记录 `COMPLETED`。
+5. 若计划的 effective risk 需要 high-risk acknowledgement，先用人类可读语言说明具体风险并取得用户的明确当前确认；确认前不得发生第一次产品文件写入或 Gate 执行，用户不确认时保留 bounded Change 为 `ACTIVE`，不写产品文件、不创建 GateRun 或 Evidence；
+6. 在 Change 范围内实现修改并保留无关工作；
+7. 对最终源码执行 Semantic Reconciliation，并逐项记录 Requirement result：人工决定不伪装成自动 Evidence，自动项映射 exact Gate IDs，外部项在没有可信导入机制时保持 `EXTERNAL_PENDING`；预期语义确实保持时记录精确 `PRESERVED`，语义改变时记录 `CHANGED`，无法判断时记录 `UNKNOWN` 并保持阻断；
+8. 重新计算 context/plan，仅通过 Core 执行 Required Gates；Core 在项目代码运行前先记录 `IN_PROGRESS` GateRun，把每条 Evidence 绑定到该 run，并记录可审计终态；
+9. 获取当前 Verdict；只有当前源码、已接受 Project Truth、语义对账和 Required Evidence 全部适用时才可能 `PASS`。若此时唯一 blocker 是 `ACKNOWLEDGEMENT_REQUIRED`，且前置人类确认所覆盖的目标、范围、Impact、Requirements 与风险均未漂移，Adapter 才记录绑定最终 subject 的 Core acknowledgement；随后重新读取当前 Verdict，并只对当前 `PASS` 自动记录 `COMPLETED`。
 
-另一个 ACTIVE Change 与新请求不匹配时，Adapter 会停止并询问是继续还是明确取消，不会静默扩大、替换或取消。有效 Draft Config drift 也需要用户重新审阅人类可读的 policy/Gate 变化并明确确认，不能为了继续实现而自动接受。若唯一 blocker 是高风险 acknowledgement，Adapter 会先解释具体风险并请求明确确认，然后才在内部记录与当前 subject 精确绑定的 acknowledgement。
+另一个 ACTIVE Change 与新请求不匹配时，Adapter 会停止并询问是继续还是明确取消，不会静默扩大、替换或取消。有效 Draft Config drift 也需要用户重新审阅人类可读的 policy/Gate 变化并明确确认，不能为了继续实现而自动接受。High-risk 流程中的首次确认是产品写入/Gate 前的人类风险确认，不是提前伪造 Core acknowledgement；Core 事件只能在最终 Evidence 已就绪且 acknowledgement 成为唯一 Verdict blocker 后记录。目标、范围、Impact、Requirements、effective risk 或人类可读风险发生漂移时，旧确认失效，必须重新说明并取得 fresh confirmation。
 
 如果取消 Change 后保留了它的源码修改，下一次 Change 不能把当前工作树当成干净新 baseline；必须显式 `supersede` 最近取消项，继承最初 baseline 和仍然 touched 的路径。Established Project Truth 的 component `path_roots` 还会反推直接 component，并沿 `depends_on` 找到所有直接/间接依赖者，再得到相关 capability/invariant；漏报和未映射最终路径会抬高风险并阻止 PASS，而不是让声明不足降低 Gate。
 
@@ -187,6 +191,8 @@ Future enforcement consumers
 当前仓库不会自动安装 Plugin，也不会改写用户的全局 Codex 配置。开发者也可以按官方方式用 `codex plugin marketplace add .` 注册本地 marketplace，但这不是普通产品用户工作流。
 
 本地开发版的安装验收、升级、故障回退与卸载规则见 [Plugin distribution operations](docs/distribution.md#local-plugin-operations)。这些管理动作本身都不能改变任何项目的 ECP mode；回退必须以新的 cachebuster 重新构建并验证，不能手工执行旧 cache 中的二进制。
+
+真实项目试点前，只对一个冻结的 exact installed Plugin/Core candidate 执行 12 个单次、串行、fail-fast 的 fresh-task host canary。每项使用独立 disposable Workspace 与 dedicated authority；产品 `FAIL` 立即终止该 candidate，宿主或 fixture 问题记为保留的 `INVALID`，不能伪装成产品结果。可丢弃运行面与持久证据分离：manifest、ledger、identity、观测及所有失败/重试必须保存在 ECP 仓库和临时目录之外的 durable results root。完整操作合同见 [Codex Plugin host-routing evaluation](docs/plugin-host-evaluation.md)。
 
 Plugin 源码发生变化后，发布者运行：
 

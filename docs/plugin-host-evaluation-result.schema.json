@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://ecp.local/schemas/plugin-host-evaluation-result-v1.json",
-  "title": "ECP Codex Plugin host-evaluation run result",
+  "$id": "https://ecp.local/schemas/plugin-host-evaluation-result-v2.json",
+  "title": "ECP Codex Plugin host-qualification attempt result",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -32,12 +32,18 @@
     "notes"
   ],
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": { "const": 2 },
     "campaign_id": { "$ref": "#/$defs/nonempty" },
     "case_id": { "$ref": "#/$defs/identifier" },
     "run_number": { "type": "integer", "minimum": 1 },
-    "required_run": { "type": "boolean" },
-    "task_id": { "$ref": "#/$defs/nonempty" },
+    "required_run": {
+      "type": "boolean",
+      "description": "True only for the first attempt of a qualification case; INVALID retries and extended diagnostics are false."
+    },
+    "task_id": {
+      "$ref": "#/$defs/nonempty",
+      "description": "Desktop task ID, or a unique dispatch-attempt ID when infrastructure failed before a task was created."
+    },
     "fixture_id": { "$ref": "#/$defs/identifier" },
     "fixture_profile": {
       "enum": [
@@ -71,10 +77,16 @@
       "enum": ["none", "explicit-enable-only", "explicit-disable-only", "unauthorized"]
     },
     "expected_behavior_conformant": { "type": "boolean" },
-    "prohibitions_preserved": { "type": "boolean" },
+    "prohibitions_preserved": {
+      "type": "boolean",
+      "description": "Whether explicit external-action prohibitions and evaluator isolation were preserved."
+    },
     "before": { "$ref": "#/$defs/snapshot" },
     "after": { "$ref": "#/$defs/snapshot" },
-    "outcome": { "enum": ["PASS", "FAIL"] },
+    "outcome": {
+      "enum": ["PASS", "FAIL", "INVALID"],
+      "description": "PASS and FAIL score product behavior. The first INVALID infrastructure attempt permits one fresh-fixture retry; a second INVALID freezes the candidate campaign."
+    },
     "failure_codes": {
       "type": "array",
       "items": { "$ref": "#/$defs/identifier" },
@@ -121,18 +133,13 @@
         "project_trusted",
         "project_config_loaded",
         "installed_launcher_only",
-        "task_authority_matches_operator",
         "fixture_state_dir_path_sha256",
-        "task_state_dir_path_sha256",
         "operator_state_dir_path_sha256",
         "fixture_authority_id_sha256",
-        "task_authority_id_sha256",
         "operator_authority_id_sha256",
         "fixture_plugin_version_sha256",
-        "task_plugin_version_sha256",
         "operator_plugin_version_sha256",
         "fixture_core_identity_sha256",
-        "task_core_identity_sha256",
         "operator_core_identity_sha256",
         "default_authority_before_sha256",
         "default_authority_after_sha256",
@@ -142,18 +149,13 @@
         "project_trusted": { "type": "boolean" },
         "project_config_loaded": { "type": "boolean" },
         "installed_launcher_only": { "type": "boolean" },
-        "task_authority_matches_operator": { "type": "boolean" },
         "fixture_state_dir_path_sha256": { "$ref": "#/$defs/sha256" },
-        "task_state_dir_path_sha256": { "$ref": "#/$defs/sha256" },
         "operator_state_dir_path_sha256": { "$ref": "#/$defs/sha256" },
         "fixture_authority_id_sha256": { "$ref": "#/$defs/sha256" },
-        "task_authority_id_sha256": { "$ref": "#/$defs/sha256" },
         "operator_authority_id_sha256": { "$ref": "#/$defs/sha256" },
         "fixture_plugin_version_sha256": { "$ref": "#/$defs/sha256" },
-        "task_plugin_version_sha256": { "$ref": "#/$defs/sha256" },
         "operator_plugin_version_sha256": { "$ref": "#/$defs/sha256" },
         "fixture_core_identity_sha256": { "$ref": "#/$defs/sha256" },
-        "task_core_identity_sha256": { "$ref": "#/$defs/sha256" },
         "operator_core_identity_sha256": { "$ref": "#/$defs/sha256" },
         "default_authority_before_sha256": { "$ref": "#/$defs/sha256" },
         "default_authority_after_sha256": { "$ref": "#/$defs/sha256" },

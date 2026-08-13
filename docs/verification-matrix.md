@@ -140,19 +140,38 @@ That command proves compilation only. It must never be reported as Windows
 runtime validation; Windows authority behavior requires an actual Windows host
 if that unsupported-path contract is promoted to release evidence.
 
+## Desktop host canary gate
+
+Repository tests do not qualify Desktop host behavior. After fixing the
+greenfield flow so explicit enablement ends at `READY` without automatically
+starting onboarding, freeze one exact installed Plugin version, Skill locator,
+and bundled Core identity. Then run the 12 canaries defined by
+`docs/real-project-pilot.md` once each, serially, in fresh disposable Workspaces
+with dedicated authorities.
+
+The gate passes only at `12/12` for that unchanged candidate. The first product
+`FAIL` stops qualification. A fixture, host, trust/config, or task-dispatch
+failure is recorded as `INVALID`: it is neither a pass nor a product failure and
+may be rerun only in a new fixture after the infrastructure cause is corrected.
+No later run overwrites a prior `FAIL` or `INVALID`. The durable campaign
+manifest, task ledger, exact identities, observations, and all result records
+must be outside the ECP repository and must not rely on `/tmp` or `/private/tmp`
+as their only copy. The terminated prior campaign is diagnostic evidence only
+and is not resumed or counted toward this gate.
+
 ## Product and release exit evidence
 
 | Requirement | Current repository evidence | Status |
 | --- | --- | --- |
 | Local v0.3 Core/CLI semantic loop | Implementation plus the 75-scenario mapping above | Locally automated |
-| User does not handwrite product code or operate ECP CLI | Four-Skill contracts, CLI hiding rules, and `docs/plugin-host-evaluation-cases.json` | Statically specified; host matrix and real-use proof missing |
-| Four-Skill host activation and output quality | `docs/plugin-host-evaluation.md`; `TestPluginHostRoutingEvaluationInventory` | Protocol/inventory automated; required fresh-task runs not performed |
+| User does not handwrite product code or operate ECP CLI | Four-Skill contracts, CLI hiding rules, and canary/pilot protocols | Statically specified; host canaries and real-use proof missing |
+| Exact installed-candidate host activation and output quality | 12-canary protocol in `docs/plugin-host-evaluation.md` and `docs/real-project-pilot.md` | `X` — previous campaign terminated; new exact-candidate gate not performed |
 | New task recovers without historical chat | Authority truth/policy/history tests | Mechanism proven; independent-project task proof missing |
-| Independent greenfield and established products, at least eight Changes each and twenty total | `docs/real-project-pilot.md` protocol only | `X` — not performed |
-| New maintainer/product person handoff | Pilot protocol only | `X` — not performed |
+| Independent greenfield and established safe copies, two or three bounded Changes each | `docs/real-project-pilot.md` protocol only | `X` — discovery pilot not performed |
+| One fresh-task handoff in each pilot track | Pilot protocol only | `X` — not performed |
 | Multi-year complexity/capacity/retention | Segmentation, health, and explicit bounds | `X` — not proven; retention/repair/GC absent |
 | Team/cross-machine authority continuity | Project Pack is portable; local Evidence is Workspace-bound | `X` — no lineage/import/shared-authority protocol |
-| Installed-copy launcher, identity, default-disabled status, and explicit check smoke | Cache-layout tests and bounded 2026-08-12 record in `docs/plugin-host-evaluation.md` | Installed read-only smoke observed; independent fresh-task matrix missing |
+| Installed-copy launcher, exact identity, default-disabled status, and `READY` boundary | Cache-layout tests plus 12-canary protocol | Repository mechanism evidence only; exact candidate not qualified |
 | Fresh-task upgrade, uninstall, reinstall, and full four-Skill pickup | Distribution policy and host-routing protocol only | `X` — not performed |
 | Trusted Plugin distribution | Checksums and reproducible package | `X` — unsigned, unnotarized, unpublished |
 | Protected CI/release enforcement | `docs/ci-consumer-contract.md` only | `X` — not implemented or deployed |
@@ -164,8 +183,9 @@ if that unsupported-path contract is promoted to release evidence.
 Passing this repository's checks can establish that the current local v0.3
 candidate implements its bounded Core/CLI/Skill contracts on the tested host.
 It cannot establish the full North Star product claim. That claim remains
-unproven until the full fresh-task host-routing matrix, independent greenfield
-and established-project pilots, newcomer handoffs, desktop lifecycle validation,
-and the chosen CI/isolation boundaries provide their own evidence. Those missing
-results are product exit blockers, not reasons to weaken or relabel the
-acceptance criteria.
+unproven until the exact-candidate 12-canary gate, the bounded greenfield and
+established safe-copy pilots, their fresh-task handoffs, desktop lifecycle
+validation, and the chosen CI/isolation boundaries provide their own evidence.
+The pilot's immediate decision is whether observed value exceeds friction and
+warrants expansion; it is not a shortcut to release readiness or a reason to
+weaken the North Star.
