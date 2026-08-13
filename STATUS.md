@@ -25,9 +25,12 @@ fixture or a real-project pilot track.
   source candidate is installed as Plugin version
   `0.3.0-dev+codex.20260813053857`; its installed copy matches the source,
   installed-launcher version/status readback passes, and the installed launcher
-  validates all five deterministic fixture profiles. The official Plugin/Skill
-  validators remain unexecuted because this host Python lacks `yaml`; no
-  dependency was installed.
+  validates all five deterministic fixture profiles. Official Plugin and all
+  four Skill validators pass in an isolated temporary validation environment;
+  no dependency was installed globally or into the project. A new Codex task
+  also completed the fresh installed-candidate readback with the project still
+  disabled, but Desktop UI control failed before any scored canary task could
+  be created.
 - Repository tests and static Skill checks remain useful mechanism evidence,
   but they do not prove that Codex Desktop selected the intended installed
   locator, loaded the dedicated authority, or followed the natural-language
@@ -51,20 +54,19 @@ fixture or a real-project pilot track.
 
 ## Next actions, in order
 
-1. Start a fresh Codex task after the installed Plugin is picked up. In that
-   task, freeze the exact installed Skill locator, Plugin version, bundled Core
-   identity, and unchanged default project mode; the current installation
-   cannot be proven by the task that preceded it.
-2. Execute the 12 canaries once each, serially and fail-fast, using a fresh
+1. Restore a usable Codex Desktop UI-control path, then execute the 12 canaries
+   once each, serially and fail-fast, using a fresh
    disposable Git Workspace and dedicated `ECP_STATE_DIR` for every canary.
    Preserve every result in the durable external results root and require
-   `12/12` for the exact unchanged candidate.
-3. Only after that gate passes, use safe copies of one genuinely new product
+   `12/12` for the exact unchanged candidate. The fresh-task installed readback
+   is complete; no scored canary was dispatched because the Desktop UI control
+   boundary failed twice.
+2. Only after that gate passes, use safe copies of one genuinely new product
    and one established product. Complete two or three bounded real Changes and
    one fresh-task handoff in each track. Measure recovered context, useful
    catches, false blockers, interaction burden, validation time, and truth
    maintenance cost.
-4. Decide whether to expand, simplify, or stop the rollout from those
+3. Decide whether to expand, simplify, or stop the rollout from those
    value-versus-friction observations. Do not pre-commit to a larger matrix or a
    fixed Change count merely to manufacture completion.
 
