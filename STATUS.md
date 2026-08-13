@@ -30,7 +30,8 @@ fixture or a real-project pilot track.
   no dependency was installed globally or into the project. A new Codex task
   also completed the fresh installed-candidate readback with the project still
   disabled, but Desktop UI control failed before any scored canary task could
-  be created.
+  be created. The exact Computer Use error was `Computer Use is not allowed to
+  use the app 'com.openai.codex' for safety reasons.`
 - Repository tests and static Skill checks remain useful mechanism evidence,
   but they do not prove that Codex Desktop selected the intended installed
   locator, loaded the dedicated authority, or followed the natural-language
@@ -59,8 +60,8 @@ fixture or a real-project pilot track.
    disposable Git Workspace and dedicated `ECP_STATE_DIR` for every canary.
    Preserve every result in the durable external results root and require
    `12/12` for the exact unchanged candidate. The fresh-task installed readback
-   is complete; no scored canary was dispatched because the Desktop UI control
-   boundary failed twice.
+   is complete; no scored canary was dispatched because Computer Use is not
+   allowed to control the Codex Desktop app in this environment.
 2. Only after that gate passes, use safe copies of one genuinely new product
    and one established product. Complete two or three bounded real Changes and
    one fresh-task handoff in each track. Measure recovered context, useful
