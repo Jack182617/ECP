@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+import re
 import tempfile
 import unittest
 from unittest import mock
@@ -29,6 +30,16 @@ def repository_snapshot() -> dict[str, object]:
 
 
 class FixtureTests(unittest.TestCase):
+    def test_attempt_directory_name_is_opaque(self) -> None:
+        with mock.patch.object(fixture.secrets, "token_hex", return_value="a" * 24):
+            name = fixture.opaque_run_name()
+
+        self.assertEqual(name, "attempt-" + "a" * 24)
+        self.assertRegex(name, re.compile(r"^attempt-[0-9a-f]{24}$"))
+        self.assertNotIn("check", name)
+        self.assertNotIn("enable", name)
+        self.assertNotIn("change", name)
+
     def create_workspace(self, temporary: str, profile: str = "enabled-active") -> tuple[Path, Path]:
         run_root = Path(temporary) / "run"
         workspace = run_root / "workspace"

@@ -891,6 +891,7 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 		"[shell_environment_policy.set]", "ECP_STATE_DIR", "DEFAULT_AUTHORITY",
 		"prepare_profile", "deterministic disposable fixture registration", "deterministic disposable fixture enablement",
 		"Prepared high-risk fixture Change", "admin/maintenance.txt",
+		"opaque_run_name", "cannot disclose the scored case",
 		"public_list", "must be an array of objects or null",
 		"package_tree_digest", "load_campaign", "validate_campaign_candidate",
 		"verify-seed", "create-run", "verify-prep", "environment-probe", "snapshot", "--campaign",
@@ -909,6 +910,7 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 		"canonical inventory must define 16 qualification and 5 extended cases",
 		"--results must be a durable root outside source, temporary, authority, and cache trees",
 		"refusing to overwrite canonical record", "product FAIL is terminal", "freeze",
+		"standard immutable cache location",
 		"Desktop inventory must expose exactly one enabled installed ecp-codex provider and locator",
 		"task-ledger", "fixture-metadata", "INVALID failure_codes must come only from the infrastructure-failure taxonomy",
 		"the one fresh-fixture retry also failed infrastructure", "task_id reused",
@@ -936,6 +938,7 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 		"if exactly one new task matches", "if zero or multiple tasks match",
 		"never dispatch again into the same fixture after an ambiguous result",
 		"The normal default authority must remain unchanged", "project-scoped configuration",
+		"attempt directory is deliberately opaque",
 		"A second `INVALID` freezes the candidate campaign", "Success is exactly `QUALIFIED: 16 qualification cases passed`",
 		"must never be a qualification fixture or one of the two real-project pilot tracks",
 	} {

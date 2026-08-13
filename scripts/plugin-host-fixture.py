@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import secrets
 import shutil
 import stat
 import subprocess
@@ -353,6 +354,11 @@ def project_id(fixture_id: str) -> str:
     return f"fixture-{suffix}"
 
 
+def opaque_run_name() -> str:
+    """Return a non-semantic locator that cannot disclose the scored case."""
+    return "attempt-" + secrets.token_hex(12)
+
+
 def write_json(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -500,7 +506,7 @@ def build_one(
         raise FixtureError("run number must be positive")
     plugin_root = validate_campaign_candidate(campaign, launcher)
     fixture_id = f"{case['id']}-run-{run_number:02d}"
-    run_root = batch_root / "runs" / fixture_id
+    run_root = batch_root / "runs" / opaque_run_name()
     workspace = run_root / "workspace"
     authority = run_root / "authority"
     if run_root.exists() or run_root.is_symlink():

@@ -394,6 +394,45 @@ class ValidatorTests(unittest.TestCase):
         self.assertEqual(sum(case["suite"] == "extended" for case in self.cases.values()), 5)
         self.assertEqual([case["qualification_order"] for case in self.qualification], list(range(1, 17)))
 
+    def test_current_desktop_inventory_resolves_exact_standard_cache_locator(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            cache_root = Path(temporary) / "cache"
+            installed = cache_root / "ecp-local" / "ecp-codex" / "0.3.0-dev+codex.test"
+            installed.mkdir(parents=True)
+            entry = {
+                "pluginId": "ecp-codex@ecp-local",
+                "name": "ecp-codex",
+                "marketplaceName": "ecp-local",
+                "version": "0.3.0-dev+codex.test",
+                "installed": True,
+                "enabled": True,
+                "source": {"source": "local", "path": "/source/checkout/plugins/ecp-codex"},
+            }
+            self.assertEqual(validator.installed_path_from(entry, cache_root), installed.resolve())
+
+    def test_inventory_locator_rejects_unsafe_or_symlinked_cache_tuple(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cache_root = root / "cache"
+            cache_root.mkdir()
+            unsafe = {
+                "name": "ecp-codex",
+                "marketplaceName": "..",
+                "version": "0.3.0-dev+codex.test",
+            }
+            self.assertIsNone(validator.installed_path_from(unsafe, cache_root))
+
+            outside = root / "outside"
+            outside.mkdir()
+            marketplace = cache_root / "ecp-local"
+            marketplace.symlink_to(outside, target_is_directory=True)
+            symlinked = {
+                "name": "ecp-codex",
+                "marketplaceName": "ecp-local",
+                "version": "0.3.0-dev+codex.test",
+            }
+            self.assertIsNone(validator.installed_path_from(symlinked, cache_root))
+
     def test_extended_case_requires_completed_qualification(self) -> None:
         extended = next(case for case in self.cases.values() if case["suite"] == "extended")
         with tempfile.TemporaryDirectory() as temporary:

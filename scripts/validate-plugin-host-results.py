@@ -25,6 +25,7 @@ FIXTURE_BUILDER = REPO_ROOT / "scripts" / "plugin-host-fixture.py"
 DEFAULT_AUTHORITY = Path.home() / ".ecp" / "state-v1"
 SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 IDENTIFIER = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
+CACHE_COMPONENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")
 TOP_KEYS = {
     "schema_version", "campaign_id", "case_id", "run_number", "required_run",
     "task_id", "fixture_id", "fixture_profile", "initial_project_mode",
@@ -906,12 +907,42 @@ def plugin_entries(value: Any) -> list[dict[str, Any]]:
     return entries
 
 
-def installed_path_from(entry: dict[str, Any]) -> str | None:
+def installed_path_from(entry: dict[str, Any], cache_root: Path) -> Path | None:
+    cache_root = cache_root.resolve(strict=False)
     for field in ("installedPath", "installed_path", "installPath", "install_path"):
         value = entry.get(field)
         if isinstance(value, str) and value.strip():
-            return value
-    return None
+            candidate = Path(value)
+            if not candidate.is_absolute():
+                return None
+            return candidate.resolve(strict=False)
+
+    # Current Desktop inventories identify an installed local Plugin by its
+    # exact marketplace/name/version tuple but expose source.path, not an
+    # installedPath field. Resolve only the standard immutable cache location;
+    # never reinterpret source.path as the installed package locator.
+    components = (
+        entry.get("marketplaceName"),
+        entry.get("name"),
+        entry.get("version"),
+    )
+    if any(
+        not isinstance(component, str) or CACHE_COMPONENT.fullmatch(component) is None
+        for component in components
+    ):
+        return None
+    candidate = cache_root
+    try:
+        for component in components:
+            candidate = candidate / component
+            if candidate.is_symlink():
+                return None
+        resolved = candidate.resolve(strict=True)
+    except OSError:
+        return None
+    if not resolved.is_dir() or not is_within(resolved, cache_root):
+        return None
+    return resolved
 
 
 def desktop_build_identity(app: Path) -> str:
@@ -981,10 +1012,10 @@ def freeze_campaign(
     inventory, inventory_digest = read_desktop_inventory(codex, marketplace)
     installed_entries = []
     for entry in plugin_entries(inventory):
-        installed_path = installed_path_from(entry)
+        installed_path = installed_path_from(entry, cache_root)
         if installed_path is None or entry.get("installed") is False or entry.get("enabled") is False:
             continue
-        installed_entries.append((entry, Path(installed_path).resolve(strict=False)))
+        installed_entries.append((entry, installed_path))
     matching = [(entry, path) for entry, path in installed_entries if path == plugin_root]
     if len(installed_entries) != 1 or len(matching) != 1:
         raise ValidationError("Desktop inventory must expose exactly one enabled installed ecp-codex provider and locator")

@@ -52,11 +52,19 @@ package as the requested launcher. It also freezes digests for the case
 inventory, result schema, validator, fixture builder, and default-authority
 sentinel; changing any of them requires a new campaign.
 
+Desktop inventory may return an explicit installed locator or only the exact
+installed marketplace/name/version tuple plus the local marketplace source.
+In the latter form, freeze resolves only the corresponding standard
+`~/.codex/plugins/cache/<marketplace>/<name>/<version>` real directory and
+requires it to equal the requested launcher package. It never treats the
+marketplace `source.path` checkout as the installed locator, follows a cache
+symlink, searches for a nearby version, or accepts more than one ECP provider.
+
 Every attempt receives this isolated shape under an operator-selected absolute
 batch root:
 
 ```text
-<batch>/runs/<case-id>-run-NN/
+<batch>/runs/attempt-<opaque-random-id>/
 ├── fixture.json
 ├── authority/                 # unique, private, initially empty
 └── workspace/                 # unique canonical Git Workspace
@@ -65,6 +73,13 @@ batch root:
 ```
 
 The generated project config binds the task to its dedicated authority:
+
+The attempt directory is deliberately opaque: neither the Workspace path nor
+its parent exposes the case ID, expected Skill, fixture profile, or run number.
+Those facts exist only in external `fixture.json` and durable operator records,
+which the scored task must never inspect. This prevents host-required memory
+lookup or ordinary path orientation from turning the Workspace locator into an
+evaluator oracle.
 
 ```toml
 [shell_environment_policy]
