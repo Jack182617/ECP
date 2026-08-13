@@ -21,6 +21,51 @@ if [ ! -f "$repo_root/go.mod" ] || [ ! -f "$repo_root/cmd/ecp/main.go" ] || [ ! 
   exit 2
 fi
 
+if [ -x /usr/bin/git ]; then
+  git_command=/usr/bin/git
+elif [ -x /bin/git ]; then
+  git_command=/bin/git
+else
+  printf '%s\n' "fixed system Git is unavailable" >&2
+  exit 1
+fi
+
+source_commit=$($git_command -C "$repo_root" rev-parse --verify HEAD 2>/dev/null) || {
+  printf '%s\n' "plugin packaging requires a committed canonical Git source" >&2
+  exit 2
+}
+source_clean=true
+if ! $git_command -C "$repo_root" diff --quiet --ignore-submodules=none -- ||
+   ! $git_command -C "$repo_root" diff --cached --quiet --ignore-submodules=none -- ||
+   [ -n "$($git_command -C "$repo_root" ls-files --others --exclude-standard)" ]; then
+  source_clean=false
+fi
+if [ "$source_clean" = false ] && [ "${ECP_PACKAGE_ALLOW_DIRTY:-0}" != 1 ]; then
+  printf '%s\n' "formal plugin packaging requires a clean source commit; set ECP_PACKAGE_ALLOW_DIRTY=1 only for a non-qualifying local development artifact" >&2
+  exit 2
+fi
+
+go_command=$(command -v go 2>/dev/null || true)
+if [ -z "$go_command" ] || [ ! -x "$go_command" ]; then
+  printf '%s\n' "Go toolchain is unavailable" >&2
+  exit 1
+fi
+go_version=$($go_command version) || {
+  printf '%s\n' "Go toolchain identity could not be read" >&2
+  exit 1
+}
+if [ -x /usr/bin/shasum ]; then
+  go_checksum_output=$(/usr/bin/shasum -a 256 "$go_command")
+elif [ -x /usr/bin/sha256sum ]; then
+  go_checksum_output=$(/usr/bin/sha256sum "$go_command")
+elif [ -x /bin/sha256sum ]; then
+  go_checksum_output=$(/bin/sha256sum "$go_command")
+else
+  printf '%s\n' "fixed system SHA-256 executable is unavailable" >&2
+  exit 1
+fi
+go_executable_sha256=sha256:${go_checksum_output%% *}
+
 if [ -x /usr/bin/mktemp ]; then
   stage_root=$(/usr/bin/mktemp -d "$plugin_root/.runtime-package.XXXXXX")
 elif [ -x /bin/mktemp ]; then
@@ -82,7 +127,7 @@ for target in $targets; do
     cd "$repo_root"
     env CGO_ENABLED=0 GOOS="$target_os" GOARCH="$target_arch" \
       GOCACHE="${GOCACHE:-${TMPDIR:-/tmp}/ecp-package-go-cache}" \
-      go build -trimpath -buildvcs=false -ldflags='-s -w' -o "$target_binary" ./cmd/ecp
+      "$go_command" build -trimpath -buildvcs=false -ldflags='-s -w' -o "$target_binary" ./cmd/ecp
   )
   chmod 0755 "$target_binary"
 
@@ -109,9 +154,17 @@ done
 
 cat > "$stage_runtime/manifest.json" <<EOF
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "plugin_name": "ecp-codex",
   "plugin_version": "$plugin_version",
+  "source_commit": "$source_commit",
+  "source_clean": $source_clean,
+  "builder": {
+    "go_version": "$go_version",
+    "go_executable_sha256": "$go_executable_sha256",
+    "cgo_enabled": false,
+    "build_flags": ["-trimpath", "-buildvcs=false", "-ldflags=-s -w"]
+  },
   "artifacts": [
 $manifest_entries
   ]

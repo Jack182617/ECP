@@ -14,8 +14,12 @@ runtime. It must never fall back to an ambient `ecp`, repository binary,
 temporary build, or stale remembered path.
 
 The generated runtime manifest must bind every artifact path, digest, size, and
-supported target to the exact Plugin version. Core/Skill/Plugin changes require
-a new cachebuster followed by a complete runtime rebuild and validation.
+supported target to the exact Plugin version, canonical source commit,
+source-clean state, Go toolchain version/executable digest, and fixed build
+flags. A formal qualification or release candidate requires clean committed
+source; an explicit dirty override produces only a non-qualifying local
+development artifact with `source_clean: false`. Core/Skill/Plugin changes
+require a new cachebuster followed by a complete runtime rebuild and validation.
 
 Installing, updating, rolling back, or removing the Plugin must not silently
 register, enable, disable, migrate, repair, or delete any project or authority

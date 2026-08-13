@@ -18,6 +18,24 @@ installed Plugin root. Never use an ambient PATH executable. The launcher select
 Darwin/Linux arm64/amd64 Core, verifies its package checksum, and fails closed
 before Core invocation when the platform, runtime, or checksum is invalid.
 
+## Host-evaluation isolation
+
+Host instructions and Codex-managed memory may still be consulted when the
+host requires them. Reading that host context is not itself evaluation
+contamination. Never use it to supply current project or ECP state, package or
+launcher identity, CLI payload details, fixture facts, expected routing,
+evaluator criteria, opaque IDs, digests, or tokens.
+
+During a scored Plugin-host attempt, inspect only the assigned canonical
+Workspace and the exact selected installed Plugin resources. Do not search
+another checkout for ECP implementation source, internal tests, or historical
+candidate behavior; never read the case inventory, evaluator
+protocol/schema/results, fixture metadata, or operator artifacts. Never open or
+traverse the live `ECP_STATE_DIR`; use only public launcher operations. These
+restrictions prevent evaluator information from manufacturing a passing trace;
+they are not an OS sandbox or a general restriction on explicitly authorized
+ECP source-development work outside qualification.
+
 Project/authority operations currently require POSIX Unix private-file
 semantics and fixed system Git. `ECP_RUNTIME_*`, `PLATFORM_SECURITY_UNSUPPORTED`, or
 `TRUSTED_GIT_UNAVAILABLE` stops repository mutation; do not bypass these with
@@ -46,7 +64,7 @@ not enable the current Workspace.
 | `ecp project register --authority ID --workspace ID --config-digest SHA256 --truth-digest SHA256 --actor LABEL --reason TEXT` | Register and initially accept exactly one inspected existing Control Config and Project Truth. Invoke only after explicit project enablement and adapter review of both exact candidates. |
 | `ecp policy accept --authority ID --workspace ID --config-digest SHA256 --actor LABEL --reason TEXT` | Accept one exact reviewed Draft Config epoch. During initial enablement, the explicit enable request supplies intent. Later drift requires a fresh, explicit user confirmation of the human-readable change. |
 | `ecp project enable --authority ID --workspace ID --activation-token SHA256 --config-digest SHA256 --truth-digest SHA256 --actor LABEL --reason TEXT` | Atomically enable exactly the observed registered Workspace/config/truth/mode epoch. Core requires a default-risk Gate and preflights its execution context without running project code. Failure leaves mode disabled. |
-| `ecp project disable --authority ID --workspace ID --activation-token SHA256 --actor LABEL --reason TEXT` | Disable exactly the observed project epoch. If the observed state has an ACTIVE Change, Core atomically appends `change_cancelled` then `project_disabled`. Source and Evidence are retained. Already-disabled/unregistered mode is idempotent. |
+| `ecp project disable --authority ID --workspace ID --activation-token SHA256 --actor LABEL --reason TEXT` | Disable exactly the observed project epoch. After obtaining the released Gate lease, Core atomically appends `gate_run_finished(INTERRUPTED)` for an observed unresolved run, `change_cancelled` for an observed ACTIVE Change, then `project_disabled`; a live Gate holder blocks rather than being guessed away. Source and Evidence are retained. Already-disabled/unregistered mode is idempotent. Interruption accounts for authority history only and does not prove descendant cleanup or effect rollback. |
 | `ecp context get [--root PATH]` | Read exact lifecycle context, accepted/candidate truth digests, source fingerprint, and optional unresolved `active_gate_run` for a registered Workspace. One response supplies start preconditions; a valid candidate truth drift may be entered only through an explicit recovery/adoption Change. |
 | `ecp policy get [--digest SHA256] [--root PATH]` | Recover the latest or one exact historical authority-backed accepted Project/Policy/Gates payload. It is authority-only and remains available when candidate control files drift or are malformed; it does not accept or rewrite the candidate. |
 | `ecp truth get [--digest SHA256] [--root PATH]` | Recover the latest or one exact historical authority-backed accepted structured Project Truth and exact UTF-8 `truth.json`/contract contents from private content-addressed blobs. It is authority-only and remains usable when the repository candidate drifts or is malformed; the optional digest must name a real accepted epoch, and missing, unsafe, or corrupt blobs are integrity failures. |

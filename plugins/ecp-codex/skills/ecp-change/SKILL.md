@@ -66,10 +66,12 @@ Complete lifecycle setup before the first repository write.
    that may enter only through an explicit recovery/adoption Change against
    accepted truth; malformed truth remains fail-closed.
 2. Run `ecp policy get` to recover the authority-backed accepted Project,
-   Policy, and Gates. If the candidate config is malformed, missing, or drifted,
-   stop. For valid drift, show the human-readable policy/Gate delta and require
-   fresh explicit confirmation before `ecp policy accept` with exact values
-   from one fresh status. Never accept drift merely to unblock implementation.
+   Policy, and Gates. If the candidate config is malformed or missing, stop.
+   If it is valid but drifted, do not begin implementation: show the
+   human-readable policy/Gate delta and require fresh explicit confirmation for
+   that exact policy acceptance before `ecp policy accept` with values from one
+   fresh status. Without that confirmation, stop and preserve the drift. Never
+   accept drift merely to unblock implementation.
 3. Run `ecp truth get` to recover accepted structured Project Truth and exact
    contracts. If an accepted blob is missing, unsafe, or corrupt, stop; never
    substitute candidate text, chat memory, or an earlier summary.
@@ -118,7 +120,8 @@ Complete lifecycle setup before the first repository write.
    local Gates, then obtain fresh explicit confirmation before the first write
    or Gate run. If confirmation is absent, keep the Change ACTIVE and stop with
    no repository write, GateRun, or Evidence. This confirmation covers only the
-   displayed action; it is not a Core acknowledgement. Scope, effective risk,
+   displayed action. This human decision is not yet a Core acknowledgement
+   event. Scope, effective risk,
    protected semantics, or authorized-effect drift requires fresh confirmation.
 10. Implement only the bounded Change, preserving unrelated user work and the
    repository architecture. Do not edit Control Config during an ordinary

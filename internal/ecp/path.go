@@ -143,37 +143,48 @@ func canonicalPotentialPath(path string) (string, error) {
 }
 
 func ensureOutsideRoot(root, candidate string) error {
+	inside, err := pathPhysicallyInside(root, candidate)
+	if err != nil {
+		return newError(KindRuntime, "PATH_BOUNDARY_CHECK_FAILED", "could not compare repository and state paths", err)
+	}
+	if inside {
+		return newError(KindIntegrity, "STATE_INSIDE_REPOSITORY", "ECP authority state must be outside the Git repository", nil)
+	}
+	return nil
+}
+
+// pathPhysicallyInside combines a lexical containment check with filesystem
+// identity. filepath.Rel alone is insufficient on case-insensitive or
+// Unicode-normalizing filesystems: two spellings can name the same directory
+// while appearing lexically unrelated. The candidate itself may not exist, so
+// walk its existing ancestors and compare them with the root inode.
+func pathPhysicallyInside(root, candidate string) (bool, error) {
 	relative, err := filepath.Rel(root, candidate)
 	if err != nil {
-		return newError(KindRuntime, "PATH_RELATIVE_FAILED", "could not compare repository and state paths", err)
+		return false, err
 	}
 	if relative == "." || (relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))) {
-		return newError(KindIntegrity, "STATE_INSIDE_REPOSITORY", "ECP authority state must be outside the Git repository", nil)
+		return true, nil
 	}
 	rootInfo, err := os.Stat(root)
 	if err != nil {
-		return newError(KindRuntime, "ROOT_STAT_FAILED", "could not inspect the repository root", err)
+		return false, err
 	}
-	// filepath.Rel is lexical and can disagree with physical identity on a
-	// case-insensitive or Unicode-normalizing filesystem. Walk from the proposed
-	// state path to its existing ancestors and compare inode/file identity so an
-	// alternate spelling of a path inside the repository cannot cross the
-	// authority boundary.
 	for cursor := filepath.Clean(candidate); ; cursor = filepath.Dir(cursor) {
 		info, statErr := os.Stat(cursor)
 		if statErr == nil {
 			if os.SameFile(rootInfo, info) {
-				return newError(KindIntegrity, "STATE_INSIDE_REPOSITORY", "ECP authority state must be outside the physical Git repository", nil)
+				return true, nil
 			}
 		} else if !os.IsNotExist(statErr) {
-			return newError(KindRuntime, "STATE_ANCESTOR_STAT_FAILED", "could not verify the physical authority-state boundary", statErr)
+			return false, statErr
 		}
 		parent := filepath.Dir(cursor)
 		if parent == cursor {
 			break
 		}
 	}
-	return nil
+	return false, nil
 }
 
 func validateIdentifier(value, label string) error {

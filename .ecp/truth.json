@@ -55,6 +55,7 @@
       "invariant_ids": [
         "disabled-projects-remain-ordinary",
         "local-pass-is-bounded",
+        "plugin-host-qualification-is-exact",
         "plugin-runtime-is-self-contained"
       ]
     }
@@ -79,7 +80,7 @@
     {
       "id": "authority-history-remains-verifiable",
       "name": "Authority history remains append-safe and verifiable",
-      "statement": "Authority events must remain replayable as one continuous sequence and hash chain across bounded atomic segments; rotation, legacy compatibility, corruption, gaps, unsafe directory chains or files, oversized atomic batches, and exhaustion of protected lifecycle/disable byte or segment reserves must fail without silently changing the projection or stranding an executed GateRun without a terminal path.",
+      "statement": "Authority events must remain replayable as one continuous sequence and hash chain across bounded atomic segments; rotation, legacy compatibility, corruption, gaps, unsafe directory chains or files, Workspace-binding interruption/remnants, durable file/directory sync failure, oversized atomic batches, and exhaustion of protected lifecycle/disable byte or segment reserves must fail without silently changing the projection or stranding an executed GateRun without a terminal path.",
       "category": "architecture",
       "risk": "critical",
       "gate_ids": [
@@ -87,6 +88,9 @@
       ],
       "source_refs": [
         "internal/ecp/store.go",
+        "internal/ecp/registry.go",
+        "internal/ecp/registry_test.go",
+        "internal/ecp/store_durability_test.go",
         "internal/ecp/store_segments_test.go",
         "internal/ecp/core_audit_regression_test.go",
         "docs/security-model.md"
@@ -95,7 +99,7 @@
     {
       "id": "authority-export-is-exact",
       "name": "Authority exports contain one exact verifiable history",
-      "statement": "A portable authority export must be deterministic, private, read-only, independent from candidate repository files, limited to the complete referenced binding/event/truth/Evidence set, and offline-verifiable without mutating or silently replacing live authority.",
+      "statement": "A portable authority export must be deterministic, private, read-only, physically outside every repository and live-authority alias, durably installed, independent from candidate repository files, limited to the complete referenced binding/event/truth/Evidence set, and offline-verifiable without mutating or silently replacing live authority.",
       "category": "architecture",
       "risk": "critical",
       "gate_ids": [
@@ -141,7 +145,7 @@
     {
       "id": "exact-evidence-applicability",
       "name": "Evidence applies only to its exact subject",
-      "statement": "A Verdict may use Evidence only when activation, Change, historical accepted config and Gate definition, accepted truth, source, Gate plan, executable, environment, process/output metadata, canonical artifact path, exact stored size and digest, and Core identities match the current subject.",
+      "statement": "A Verdict may use Evidence only when activation, Change, historical accepted config and Gate definition, accepted truth, source, Gate plan, executable, environment, process/output metadata, durably installed canonical artifact path, exact stored size and digest, and Core identities match the current subject.",
       "category": "security",
       "risk": "critical",
       "gate_ids": [
@@ -261,6 +265,23 @@
         "plugins/ecp-codex/scripts/ecp",
         "plugins/ecp-codex/references/cli-contract.md",
         "scripts/package-plugin.sh",
+        "internal/ecp/project_pack_test.go"
+      ]
+    },
+    {
+      "id": "plugin-host-qualification-is-exact",
+      "name": "Plugin host qualification is exact and non-substitutable",
+      "statement": "Formal Desktop qualification must freeze one Desktop build/inventory and exactly one installed Plugin provider/tree with exact launcher and Skill locators, Core and evaluator contracts; all 16 serial qualification attempts bind canonical prompt, fixture Workspace/metadata, immutable task ledger and rollout readback, while product failures stop and cannot be relabelled as infrastructure INVALID.",
+      "category": "operations",
+      "risk": "high",
+      "gate_ids": [
+        "go-test-project-pack"
+      ],
+      "source_refs": [
+        "docs/plugin-host-evaluation.md",
+        "docs/plugin-host-evaluation-cases.json",
+        "scripts/plugin-host-fixture.py",
+        "scripts/validate-plugin-host-results.py",
         "internal/ecp/project_pack_test.go"
       ]
     },
@@ -610,7 +631,7 @@
   "unknowns": [
     {
       "id": "independent-dual-track-pilot-unproven",
-      "statement": "No independent greenfield and established product pair has yet completed the required fresh-task host-routing matrix, at least eight real Changes per project and twenty total, newcomer handoffs, and fault exercises needed to evaluate the bounded Phase 1B value hypothesis.",
+      "statement": "No independent greenfield and established product safety-copy pair has yet completed the 16-case fresh-task host gate followed by two or three bounded Changes and one fresh-task handoff per track needed to evaluate the Phase 1B value-versus-friction hypothesis.",
       "risk": "high",
       "resolution_condition": "Complete the canonical dual-track protocol in docs/real-project-pilot.md, preserve all failures and measurements in the authorized project records, and evaluate the stated exit criteria without weakening them."
     },
@@ -646,9 +667,9 @@
     },
     {
       "id": "desktop-host-routing-not-proven",
-      "statement": "An installed Plugin copy has matched reviewed source files and completed launcher, Core identity, default-disabled status, and explicit ecp-check read-only smoke in Codex Desktop, but the canonical direct, indirect, incomplete, negative, and edge-case matrix has not run in independent fresh tasks for all four Skills.",
+      "statement": "No post-fix candidate has frozen a single-provider Desktop inventory and exact Desktop/Plugin tree/launcher/Skill/Core/evaluator identity, then passed the canonical 16 direct, indirect, incomplete, negative, and edge qualification cases in independent fresh tasks for all four Skills.",
       "risk": "high",
-      "resolution_condition": "Pass every required independent run in docs/plugin-host-evaluation-cases.json against disposable fixtures using one exact installed Plugin/Core identity, preserve failures, and rerun the full matrix after any routing correction."
+      "resolution_condition": "Pass every required independent run in docs/plugin-host-evaluation-cases.json against disposable fixtures using one frozen exact candidate and immutable fixture/task/rollout evidence, preserve every FAIL/INVALID/retry, and start a new campaign after any candidate or evaluator-contract correction."
     },
     {
       "id": "desktop-plugin-lifecycle-not-proven",

@@ -25,6 +25,16 @@ def digest(character: str) -> str:
     return "sha256:" + character * 64
 
 
+def skill_digest(skill: str) -> str:
+    return {
+        "none": validator.sha256_text("none"),
+        "ecp-check": digest("1"),
+        "ecp-enable": digest("2"),
+        "ecp-disable": digest("3"),
+        "ecp-change": digest("4"),
+    }[skill]
+
+
 def repository(
     changed_paths: list[str], marker: str, preserved: dict[str, str] | None = None
 ) -> dict[str, object]:
@@ -133,7 +143,7 @@ def passing_record(case: dict[str, object], run_number: int) -> dict[str, object
             "observed_project_mode_mutation": "none",
         }, final_turn]
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "campaign_id": "campaign-1",
         "case_id": case["id"],
         "run_number": run_number,
@@ -158,8 +168,17 @@ def passing_record(case: dict[str, object], run_number: int) -> dict[str, object
             "default_authority_after_sha256": digest("7"),
             "default_authority_unchanged": True,
         },
+        "desktop_build": "com.openai.codex|test|1",
         "installed_plugin_version": "0.3.0-test",
         "core_identity": "0.3.0-test+sha256:" + "8" * 64,
+        "installed_plugin_tree_sha256": digest("a"),
+        "installed_launcher_locator_sha256": digest("b"),
+        "resolved_skill_locator_sha256": skill_digest(str(case["expected_skill"])),
+        "prompt_sha256": validator.case_prompt_digest(case),
+        "dispatch_intent_sha256": digest("c"),
+        "fixture_metadata_sha256": digest("d"),
+        "workspace_path_sha256": digest("c"),
+        "task_ledger_sha256": digest("e"),
         "turn_observations": turn_observations,
         "selected_skill": case["expected_skill"],
         "observed_status_probe": status_probe,
@@ -173,6 +192,93 @@ def passing_record(case: dict[str, object], run_number: int) -> dict[str, object
         "outcome": "PASS",
         "failure_codes": [],
         "notes": "",
+    }
+
+
+def frozen_campaign() -> dict[str, object]:
+    return {
+        "schema_version": 3,
+        "campaign_id": "campaign-1",
+        "protocol": "serial-fail-fast-exact-candidate-v2",
+        "desktop_build": "com.openai.codex|test|1",
+        "desktop_inventory_sha256": digest("9"),
+        "installed_plugin_version": "0.3.0-test",
+        "core_identity": "0.3.0-test+sha256:" + "8" * 64,
+        "installed_plugin_root_sha256": digest("0"),
+        "installed_launcher_locator_sha256": digest("b"),
+        "installed_plugin_tree_sha256": digest("a"),
+        "runtime_manifest_sha256": digest("f"),
+        "skill_locator_sha256": {skill: skill_digest(skill) for skill in validator.SKILLS},
+        **validator.canonical_contract_digests(),
+        "default_authority_sha256": digest("7"),
+        "qualification_case_count": 16,
+    }
+
+
+def task_ledger(record: dict[str, object]) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "campaign_id": record["campaign_id"],
+        "case_id": record["case_id"],
+        "run_number": record["run_number"],
+        "task_id": record["task_id"],
+        "task_created": True,
+        "fixture_id": record["fixture_id"],
+        "desktop_build": record["desktop_build"],
+        "workspace_path_sha256": record["workspace_path_sha256"],
+        "task_cwd_sha256": record["workspace_path_sha256"],
+        "prompt_sha256": record["prompt_sha256"],
+        "dispatch_intent_sha256": record["dispatch_intent_sha256"],
+        "fixture_metadata_sha256": record["fixture_metadata_sha256"],
+        "selected_skill": record["selected_skill"],
+        "resolved_skill_locator_sha256": record["resolved_skill_locator_sha256"],
+        "installed_launcher_locator_sha256": record["installed_launcher_locator_sha256"],
+        "installed_plugin_tree_sha256": record["installed_plugin_tree_sha256"],
+        "runtime_manifest_sha256": frozen_campaign()["runtime_manifest_sha256"],
+        "rollout_log_sha256": digest("e"),
+        "readback_source": "desktop-task-and-rollout-readback",
+    }
+
+
+def fixture_metadata(
+    record: dict[str, object], case: dict[str, object], campaign: dict[str, object]
+) -> dict[str, object]:
+    workspace = f"/var/lib/ecp-fixtures/{record['fixture_id']}/workspace"
+    record["workspace_path_sha256"] = validator.path_digest(Path(workspace))
+    return {
+        "schema_version": 2,
+        "campaign_id": record["campaign_id"],
+        "fixture_id": record["fixture_id"],
+        "case_id": record["case_id"],
+        "run_number": record["run_number"],
+        "required_run": record["required_run"],
+        "case_suite": case["suite"],
+        "qualification_order": case.get("qualification_order"),
+        "fixture_profile": record["fixture_profile"],
+        "workspace": workspace,
+        "workspace_path_sha256": record["workspace_path_sha256"],
+        "dedicated_state_dir": f"/var/lib/ecp-fixtures/{record['fixture_id']}/authority",
+        "expected_state_dir_path_sha256": digest("5"),
+        "project_config": workspace + "/.codex/config.toml",
+        "expected_authority_id_sha256": digest("6"),
+        "installed_plugin_version": campaign["installed_plugin_version"],
+        "desktop_build": campaign["desktop_build"],
+        "installed_plugin_root_sha256": campaign["installed_plugin_root_sha256"],
+        "installed_launcher_locator_sha256": campaign["installed_launcher_locator_sha256"],
+        "installed_plugin_tree_sha256": campaign["installed_plugin_tree_sha256"],
+        "runtime_manifest_sha256": campaign["runtime_manifest_sha256"],
+        "skill_locator_sha256": campaign["skill_locator_sha256"],
+        "case_inventory_sha256": campaign["case_inventory_sha256"],
+        "fixture_builder_sha256": campaign["fixture_builder_sha256"],
+        "core_version": "0.3.0-test",
+        "core_identity": campaign["core_identity"],
+        "default_authority_before_sha256": campaign["default_authority_sha256"],
+        "preparation": "installed-public-cli",
+        "prep_state": "ready",
+        "prompt_sequence": case.get("prompt_sequence") or [case["prompt"]],
+        "prompt_sha256": record["prompt_sha256"],
+        "prepared_authority_tree_sha256": digest("2"),
+        "prepared_status": {},
     }
 
 
@@ -190,22 +296,44 @@ class ValidatorTests(unittest.TestCase):
         path.write_text(json.dumps(record), encoding="utf-8")
         return path
 
-    def append(self, root: Path, record: dict[str, object]) -> None:
+    def append(
+        self,
+        root: Path,
+        record: dict[str, object],
+        ledger: dict[str, object] | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> None:
+        campaign_path = root / "campaign.json"
+        if not campaign_path.exists():
+            validator.install_exclusive(campaign_path, frozen_campaign())
+        campaign = frozen_campaign()
+        case = self.cases[str(record["case_id"])]
+        metadata = metadata or fixture_metadata(record, case, campaign)
+        record["fixture_metadata_sha256"] = validator.sha256_bytes(validator.canonical_bytes(metadata))
+        record["dispatch_intent_sha256"] = validator.dispatch_intent_digest(record)
+        ledger = ledger or task_ledger(record)
+        record["task_ledger_sha256"] = validator.sha256_bytes(validator.canonical_bytes(ledger))
         with contextlib.redirect_stdout(io.StringIO()):
-            validator.record_result(root, self.write_draft(root.parent, record), self.cases)
+            validator.record_result(
+                root,
+                self.write_draft(root.parent, record),
+                self.write_draft(root.parent, ledger),
+                self.write_draft(root.parent, metadata),
+                self.cases,
+            )
 
     def create_complete_campaign(self, root: Path) -> None:
         for case in self.qualification:
             self.append(root, passing_record(case, 1))
 
-    def test_complete_12_case_qualification_passes(self) -> None:
+    def test_complete_16_case_qualification_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "results"
             self.create_complete_campaign(root)
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
                 validator.validate_results(root, self.cases)
-            self.assertIn("QUALIFIED: 12 qualification cases passed", output.getvalue())
+            self.assertIn("QUALIFIED: 16 qualification cases passed", output.getvalue())
 
     def test_invalid_attempt_can_retry_in_fresh_fixture(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -240,6 +368,7 @@ class ValidatorTests(unittest.TestCase):
             root = Path(temporary) / "results"
             failed = passing_record(self.qualification[0], 1)
             failed.update(outcome="FAIL", failure_codes=["wrong-route"], selected_skill="none")
+            failed["resolved_skill_locator_sha256"] = skill_digest("none")
             self.append(root, failed)
             with self.assertRaisesRegex(validator.ValidationError, "product FAIL is terminal"):
                 self.append(root, passing_record(self.qualification[1], 1))
@@ -259,11 +388,11 @@ class ValidatorTests(unittest.TestCase):
             with self.assertRaisesRegex(validator.ValidationError, "INCOMPLETE"):
                 validator.validate_results(root, self.cases)
 
-    def test_inventory_has_12_qualification_and_9_extended_cases(self) -> None:
+    def test_inventory_has_16_qualification_and_5_extended_cases(self) -> None:
         self.assertEqual(len(self.cases), 21)
-        self.assertEqual(len(self.qualification), 12)
-        self.assertEqual(sum(case["suite"] == "extended" for case in self.cases.values()), 9)
-        self.assertEqual([case["qualification_order"] for case in self.qualification], list(range(1, 13)))
+        self.assertEqual(len(self.qualification), 16)
+        self.assertEqual(sum(case["suite"] == "extended" for case in self.cases.values()), 5)
+        self.assertEqual([case["qualification_order"] for case in self.qualification], list(range(1, 17)))
 
     def test_extended_case_requires_completed_qualification(self) -> None:
         extended = next(case for case in self.cases.values() if case["suite"] == "extended")
@@ -289,11 +418,70 @@ class ValidatorTests(unittest.TestCase):
         record = passing_record(self.qualification[0], 1)
         record.update(outcome="INVALID", failure_codes=["wrong-route"])
         errors = validator.validate_record(record, self.cases)
-        self.assertIn("INVALID must include an infra- failure code", errors)
+        self.assertIn("INVALID failure_codes must come only from the infrastructure-failure taxonomy", errors)
+
+    def test_invalid_cannot_hide_an_observed_product_failure(self) -> None:
+        record = passing_record(self.qualification[0], 1)
+        record.update(
+            outcome="INVALID",
+            failure_codes=["infra-observation-incomplete"],
+            selected_skill="none",
+            observed_status_probe="none",
+        )
+        errors = validator.validate_record(record, self.cases)
+        self.assertTrue(any("must be FAIL, never INVALID" in error for error in errors))
+
+    def test_invalid_rejects_unknown_infrastructure_code(self) -> None:
+        record = passing_record(self.qualification[0], 1)
+        record.update(outcome="INVALID", failure_codes=["infra-unbounded-escape"])
+        errors = validator.validate_record(record, self.cases)
+        self.assertIn(
+            "INVALID failure_codes must come only from the infrastructure-failure taxonomy",
+            errors,
+        )
+
+    def test_record_rejects_tampered_frozen_contract_digest(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "results"
+            campaign = frozen_campaign()
+            campaign["validator_sha256"] = digest("f")
+            validator.install_exclusive(root / "campaign.json", campaign)
+            with self.assertRaisesRegex(validator.ValidationError, "exact current canonical contract"):
+                self.append(root, passing_record(self.qualification[0], 1))
+
+    def test_task_ledger_cwd_mismatch_requires_product_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "results"
+            record = passing_record(self.qualification[0], 1)
+            campaign = frozen_campaign()
+            metadata = fixture_metadata(record, self.qualification[0], campaign)
+            record["dispatch_intent_sha256"] = validator.dispatch_intent_digest(record)
+            ledger = task_ledger(record)
+            ledger["task_cwd_sha256"] = digest("f")
+            with self.assertRaisesRegex(validator.ValidationError, "workspace-mismatch"):
+                self.append(root, record, ledger=ledger, metadata=metadata)
+
+    def test_exact_orphaned_ledger_can_resume_after_interruption(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "results"
+            campaign = frozen_campaign()
+            validator.install_exclusive(root / "campaign.json", campaign)
+            record = passing_record(self.qualification[0], 1)
+            metadata = fixture_metadata(record, self.qualification[0], campaign)
+            record["fixture_metadata_sha256"] = validator.sha256_bytes(validator.canonical_bytes(metadata))
+            record["dispatch_intent_sha256"] = validator.dispatch_intent_digest(record)
+            ledger = task_ledger(record)
+            record["task_ledger_sha256"] = validator.sha256_bytes(validator.canonical_bytes(ledger))
+            validator.install_exclusive(
+                root / "task-ledger" / "check-direct-status-version-run-01.json",
+                ledger,
+            )
+            self.append(root, record, ledger=ledger, metadata=metadata)
+            self.assertTrue((root / "runs" / "check-direct-status-version-run-01.json").is_file())
 
     def test_result_schema_exposes_three_attempt_outcomes(self) -> None:
         schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
-        self.assertEqual(schema["properties"]["schema_version"]["const"], 2)
+        self.assertEqual(schema["properties"]["schema_version"]["const"], 3)
         self.assertEqual(schema["properties"]["outcome"]["enum"], ["PASS", "FAIL", "INVALID"])
 
     def test_results_root_rejects_source_temp_authority_and_cache(self) -> None:

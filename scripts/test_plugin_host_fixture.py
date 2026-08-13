@@ -36,10 +36,18 @@ class FixtureTests(unittest.TestCase):
         workspace.mkdir(parents=True)
         authority.mkdir()
         metadata = {
+            "schema_version": 2,
             "fixture_profile": profile,
             "dedicated_state_dir": str(authority),
+            "workspace_path_sha256": fixture.path_digest(workspace),
             "installed_plugin_version": "0.3.0-test",
+            "installed_plugin_root_sha256": fixture.sha256_bytes(b"plugin-root"),
+            "installed_launcher_locator_sha256": fixture.sha256_bytes(b"launcher"),
+            "installed_plugin_tree_sha256": fixture.sha256_bytes(b"plugin-tree"),
+            "runtime_manifest_sha256": fixture.sha256_bytes(b"runtime-manifest"),
             "core_identity": "0.3.0-test+sha256:" + "3" * 64,
+            "case_inventory_sha256": fixture.sha256_file(fixture.CASES_PATH),
+            "fixture_builder_sha256": fixture.sha256_file(fixture.SCRIPT if hasattr(fixture, "SCRIPT") else SCRIPT),
             "expected_authority_id_sha256": fixture.sha256_bytes(b"auth-test"),
             "default_authority_before_sha256": "sha256:" + "4" * 64,
             "prep_state": "needs-preparation",
@@ -133,6 +141,7 @@ class FixtureTests(unittest.TestCase):
                 mock.patch.object(fixture, "invoke_launcher", side_effect=invoke),
                 mock.patch.object(fixture, "repository_snapshot", return_value=repository_snapshot()),
                 mock.patch.object(fixture, "tree_digest", return_value="sha256:" + "5" * 64),
+                mock.patch.object(fixture, "validate_metadata_candidate"),
             ):
                 snapshot = fixture.public_snapshot(str(workspace), Path("/installed/ecp"))
 
@@ -169,6 +178,7 @@ class FixtureTests(unittest.TestCase):
                 mock.patch.object(fixture, "installed_plugin_version", return_value="0.3.0-test"),
                 mock.patch.object(fixture, "repository_snapshot", return_value=repository_snapshot()),
                 mock.patch.object(fixture, "tree_digest", side_effect=authority_digest),
+                mock.patch.object(fixture, "validate_metadata_candidate"),
             ):
                 fixture.verify_prep(str(workspace), Path("/installed/ecp"))
 
@@ -187,6 +197,7 @@ class FixtureTests(unittest.TestCase):
                 mock.patch.object(fixture, "invoke_launcher", side_effect=invoke),
                 mock.patch.object(fixture, "repository_snapshot", return_value=repository_snapshot()),
                 mock.patch.object(fixture, "tree_digest", return_value="sha256:" + "5" * 64),
+                mock.patch.object(fixture, "validate_metadata_candidate"),
             ):
                 with self.assertRaisesRegex(fixture.FixtureError, "evidence list result must be an array of objects or null"):
                     fixture.public_snapshot(str(workspace), Path("/installed/ecp"))

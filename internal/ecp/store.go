@@ -563,11 +563,14 @@ func (s *Store) WriteArtifacts(changeID, evidenceID string, stdout, stderr []byt
 	}
 	stdoutFile := filepath.Join(temp, "stdout.log")
 	stderrFile := filepath.Join(temp, "stderr.log")
-	if err := os.WriteFile(stdoutFile, stdout, 0o600); err != nil {
+	if err := writeDurableFile(stdoutFile, stdout, 0o600); err != nil {
 		return ArtifactInfo{}, newError(KindRuntime, "ARTIFACT_WRITE_FAILED", "could not write stdout artifact", err)
 	}
-	if err := os.WriteFile(stderrFile, stderr, 0o600); err != nil {
+	if err := writeDurableFile(stderrFile, stderr, 0o600); err != nil {
 		return ArtifactInfo{}, newError(KindRuntime, "ARTIFACT_WRITE_FAILED", "could not write stderr artifact", err)
+	}
+	if err := syncDirectory(temp); err != nil {
+		return ArtifactInfo{}, newError(KindRuntime, "ARTIFACT_STAGING_SYNC_FAILED", "could not sync the staged Evidence artifact directory", err)
 	}
 	target := filepath.Join(artifactRoot, evidenceID)
 	if _, err := os.Lstat(target); err == nil {
@@ -577,6 +580,9 @@ func (s *Store) WriteArtifacts(changeID, evidenceID string, stdout, stderr []byt
 	}
 	if err := os.Rename(temp, target); err != nil {
 		return ArtifactInfo{}, newError(KindRuntime, "ARTIFACT_COMMIT_FAILED", "could not atomically install artifacts", err)
+	}
+	if err := syncDirectory(artifactRoot); err != nil {
+		return ArtifactInfo{}, newError(KindRuntime, "ARTIFACT_DIRECTORY_SYNC_FAILED", "could not durably commit the Evidence artifact directory", err)
 	}
 	if err := s.verifyAuthorityDirectory(target); err != nil {
 		return ArtifactInfo{}, newError(KindIntegrity, "ARTIFACT_DIRECTORY_UNSAFE", "installed Evidence artifact directory is not a private symlink-free directory", err)
@@ -1650,6 +1656,10 @@ func ensurePrivateDirectory(path string) error {
 }
 
 func atomicWriteFile(path string, data []byte, mode os.FileMode) error {
+	return atomicWriteFileWithDirectorySync(path, data, mode, syncDirectory)
+}
+
+func atomicWriteFileWithDirectorySync(path string, data []byte, mode os.FileMode, syncDir func(string) error) error {
 	dir := filepath.Dir(path)
 	if err := ensurePrivateDirectory(dir); err != nil {
 		return err
@@ -1678,12 +1688,46 @@ func atomicWriteFile(path string, data []byte, mode os.FileMode) error {
 	if err := os.Rename(tempPath, path); err != nil {
 		return newError(KindRuntime, "ATOMIC_RENAME_FAILED", "could not commit atomic file", err)
 	}
-	directory, err := os.Open(dir)
-	if err == nil {
-		_ = directory.Sync()
-		_ = directory.Close()
+	if err := syncDir(dir); err != nil {
+		return newError(KindRuntime, "ATOMIC_DIRECTORY_SYNC_FAILED", "atomic file was renamed but its parent directory could not be synced", err)
 	}
 	return nil
+}
+
+func writeDurableFile(path string, data []byte, mode os.FileMode) error {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+	if err != nil {
+		return err
+	}
+	closeNeeded := true
+	defer func() {
+		if closeNeeded {
+			_ = file.Close()
+		}
+	}()
+	if _, err := file.Write(data); err != nil {
+		return err
+	}
+	if err := file.Sync(); err != nil {
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	closeNeeded = false
+	return nil
+}
+
+func syncDirectory(path string) error {
+	directory, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	if err := directory.Sync(); err != nil {
+		_ = directory.Close()
+		return err
+	}
+	return directory.Close()
 }
 
 func sortedEvidenceByTime(evidence []Evidence) []Evidence {

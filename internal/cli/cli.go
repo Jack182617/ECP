@@ -607,13 +607,30 @@ func (c CLI) writeError(operation string, err error, partialResult any) int {
 			exitCode = 1
 		}
 	}
-	_ = writeJSON(c.Stderr, envelope{
+	primary := envelope{
 		SchemaVersion: ecp.SchemaVersion,
 		Operation:     operation,
 		OK:            false,
 		PartialResult: partialResult,
 		Error:         &errorDTO{Kind: string(kind), Code: code, Message: message},
-	})
+	}
+	if writeErr := writeJSON(c.Stderr, primary); writeErr != nil {
+		// A permanently broken stderr cannot carry any contract. Preserve a
+		// machine-readable failure on stdout when it remains available, while
+		// returning runtime failure rather than the original business exit code.
+		_ = writeJSON(c.Stdout, envelope{
+			SchemaVersion: ecp.SchemaVersion,
+			Operation:     operation,
+			OK:            false,
+			PartialResult: partialResult,
+			Error: &errorDTO{
+				Kind:    string(ecp.KindRuntime),
+				Code:    "ERROR_OUTPUT_FAILED",
+				Message: fmt.Sprintf("could not write the %s error envelope to stderr", code),
+			},
+		})
+		return 1
+	}
 	return exitCode
 }
 

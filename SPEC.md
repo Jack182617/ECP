@@ -68,7 +68,7 @@ Project 的一个具体 Git clone/worktree。`workspace_id` 必须由 canonical 
 
 显式 enable 必须绑定 immediately preceding status 的 exact authority ID、Workspace ID、activation token、已接受 candidate config digest 和 accepted truth digest。在记录 enabled event 前，Core 必须要求 default risk 至少一个 Required Gate，并解析/preflight 其 cwd、executable 与 environment，但不得执行 Gate。任何初始化、注册、接受、预检或最终 transition 失败都必须保持 authoritative mode disabled；Draft Config、Project Truth 或 registration 的部分准备不是启用。
 
-仅说“配置、设置或准备好 ECP”而未明确要求为当前整个项目/Workspace 启用，不构成 enablement intent。Adapter 可以进行回答或澄清该请求所必需的只读检查，包括适用的只读 ECP operation；这些观察不得被解释为 mutation 授权。取得 whole-project enablement 的明确意图前，不得创建或修改 Draft Config、authority、registration、activation 或其他项目状态。安装、版本或状态检查必须保持只读且不得隐式转入 enablement。
+仅说“配置、设置或准备好 ECP”而未明确要求为当前整个项目/Workspace 启用，不构成 enablement intent。Adapter 此时只问一个简短的 whole-project 意图确认问题；取得明确确认前，不解析或读取仓库、不调用 `project status`、`project inspect` 或其他 ECP operation，也不创建或修改 Draft Config、authority、registration、activation 或其他项目状态。用户明确提出安装、版本或状态检查时走独立只读 check 流程，且不得隐式转入 enablement。
 
 显式 project disable 必须绑定 immediately preceding status 的 exact authority ID、Workspace ID 与 activation token，在与 Gate/terminal transition 共用的 Workspace lease 内重新加载 authority。若该 status 观察到 ACTIVE Change，Core 必须在同一次原子 append 中先记录 `change_cancelled`、再记录 `project_disabled`；保留源码、Draft Config、Evidence 与全部历史，不产生 PASS。关闭已关闭或未注册 Workspace 是不追加 event 的幂等成功。Draft Config malformed 不得阻止 authority-only disable。
 
@@ -323,7 +323,7 @@ Authority export 是显式、只读于 live authority 的管理操作。Core 必
 
 Codex Plugin 的 Skill 必须从自身安装路径解析 `scripts/ecp` launcher；不得要求普通用户安装 CLI、修改 PATH，或 fallback 到 ambient/repository/temp `ecp`。launcher 只支持 Plugin runtime manifest 声明的 OS/architecture，必须拒绝 symlink、缺失或不可执行 runtime，并在 Core 启动前用固定系统 SHA-256 工具核对 selected binary sidecar。不支持的平台、缺包和 checksum mismatch 使用版本化 `ECP_RUNTIME_*` integrity error 与退出码 4。
 
-Plugin runtime manifest 必须绑定 exact Plugin version、每个支持 target 的唯一相对路径、SHA-256 与 byte size。当前 v0.3 包含 `darwin-arm64`、`darwin-amd64`、`linux-arm64`、`linux-amd64`，不包含 Windows authority runtime。Core/Skill/Plugin source 或 cachebuster 变化后必须重新构建完整 runtime matrix；版本或 artifact mismatch 不得发布或安装为兼容包。checksum 只证明包内一致性，不是签名、notarization 或 publisher provenance。
+Plugin runtime manifest 必须绑定 exact Plugin version、canonical source commit、source-clean 位、Go toolchain version/executable digest、固定 build flags，以及每个支持 target 的唯一相对路径、SHA-256 与 byte size。当前 v0.3 包含 `darwin-arm64`、`darwin-amd64`、`linux-arm64`、`linux-amd64`，不包含 Windows authority runtime。正式 qualification/release candidate 必须来自 clean committed source；显式 dirty override 只能生成 `source_clean: false` 的非资格本地开发制品。Core/Skill/Plugin source 或 cachebuster 变化后必须重新构建完整 runtime matrix；版本、source/toolchain identity 或 artifact mismatch 不得发布、qualification 或安装为兼容包。checksum 只证明包内一致性，不是签名、notarization 或 publisher provenance。
 
 `project status` 返回 `enabled`、`registered`、`config_state`、`truth_state`、候选/接受的两个 digest、`operational`、`assurance`、可选 ACTIVE Change、可选 `active_gate_run` 与 diagnostics。未启用、READY、ACTIVE status 使用退出码 `0`；已启用且 assurance=`BLOCKED` 使用 `3`，已启用且 assurance=`INDETERMINATE` 使用 `4`。`authority health` 的 `HEALTHY`/`ATTENTION`/`INDETERMINATE` 同样使用 `0/3/4`。这些状态结果即使非零也必须是 stdout 上 `ok: true` 的正常 result envelope，调用方不得丢弃 mode、health status 或 diagnostics；真正 typed error 才使用 stderr 的 `ok: false` envelope。
 

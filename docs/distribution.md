@@ -56,11 +56,15 @@ The release order is mandatory:
    Plugin manifest, all four Skills, and a copied cache-layout launcher smoke test.
 5. Sign/notarize and publish through the chosen trusted distribution process.
 
-`package-plugin.sh` builds with CGO disabled, `-trimpath`, and
+`package-plugin.sh` refuses formal packaging unless HEAD is a committed clean
+source epoch. `ECP_PACKAGE_ALLOW_DIRTY=1` is an explicit development-only
+override; it emits `source_clean: false`, and campaign freeze must reject that
+artifact. The script builds with CGO disabled, `-trimpath`, and
 `-buildvcs=false` for the four supported targets. It stages all artifacts first
 and replaces the prior runtime directory only after every build and checksum
-succeeds. The generated runtime manifest binds all artifact paths, digests, and
-sizes to the current Plugin version.
+succeeds. The Schema v2 runtime manifest binds the canonical source commit,
+clean/dirty state, Go toolchain version and executable digest, fixed build
+flags, and all artifact paths/digests/sizes to the current Plugin version.
 
 Changing Plugin source after packaging makes the package stale. Changing the
 Plugin version after packaging makes the manifest version mismatch. Both must
@@ -104,16 +108,20 @@ or deletion.
    identity. Success requires the expected installed Plugin version, the exact
    packaged Core identity, and an unchanged project mode. A source/cache check
    in the task that performed installation does not prove fresh-task pickup.
-6. Before any real-product pilot write, complete the 12 independent host
+6. Before any real-product pilot write, complete the 16 independent host
    canaries in [Codex Plugin host-routing evaluation](plugin-host-evaluation.md).
-   Freeze one exact installed Plugin version and bundled Core identity, then run
+   Freeze one exact Desktop build/inventory, single installed Plugin tree,
+   launcher/Skill locators, Plugin version, bundled Core identity, and evaluator
+   contract set, then run
    one fresh task per canary, serially and fail-fast, with a new disposable Git
-   Workspace and dedicated authority each time. Acceptance is `12/12` for that
+   Workspace and dedicated authority each time. Acceptance is `16/16` for that
    unchanged candidate. A product `FAIL` stops qualification; a fixture, host,
-   or dispatch failure is preserved as `INVALID` and may be rerun once in a new
+   or dispatch failure from the closed infrastructure taxonomy is preserved as
+   `INVALID` and may be rerun once in a new
    fixture after its infrastructure cause is corrected. A second `INVALID`
    freezes that candidate campaign. Store the campaign
-   manifest, task ledger, identities, observations, and every failed, invalid,
+   manifest, fixture metadata, Desktop task ledger/rollout readback, identities,
+   observations, and every failed, invalid,
    or retry record in a durable external results root; `/tmp` and
    `/private/tmp` are not acceptable as the only copy.
 

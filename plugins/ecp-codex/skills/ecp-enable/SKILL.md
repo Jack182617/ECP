@@ -1,6 +1,6 @@
 ---
 name: ecp-enable
-description: Enable ECP for the current canonical Git Workspace only after an explicit user request, or clarify an ambiguous request to configure or set up ECP without treating read-only observations as authorization. Use for both new projects and already-developed projects that need reviewed local Gates, an evidence-backed minimal Project Pack, registration or initial acceptance, and a final authoritative enabled status. Do not trigger for ordinary implementation work or merely because the Plugin or .ecp exists.
+description: Enable ECP for the current canonical Git Workspace only after an explicit user request, or clarify an ambiguous request to configure or set up ECP with one question and no repository or ECP probe before confirmation. Use for both new projects and already-developed projects that need reviewed local Gates, an evidence-backed minimal Project Pack, registration or initial acceptance, and a final authoritative enabled status. Do not trigger for ordinary implementation work or merely because the Plugin or .ecp exists.
 ---
 
 # Enable ECP
@@ -15,12 +15,12 @@ intent.
 Treat a request that only says to configure, set up, prepare, or "get ECP
 ready" as ambiguous. Select this Skill only to ask one short question: does the
 user explicitly want to enable ECP governance for the whole current canonical
-Git Workspace? Before that confirmation, limit work to the read-only inspection
-needed to answer or clarify the request; use the applicable check flow when an
-ECP status, installation, or version observation is needed. Reading repository
-content or a documented read-only ECP result does not authorize writing
-`.ecp`, registration, acceptance, activation, or any other repository,
-authority, or project-mode mutation.
+Git Workspace? Before that confirmation, do not resolve or inspect the
+repository, run `ecp project status` or any other ECP command, read `.ecp`, or
+perform any repository, authority, registration, acceptance, activation, or
+project-mode mutation. If the user instead explicitly asks for ECP status,
+installation, or version facts, end this flow and route that separate read-only
+request through `ecp-check`.
 
 After an explicit whole-project confirmation, continue below. The confirmation
 authorizes only the reviewed local setup and enablement described by this
@@ -82,8 +82,11 @@ CLI or copy opaque protocol values.
 8. For an unregistered Workspace, run one fresh `ecp project inspect`, then
    invoke `ecp project register` with the exact authority, Workspace, candidate
    config, and candidate truth values from that response. For registered config
-   drift, use one fresh status and accept only the exact reviewed candidate.
-   Use actor `codex-local-adapter` and a concise reason tied to this request.
+   drift, show the exact human-readable Project/Policy/Gate delta and obtain a
+   fresh explicit confirmation for that policy acceptance; the earlier general
+   setup request is not reusable after the reviewed candidate changes. Then use
+   one fresh status and accept only that exact confirmed candidate. Use actor
+   `codex-local-adapter` and a concise reason tied to this request.
 9. Run a fresh `ecp project status`. Require registered state, accepted
    config/truth, at least one applicable safe Gate, and no unsafe effect. Invoke
    `ecp project enable` with only the exact authority ID, Workspace ID,

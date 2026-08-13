@@ -1,6 +1,7 @@
 package ecp
 
 import (
+	"encoding/json"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -47,7 +48,11 @@ func TestPackagePluginRuntimeSwapRecovery(t *testing.T) {
 			pluginRoot := createPackagePluginFixture(t, fixtureRoot, packageScript)
 			runtimeRoot := filepath.Join(pluginRoot, "runtime")
 			originalRuntime := snapshotPackagedRuntime(t, runtimeRoot)
-			shimRoot := createPackagePluginTestShims(t, fixtureRoot)
+			shimFixture, err := filepath.EvalSymlinks(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			shimRoot := createPackagePluginTestShims(t, shimFixture)
 
 			command := exec.Command("/bin/sh", filepath.Join(fixtureRoot, "scripts", "package-plugin.sh"))
 			command.Dir = fixtureRoot
@@ -89,6 +94,71 @@ func TestPackagePluginRuntimeSwapRecovery(t *testing.T) {
 	}
 }
 
+func TestPackagePluginRequiresCleanSourceUnlessDevelopmentOverride(t *testing.T) {
+	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	packageScript, err := os.ReadFile(filepath.Join(repoRoot, "scripts", "package-plugin.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	realMV, err := exec.LookPath("mv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixtureRoot, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	pluginRoot := createPackagePluginFixture(t, fixtureRoot, packageScript)
+	runtimeRoot := filepath.Join(pluginRoot, "runtime")
+	originalRuntime := snapshotPackagedRuntime(t, runtimeRoot)
+	writePackageTestFile(t, filepath.Join(fixtureRoot, "uncommitted-source.txt"), []byte("dirty source\n"), 0o644)
+	shimFixture, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	shimRoot := createPackagePluginTestShims(t, shimFixture)
+	baseEnvironment := []string{
+		"PATH=" + shimRoot + ":/usr/bin:/bin",
+		"TMPDIR=" + filepath.Join(fixtureRoot, "tmp"),
+		"ECP_PACKAGE_TEST_REAL_MV=" + realMV,
+		"ECP_PACKAGE_TEST_PLUGIN_ROOT=" + pluginRoot,
+		"ECP_PACKAGE_TEST_MV_BEHAVIOR=",
+	}
+	command := exec.Command("/bin/sh", filepath.Join(fixtureRoot, "scripts", "package-plugin.sh"))
+	command.Dir = fixtureRoot
+	command.Env = baseEnvironment
+	output, runErr := command.CombinedOutput()
+	if runErr == nil || !strings.Contains(string(output), "formal plugin packaging requires a clean source commit") {
+		t.Fatalf("dirty formal package was not rejected before staging: err=%v\n%s", runErr, output)
+	}
+	if current := snapshotPackagedRuntime(t, runtimeRoot); !reflect.DeepEqual(current, originalRuntime) {
+		t.Fatal("rejected dirty formal package changed the installed runtime")
+	}
+
+	command = exec.Command("/bin/sh", filepath.Join(fixtureRoot, "scripts", "package-plugin.sh"))
+	command.Dir = fixtureRoot
+	command.Env = append(append([]string(nil), baseEnvironment...), "ECP_PACKAGE_ALLOW_DIRTY=1")
+	if output, runErr = command.CombinedOutput(); runErr != nil {
+		t.Fatalf("explicit development package failed: %v\n%s", runErr, output)
+	}
+	manifestBytes, err := os.ReadFile(filepath.Join(runtimeRoot, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		SourceClean bool `json:"source_clean"`
+	}
+	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.SourceClean {
+		t.Fatal("development dirty override incorrectly claimed a clean source")
+	}
+}
+
 func createPackagePluginFixture(t *testing.T, root string, packageScript []byte) string {
 	t.Helper()
 	writePackageTestFile(t, filepath.Join(root, "scripts", "package-plugin.sh"), packageScript, 0o755)
@@ -103,6 +173,24 @@ func createPackagePluginFixture(t *testing.T, root string, packageScript []byte)
 	if err := os.MkdirAll(filepath.Join(root, "tmp"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	git := exec.Command("/usr/bin/git", "init", "--initial-branch=main")
+	git.Dir = root
+	if output, err := git.CombinedOutput(); err != nil {
+		t.Fatalf("initialize package fixture Git repository: %v\n%s", err, output)
+	}
+	git = exec.Command("/usr/bin/git", "add", "--all")
+	git.Dir = root
+	if output, err := git.CombinedOutput(); err != nil {
+		t.Fatalf("stage package fixture: %v\n%s", err, output)
+	}
+	git = exec.Command(
+		"/usr/bin/git", "-c", "user.name=Package Test", "-c",
+		"user.email=package-test@example.invalid", "commit", "-m", "fixture",
+	)
+	git.Dir = root
+	if output, err := git.CombinedOutput(); err != nil {
+		t.Fatalf("commit package fixture: %v\n%s", err, output)
+	}
 	return pluginRoot
 }
 
@@ -111,6 +199,11 @@ func createPackagePluginTestShims(t *testing.T, root string) string {
 	shimRoot := filepath.Join(root, "test-bin")
 	writePackageTestFile(t, filepath.Join(shimRoot, "go"), []byte(`#!/bin/sh
 set -eu
+
+if [ "${1:-}" = "version" ]; then
+  printf '%s\n' "go version go0.0.0-package-test test/arch"
+  exit 0
+fi
 
 output=
 while [ "$#" -gt 0 ]; do
@@ -231,5 +324,20 @@ func assertPackagedRuntimeInstalled(t *testing.T, runtimeRoot string) {
 		if _, err := os.Stat(filepath.Join(runtimeRoot, relativePath)); err != nil {
 			t.Fatalf("packaged runtime is missing %s: %v", relativePath, err)
 		}
+	}
+	manifestBytes, err := os.ReadFile(filepath.Join(runtimeRoot, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		SchemaVersion int    `json:"schema_version"`
+		SourceCommit  string `json:"source_commit"`
+		SourceClean   bool   `json:"source_clean"`
+	}
+	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.SchemaVersion != 2 || len(manifest.SourceCommit) != 40 || !manifest.SourceClean {
+		t.Fatalf("clean formal package did not preserve source provenance: %+v", manifest)
 	}
 }

@@ -198,13 +198,15 @@ func (s Service) ExportAuthority(ctx context.Context, start, output string) (Aut
 	if err := sealAuthorityExport(staging); err != nil {
 		return AuthorityExportResult{}, err
 	}
+	if err := syncAuthorityExportDirectories(staging); err != nil {
+		return AuthorityExportResult{}, err
+	}
 	if err := os.Rename(staging, target); err != nil {
 		return AuthorityExportResult{}, newError(KindRuntime, "EXPORT_COMMIT_FAILED", "could not atomically commit authority export", err)
 	}
 	removeStaging = false
-	if directory, openErr := os.Open(parent); openErr == nil {
-		_ = directory.Sync()
-		_ = directory.Close()
+	if err := syncDirectory(parent); err != nil {
+		return AuthorityExportResult{}, newError(KindRuntime, "EXPORT_DIRECTORY_SYNC_FAILED", "authority export was renamed but its parent directory could not be synced", err)
 	}
 	return exportResultFromVerification(target, verified), nil
 }
@@ -737,10 +739,18 @@ func resolveAuthorityExportTarget(repositoryRoot, stateDir, output string) (stri
 		return "", newError(KindNotFound, "EXPORT_PARENT_NOT_FOUND", "authority export parent directory must already exist", err)
 	}
 	target = filepath.Join(parent, filepath.Base(target))
-	if pathInside(repositoryRoot, target) {
+	insideRepository, err := pathPhysicallyInside(repositoryRoot, target)
+	if err != nil {
+		return "", newError(KindRuntime, "EXPORT_BOUNDARY_CHECK_FAILED", "could not verify the physical repository export boundary", err)
+	}
+	if insideRepository {
 		return "", newError(KindIntegrity, "EXPORT_INSIDE_REPOSITORY", "authority exports must remain outside the Git repository", nil)
 	}
-	if pathInside(stateDir, target) {
+	insideAuthority, err := pathPhysicallyInside(stateDir, target)
+	if err != nil {
+		return "", newError(KindRuntime, "EXPORT_BOUNDARY_CHECK_FAILED", "could not verify the physical authority export boundary", err)
+	}
+	if insideAuthority {
 		return "", newError(KindIntegrity, "EXPORT_INSIDE_AUTHORITY", "authority exports must remain outside the live authority state directory", nil)
 	}
 	return target, nil
@@ -795,6 +805,28 @@ func sealAuthorityExport(root string) error {
 	return nil
 }
 
+func syncAuthorityExportDirectories(root string) error {
+	var directories []string
+	if err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			directories = append(directories, path)
+		}
+		return nil
+	}); err != nil {
+		return newError(KindRuntime, "EXPORT_DIRECTORY_SYNC_FAILED", "could not enumerate authority export directories for durability", err)
+	}
+	sort.Slice(directories, func(i, j int) bool { return len(directories[i]) > len(directories[j]) })
+	for _, directory := range directories {
+		if err := syncDirectory(directory); err != nil {
+			return newError(KindRuntime, "EXPORT_DIRECTORY_SYNC_FAILED", "could not sync an authority export directory", err)
+		}
+	}
+	return nil
+}
+
 func removeAuthorityExportTree(root string) {
 	_ = filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -808,11 +840,6 @@ func removeAuthorityExportTree(root string) {
 		return nil
 	})
 	_ = os.RemoveAll(root)
-}
-
-func pathInside(root, candidate string) bool {
-	relative, err := filepath.Rel(root, candidate)
-	return err == nil && (relative == "." || (relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))))
 }
 
 func containsExportRole(files []AuthorityExportFile, role string) bool {

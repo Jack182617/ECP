@@ -8,13 +8,13 @@ an OS, shell, CI, or release enforcement boundary.
 
 No qualification canary has passed yet. Do not start a real-project pilot until
 the installed Skill locator resolves one newly frozen candidate and the
-canonical validator reports `QUALIFIED` for all 12 cases.
+canonical validator reports `QUALIFIED` for all 16 cases.
 
 ## Canonical artifacts and acceptance rule
 
 - [`plugin-host-evaluation-cases.json`](plugin-host-evaluation-cases.json) is
-  the Schema v3 inventory. It contains 12 ordered `qualification` cases and 9
-  optional `extended` diagnostics. Only the 12 ordered cases determine
+  the Schema v4 inventory. It contains 16 ordered `qualification` cases and 5
+  optional `extended` diagnostics. Only the 16 ordered cases determine
   qualification.
 - [`plugin-host-evaluation-result.schema.json`](plugin-host-evaluation-result.schema.json)
   defines one attempt record. `scripts/validate-plugin-host-results.py` applies
@@ -27,7 +27,7 @@ canonical validator reports `QUALIFIED` for all 12 cases.
   profile through the installed Core's public CLI, and emits public before/after
   summaries.
 
-The 12 qualification cases run once in `qualification_order`, strictly
+The 16 qualification cases run once in `qualification_order`, strictly
 serially. A product `FAIL` immediately ends qualification for that candidate.
 An infrastructure failure is recorded as `INVALID`; after correcting the cause,
 the same case may be retried once with run number 2 in a completely fresh
@@ -36,16 +36,21 @@ append run 3, replace an earlier record, continue to a later case after `FAIL`
 or terminal `INVALID`, or use an extended diagnostic to fill a qualification
 slot.
 
-The nine extended cases are optional diagnostics and may run only after the
-validator considers the 12 qualification cases `QUALIFIED`.
+The five extended cases are optional diagnostics and may run only after the
+validator considers the 16 qualification cases `QUALIFIED`.
 
 ## Exact candidate and environment isolation
 
-Freeze one installed Skill locator, Plugin version, bundled Core identity, and
-Desktop build for the entire campaign. The launcher must be the absolute
+Freeze one installed Skill locator set, Plugin tree, Plugin version, bundled
+Core identity, Desktop inventory, and Desktop build for the entire campaign.
+The launcher must be the absolute
 `scripts/ecp` inside that installed Plugin cache. A repository launcher,
 repository-built Core, ambient `ecp`, removed cache, or hand-edited installed
-cache is not the candidate.
+cache is not the candidate. The freeze fails unless Desktop inventory exposes
+exactly one enabled installed `ecp-codex` provider and its locator is the same
+package as the requested launcher. It also freezes digests for the case
+inventory, result schema, validator, fixture builder, and default-authority
+sentinel; changing any of them requires a new campaign.
 
 Every attempt receives this isolated shape under an operator-selected absolute
 batch root:
@@ -82,12 +87,32 @@ because the campaign is explicitly bound to that package.
 
 ## Preflight and deterministic fixture preparation
 
-Before creating persistent campaign attempts, use the exact installed launcher
-to generate and validate temporary representatives of all five profiles:
+First create a durable results root outside the repository, temporary,
+authority, fixture, and Plugin-cache trees. Freeze the exact Desktop-installed
+candidate before any fixture or task is created:
+
+```text
+python3 scripts/validate-plugin-host-results.py freeze \
+  --results /absolute/durable-results/<campaign-id> \
+  --campaign-id <lowercase-campaign-id> \
+  --launcher /absolute/installed/ecp-codex/scripts/ecp \
+  --codex /absolute/path/to/codex \
+  --desktop-app /Applications/Codex.app \
+  --marketplace <configured-marketplace-name>
+```
+
+`freeze` reads Desktop's installed Plugin inventory and refuses a duplicated,
+disabled, stale, source-tree, or otherwise ambiguous provider. It writes one
+non-overwritable `campaign.json`; it does not install a Plugin, change global
+configuration, create a Desktop task, or mutate a project.
+
+Then use the exact frozen launcher and campaign to generate and validate
+temporary representatives of all five profiles:
 
 ```text
 python3 scripts/plugin-host-fixture.py verify-seed \
-  --launcher /absolute/installed/ecp-codex/scripts/ecp
+  --launcher /absolute/installed/ecp-codex/scripts/ecp \
+  --campaign /absolute/durable-results/<campaign-id>/campaign.json
 ```
 
 This preflight uses temporary disposable Workspaces and authorities. For enabled
@@ -105,15 +130,18 @@ python3 scripts/plugin-host-fixture.py create-run \
   --batch-root /private/tmp/ecp-plugin-host-<package-version> \
   --case-id check-direct-status-version \
   --run-number 1 \
-  --launcher /absolute/installed/ecp-codex/scripts/ecp
+  --launcher /absolute/installed/ecp-codex/scripts/ecp \
+  --campaign /absolute/durable-results/<campaign-id>/campaign.json
 ```
 
 Run number 1 is the sole initial qualification attempt. Run number 2 is valid
 only as the one allowed retry after a preserved `INVALID`; it always receives a
 new Git repository, authority, saved/trusted Desktop project, and task. The
-builder writes `fixture.json` outside the synthetic Workspace and immediately
-verifies the prepared state. That file is operator metadata and must never be
-provided to the scored task.
+builder writes Schema v2 `fixture.json` outside the synthetic Workspace and
+immediately verifies its case, prompt, Workspace path, campaign, Desktop,
+installed package tree/launcher/Skill locators, Core, and authority sentinels.
+That file is operator metadata and must never be provided to the scored task;
+an immutable copy is archived only when the result is recorded.
 
 The profiles are deterministic states, not reusable instances:
 
@@ -140,7 +168,10 @@ follow-up is part of this protocol.
 
 Before every non-idempotent task dispatch, persist a dispatch intent in the
 durable external results area. It must identify the case/run, exact Workspace,
-prompt digest, creation-time lower bound, and the baseline of matching task IDs.
+canonical prompt digest, campaign, fixture, run number, creation-time lower
+bound, and the baseline of matching task IDs. The record's
+`dispatch_intent_sha256` binds the canonical campaign/case/run/fixture/prompt/
+Workspace tuple; changing any member creates a different attempt.
 A task-creation error does not prove that no task was created. Reconcile the
 Desktop task ledger before any retry:
 
@@ -149,6 +180,16 @@ Desktop task ledger before any retry:
 - if zero or multiple tasks match, or the first input cannot be verified, mark
   the attempt `INVALID`, preserve all ledger evidence, and consume the fixture;
 - never dispatch again into the same fixture after an ambiguous result.
+
+For every attempt, retain one immutable task-ledger entry. A scored `PASS` or
+`FAIL` requires a created Desktop task, exact task ID, exact task cwd equal to
+the fixture Workspace, exact first-input/prompt digest, exact dispatch intent,
+Desktop build, installed Plugin tree/launcher, selected Skill and resolved Skill
+locator, fixture metadata digest, and a real rollout-log digest obtained from
+Desktop task-and-rollout readback. An infrastructure failure before task
+creation uses `task_created: false`, the canonical absent rollout sentinel, and
+Desktop dispatch-ledger readback. Task identity, cwd, prompt, or locator
+ambiguity is never silently accepted.
 
 Open the exact disposable Workspace in Desktop and confirm the project is
 trusted and its project-scoped configuration is loaded before sending the
@@ -207,16 +248,19 @@ For each attempt, perform this order:
      --launcher /absolute/installed/ecp-codex/scripts/ecp
    ```
 
-6. Classify and append the attempt. Do not ask the scored task to summarize or
+6. Freeze the Desktop task-ledger/rollout readback and the exact final
+   `fixture.json`, then classify and append the attempt. Do not ask the scored task to summarize or
    hash its own environment, and do not modify frozen observations using facts
    learned after the response.
 
 The fixture and operator authority-path, authority-ID, Plugin-version, and
 Core-identity hashes must match for `PASS`; the default-authority before/after
-digests must match. The validator also requires the exact case/profile/Skill/
-probe/mutation contract, compatible public before/after state, unchanged HEAD,
-preservation of every pre-existing dirty path's content, exact per-turn
-observations, and preserved prohibitions.
+digests must match. The validator also requires the frozen Desktop/candidate
+identity, archived fixture metadata, exact Workspace/cwd, canonical prompt and
+dispatch intent, resolved Skill locator, immutable task ledger and rollout
+readback, exact case/profile/Skill/probe/mutation contract, compatible public
+before/after state, unchanged HEAD, preservation of every pre-existing dirty
+path's content, exact per-turn observations, and preserved prohibitions.
 
 ## PASS, FAIL, and INVALID
 
@@ -231,11 +275,14 @@ observations, and preserved prohibitions.
 - `INVALID` means infrastructure prevented a trustworthy product score: fixture
   construction failure, unavailable trust/config readback, unresolved task
   dispatch, host outage, or missing observation caused by infrastructure. It
-  requires at least one `infra-...` failure code. Wrong product behavior must
-  never be relabelled `INVALID`.
+  requires at least one code from the validator's closed infrastructure
+  allowlist. A name that merely starts with `infra-` is insufficient. Wrong
+  route/probe/mutation/launcher/conformance/prohibition observations must be
+  recorded as product `FAIL` even when an infrastructure problem also occurred;
+  they can never be hidden by `INVALID`.
 
 Every attempt is immutable and consumed. Never reset or reuse its Workspace,
-authority, or task. `INVALID` does not count in the `12/12` denominator, but it
+authority, or task. `INVALID` does not count in the `16/16` denominator, but it
 remains visible in the campaign. Only the first `INVALID` for a qualification
 case permits one fresh-fixture retry; another `INVALID` freezes the candidate.
 
@@ -246,18 +293,24 @@ fixture batch, temporary directories, authority trees, and Plugin caches.
 `/tmp`, `/private/tmp`, a disposable Workspace, or Codex chat cannot be the only
 copy.
 
-Append one Schema v2 attempt record through the canonical validator:
+Append one Schema v3 attempt record and its exact Desktop task-ledger and
+fixture-metadata inputs through the canonical validator:
 
 ```text
 python3 scripts/validate-plugin-host-results.py record \
   --results /absolute/durable-results/<campaign-id> \
-  --input /absolute/draft/run.json
+  --input /absolute/draft/run.json \
+  --task-ledger /absolute/draft/task-ledger.json \
+  --fixture-metadata /absolute/.../fixture.json
 ```
 
-The first append atomically creates `campaign.json`. Every attempt is installed
-under `runs/<case-id>-run-NN.json` with no-overwrite semantics. All records share
-the exact campaign ID, installed Plugin version, Core identity, and default-
-authority sentinel. Task IDs cannot be reused.
+The earlier `freeze` operation exclusively creates `campaign.json`. Every
+attempt is durably installed under `runs/`, `task-ledger/`, and
+`fixture-metadata/` with no-overwrite semantics. If a process stops after the
+ledger or fixture metadata is installed but before the scored record, a retry
+may resume only with byte-for-byte identical canonical input; conflicting
+recovery is rejected. All records share the exact frozen Desktop/candidate/
+contract identity and default-authority sentinel. Task IDs cannot be reused.
 
 Validate the complete qualification with:
 
@@ -266,11 +319,14 @@ python3 scripts/validate-plugin-host-results.py validate \
   --results /absolute/durable-results/<campaign-id>
 ```
 
-Success is exactly `QUALIFIED: 12 qualification cases passed`, with any allowed
+Success is exactly `QUALIFIED: 16 qualification cases passed`, with any allowed
 first-attempt `INVALID` records preserved and no product `FAIL` or terminal
 second `INVALID`. Changing a Skill, shared reference, launcher, runtime,
-manifest, Plugin version, Core identity, or Desktop routing surface requires a
-new cachebuster and a new campaign from qualification order 1.
+manifest, Plugin tree/version, Core identity, Desktop build/inventory, case
+inventory, result schema, validator, fixture builder, prompt, or routing surface
+requires a new cachebuster where applicable and always a new campaign from
+qualification order 1. The CLI intentionally has no arbitrary `--cases` escape
+hatch for formal validation.
 
 ## Pilot boundary and current evidence
 

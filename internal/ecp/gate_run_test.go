@@ -79,6 +79,50 @@ func TestGateRunPartialFailureIsTerminalAndPreservesEvidence(t *testing.T) {
 	}
 }
 
+func TestGateRunReportsPrimaryAndTerminalAppendFailures(t *testing.T) {
+	ctx := context.Background()
+	repo := createTestRepository(t)
+	service := newTestService(t)
+	service.gateRunFinalizer = func(context.Context, Service, *Store, *Projection, string, GateRunState, string, string) error {
+		return newError(KindRuntime, "TEST_TERMINAL_APPEND_FAILED", "injected terminal append failure", nil)
+	}
+	mutateConfig := passingGitGate()
+	mutateConfig.ID = "a-mutate-config"
+	mutateConfig.Command = []string{"sh", "-c", "printf ' ' >> .ecp/project.json"}
+	second := passingGitGate()
+	second.ID = "z-must-not-run"
+	bootstrapProjectWithGates(t, ctx, service, repo, []GateConfig{mutateConfig, second})
+	change, err := startTestChange(t, ctx, service, repo, StartChangeInput{
+		Title: "Expose terminal append failure", Goal: "Retain both Gate execution and finalization failures", Scope: []string{"src"},
+		AcceptanceCriteria: []string{"partial result remains explicitly IN_PROGRESS"}, Risk: RiskModerate,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendFile(t, filepath.Join(repo, "src", "app.txt"), "terminal append failure\n")
+	if err := assessPreservedTestChange(t, ctx, service, repo, change.ChangeID); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := service.PlanGates(ctx, repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := service.RunGates(ctx, repo, change.ChangeID, plan.PlanDigest, nil)
+	if err == nil || !isErrorCode(err, "GATE_RUN_TERMINAL_APPEND_FAILED") {
+		t.Fatalf("double failure was not classified: result=%+v err=%v", result, err)
+	}
+	if result.State != GateRunInProgress || result.RunID == "" || len(result.Evidence) != 1 {
+		t.Fatalf("double failure did not expose the durable partial state: %+v", result)
+	}
+	if !strings.Contains(err.Error(), "CONFIG_CHANGED_DURING_GATE_SEQUENCE") || !strings.Contains(err.Error(), "TEST_TERMINAL_APPEND_FAILED") {
+		t.Fatalf("double failure omitted one cause: %v", err)
+	}
+	report, historyErr := service.ListGateRuns(ctx, repo, change.ChangeID)
+	if historyErr != nil || len(report.Runs) != 1 || report.Runs[0].State != GateRunInProgress {
+		t.Fatalf("authority history did not retain the unresolved run: %+v err=%v", report, historyErr)
+	}
+}
+
 func TestReleasedGateRunIsRecoveredAsInterruptedBeforeNextRun(t *testing.T) {
 	ctx := context.Background()
 	repo := createTestRepository(t)

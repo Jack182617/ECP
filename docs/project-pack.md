@@ -42,7 +42,7 @@ Project Pack 是每个项目随仓库保存的、可评审但不能自行生效�
 ## 生命周期
 
 1. `project init` 只创建诚实的 `seed` truth，并明确“尚未完成项目理解”这一高风险 Unknown。
-2. 启用后，通过一个受限 onboarding Change 从当前代码、测试、Schema、正式文档和用户意图建立 `established` truth；证据不足的部分继续保留 Unknown。
+2. 启用流程只负责把已评审的候选 Project Pack 接受并把 Workspace 带到 `READY`；如果 accepted truth 仍是 `seed`，只报告其 Unknown，不在启用流程中自动创建 Change。Truth maturation/onboarding 是之后的独立产品 Change，必须由用户另行明确授权，并从新鲜的 `ecp-change` 路由开始；证据不足的部分继续保留 Unknown。
 3. 普通 Change 只读取 accepted Project Truth，在开始前声明结构化 Impact，并用逐项 Requirement 为所有 material contract item 记录决定来源、理由、精确覆盖和 `AUTOMATED`/`REVIEW`/`EXTERNAL` 验证模式。Core 不接受 `BLOCKING_UNKNOWN` 或漏覆盖。
 4. Core 用 component path ownership 反推 scope/touched path 的 direct component，沿 `depends_on` 的反向传递闭包加入直接/间接依赖者，再得到 capability → invariant。声明与推导取并集进入风险/Gate；漏报或 established truth 的未映射最终路径阻止 PASS。
 5. 实现完成后，Core 分别记录产品语义结果、每项 Requirement result，并计算 accepted 与 candidate Project Pack 的真实差异。自动 Requirement 仍需当前 mapped Gate Evidence；外部 Requirement 在 v0.3 保持 pending。`PRESERVED` 不接受任何 truth delta或 declared expected change；`CHANGED` 可以在 durable truth 仍准确时保持零 delta，非零 delta 必须在 Impact 内并由用户确认精确 protected change；`UNKNOWN` 阻止 PASS。

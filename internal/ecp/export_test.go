@@ -210,6 +210,55 @@ func TestAuthorityExportRejectsUnsafeTargetsAndBundleRoots(t *testing.T) {
 	}
 }
 
+func TestAuthorityExportRejectsPhysicalRepositoryAndAuthorityAliases(t *testing.T) {
+	service, repo := createAuthorityExportProject(t, false)
+	tests := []struct {
+		name   string
+		root   string
+		code   string
+		prefix string
+	}{
+		{name: "repository alternate case", root: repo, code: "EXPORT_INSIDE_REPOSITORY", prefix: "repo-export"},
+		{name: "authority alternate case", root: service.StateDir, code: "EXPORT_INSIDE_AUTHORITY", prefix: "authority-export"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			alternate := toggleFirstASCIIPathCase(test.root)
+			rootInfo, rootErr := os.Stat(test.root)
+			alternateInfo, alternateErr := os.Stat(alternate)
+			if rootErr != nil || alternateErr != nil || !os.SameFile(rootInfo, alternateInfo) {
+				t.Skip("filesystem does not expose an alternate-case spelling for this path")
+			}
+			_, err := resolveAuthorityExportTarget(repo, service.StateDir, filepath.Join(alternate, test.prefix))
+			if err == nil || !isErrorCode(err, test.code) {
+				t.Fatalf("physical path alias crossed export boundary: %v", err)
+			}
+		})
+	}
+}
+
+func TestAuthorityExportRejectsUnicodeNormalizedRepositoryAlias(t *testing.T) {
+	parent := t.TempDir()
+	composed := filepath.Join(parent, "caf\u00e9")
+	decomposed := filepath.Join(parent, "cafe\u0301")
+	if err := os.Mkdir(composed, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	composedInfo, composedErr := os.Stat(composed)
+	decomposedInfo, decomposedErr := os.Stat(decomposed)
+	if composedErr != nil || decomposedErr != nil || !os.SameFile(composedInfo, decomposedInfo) {
+		t.Skip("filesystem does not expose a Unicode-normalized alias for this path")
+	}
+	authority := filepath.Join(t.TempDir(), "authority")
+	if err := os.Mkdir(authority, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	_, err := resolveAuthorityExportTarget(composed, authority, filepath.Join(decomposed, "export"))
+	if err == nil || !isErrorCode(err, "EXPORT_INSIDE_REPOSITORY") {
+		t.Fatalf("Unicode-normalized repository alias crossed export boundary: %v", err)
+	}
+}
+
 func TestAuthorityExportPreservesSegmentedHistory(t *testing.T) {
 	ctx := context.Background()
 	service, repo := createAuthorityExportProject(t, false)

@@ -1,7 +1,7 @@
 # ECP — Engineering Control Plane
 
 > 当前结论与下一步以 [STATUS.md](STATUS.md) 为准：旧 host-routing campaign
-> 已终止且不构成 qualification。下一候选先通过 12 个串行 fail-fast host
+> 已终止且不构成 qualification。下一候选先通过 16 个串行 fail-fast host
 > canary，再进入一新一旧两个安全副本的最小真实试点。ECP 自身不作为 fixture 或试点项目。
 
 ECP 是一套面向长期 AI 原生软件开发的、多项目通用、工具无关、local-first 的项目连续性与可信变更控制系统。它不替代 Codex、IDE、Git、测试框架或 CI；它让项目自身长期保存关键产品与工程事实，并把一次工程变更的目标、影响、风险、验证命令、执行证据和裁决绑定到同一个精确的软件状态上。
@@ -192,7 +192,7 @@ Future enforcement consumers
 
 本地开发版的安装验收、升级、故障回退与卸载规则见 [Plugin distribution operations](docs/distribution.md#local-plugin-operations)。这些管理动作本身都不能改变任何项目的 ECP mode；回退必须以新的 cachebuster 重新构建并验证，不能手工执行旧 cache 中的二进制。
 
-真实项目试点前，只对一个冻结的 exact installed Plugin/Core candidate 执行 12 个单次、串行、fail-fast 的 fresh-task host canary。每项使用独立 disposable Workspace 与 dedicated authority；产品 `FAIL` 立即终止该 candidate，宿主或 fixture 问题记为保留的 `INVALID`，不能伪装成产品结果。可丢弃运行面与持久证据分离：manifest、ledger、identity、观测及所有失败/重试必须保存在 ECP 仓库和临时目录之外的 durable results root。完整操作合同见 [Codex Plugin host-routing evaluation](docs/plugin-host-evaluation.md)。
+真实项目试点前，只对一个冻结的 exact Codex Desktop build、single installed Plugin tree/locator 与 bundled Core candidate 执行 16 个单次、串行、fail-fast 的 fresh-task host canary；四条自然语言间接路由与直接路由同为必过项。每项使用独立 disposable Workspace 与 dedicated authority，并绑定 canonical prompt、fixture metadata、Workspace/cwd、resolved Skill locator、Desktop task ledger 和 rollout readback。产品 `FAIL` 立即终止该 candidate；`INVALID` 只接受闭集基础设施原因，不能掩盖已观察到的产品错误。可丢弃运行面与持久证据分离：campaign、ledger、fixture metadata、exact identity、观测及所有失败/重试必须保存在 ECP 仓库和临时目录之外的 durable results root。完整操作合同见 [Codex Plugin host-routing evaluation](docs/plugin-host-evaluation.md)。
 
 Plugin 源码发生变化后，发布者运行：
 

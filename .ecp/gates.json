@@ -113,14 +113,14 @@
     },
     {
       "id": "go-test-project-pack",
-      "description": "Run Project Pack, Skill, Plugin, and packaged-runtime contract tests when distribution or documentation changes",
+      "description": "Run Project Pack, Skill, Plugin, READY-boundary, pilot, and packaged-runtime contract tests when distribution or documentation changes",
       "tier": "affected",
       "command": [
         "go",
         "test",
         "./internal/ecp",
         "-run",
-        "TestRepositoryProjectPack|TestBundled|TestPlugin|TestVerificationMatrix|TestCanonical"
+        "TestRepositoryProjectPack|TestBundled|TestPlugin|TestVerificationMatrix|TestCanonical|TestDualTrack|TestEnablementStopsAtReady"
       ],
       "working_directory": ".",
       "timeout_seconds": 180,

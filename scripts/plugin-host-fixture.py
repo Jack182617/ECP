@@ -32,6 +32,15 @@ PROFILES = {
     "enabled-active",
     "enabled-blocked",
 }
+CAMPAIGN_KEYS = {
+    "schema_version", "campaign_id", "protocol", "desktop_build",
+    "desktop_inventory_sha256", "installed_plugin_version", "core_identity",
+    "installed_plugin_root_sha256", "installed_launcher_locator_sha256",
+    "installed_plugin_tree_sha256", "runtime_manifest_sha256", "skill_locator_sha256",
+    "case_inventory_sha256", "result_schema_sha256", "validator_sha256",
+    "fixture_builder_sha256", "default_authority_sha256",
+    "qualification_case_count",
+}
 
 
 class FixtureError(RuntimeError):
@@ -40,6 +49,43 @@ class FixtureError(RuntimeError):
 
 def sha256_bytes(value: bytes) -> str:
     return "sha256:" + hashlib.sha256(value).hexdigest()
+
+
+def sha256_file(path: Path) -> str:
+    return sha256_bytes(path.read_bytes())
+
+
+def path_digest(path: Path) -> str:
+    return sha256_bytes(str(path.resolve(strict=False)).encode())
+
+
+def canonical_bytes(value: Any) -> bytes:
+    return (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
+def package_tree_digest(root: Path) -> str:
+    """Hash a real installed package tree and reject links or special entries."""
+    if root.is_symlink():
+        raise FixtureError("installed Plugin package root must not be a symlink")
+    root = root.resolve(strict=True)
+    if not root.is_dir():
+        raise FixtureError("installed Plugin package root must be a real directory")
+    digest = hashlib.sha256()
+    digest.update(b"directory\0")
+    for path in sorted(root.rglob("*"), key=lambda item: item.relative_to(root).as_posix()):
+        relative = path.relative_to(root).as_posix().encode("utf-8")
+        info = path.lstat()
+        digest.update(relative + b"\0" + oct(stat.S_IMODE(info.st_mode)).encode() + b"\0")
+        if stat.S_ISREG(info.st_mode):
+            digest.update(b"file\0")
+            with path.open("rb") as handle:
+                while chunk := handle.read(1024 * 1024):
+                    digest.update(chunk)
+        elif stat.S_ISDIR(info.st_mode):
+            digest.update(b"directory\0")
+        else:
+            raise FixtureError(f"installed Plugin package contains a link or special entry: {path}")
+    return "sha256:" + digest.hexdigest()
 
 
 def tree_digest(root: Path) -> str:
@@ -72,8 +118,8 @@ def tree_digest(root: Path) -> str:
 def load_cases() -> dict[str, dict[str, Any]]:
     with CASES_PATH.open(encoding="utf-8") as handle:
         inventory = json.load(handle)
-    if inventory.get("schema_version") != 3:
-        raise FixtureError("fixture builder requires case inventory schema_version 3")
+    if inventory.get("schema_version") != 4:
+        raise FixtureError("fixture builder requires case inventory schema_version 4")
     cases = {case["id"]: case for case in inventory["cases"]}
     if len(cases) != len(inventory["cases"]):
         raise FixtureError("case IDs are not unique")
@@ -190,14 +236,19 @@ def toml_string(value: str) -> str:
 
 
 def installed_plugin_version(launcher: Path) -> str:
-    launcher = launcher.resolve(strict=True)
+    raw_launcher = launcher
+    if raw_launcher.is_symlink():
+        raise FixtureError("qualification launcher must not be a symlink")
+    launcher = raw_launcher.resolve(strict=True)
+    plugin_root = launcher.parent.parent
+    cache_root = (Path.home() / ".codex" / "plugins" / "cache").resolve(strict=False)
     try:
-        launcher.relative_to(REPO_ROOT)
-    except ValueError:
-        pass
-    else:
-        raise FixtureError("qualification preflight must use an installed Plugin cache launcher, not repository source")
-    manifest_path = launcher.parent.parent / ".codex-plugin" / "plugin.json"
+        plugin_root.relative_to(cache_root)
+    except ValueError as error:
+        raise FixtureError("qualification preflight must use the Desktop installed Plugin cache launcher") from error
+    if launcher != plugin_root / "scripts" / "ecp":
+        raise FixtureError("qualification launcher must be the installed package shared launcher")
+    manifest_path = plugin_root / ".codex-plugin" / "plugin.json"
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         version = manifest["version"]
@@ -206,6 +257,61 @@ def installed_plugin_version(launcher: Path) -> str:
     if not isinstance(version, str) or not version.strip():
         raise FixtureError("installed Plugin manifest has no usable version")
     return version
+
+
+def load_campaign(path: Path) -> dict[str, Any]:
+    if path.is_symlink() or not path.is_file():
+        raise FixtureError("--campaign must name a real frozen campaign manifest")
+    try:
+        campaign = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise FixtureError("could not read frozen campaign manifest") from error
+    if not isinstance(campaign, dict) or set(campaign) != CAMPAIGN_KEYS:
+        raise FixtureError("frozen campaign manifest has missing or unknown fields")
+    if campaign.get("schema_version") != 3 or campaign.get("protocol") != "serial-fail-fast-exact-candidate-v2":
+        raise FixtureError("frozen campaign protocol is unsupported")
+    if campaign.get("qualification_case_count") != 16:
+        raise FixtureError("frozen campaign does not bind all 16 qualification cases")
+    if campaign.get("case_inventory_sha256") != sha256_file(CASES_PATH):
+        raise FixtureError("frozen campaign case inventory differs from the current canonical inventory")
+    if campaign.get("fixture_builder_sha256") != sha256_file(Path(__file__).resolve()):
+        raise FixtureError("frozen campaign fixture builder differs from this exact builder")
+    if campaign.get("default_authority_sha256") != tree_digest(DEFAULT_AUTHORITY):
+        raise FixtureError("default authority changed after the campaign was frozen")
+    return campaign
+
+
+def validate_campaign_candidate(
+    campaign: dict[str, Any], launcher: Path, core_identity: str | None = None
+) -> Path:
+    version = installed_plugin_version(launcher)
+    launcher = launcher.resolve(strict=True)
+    plugin_root = launcher.parent.parent
+    exact = {
+        "installed_plugin_version": version,
+        "installed_plugin_root_sha256": path_digest(plugin_root),
+        "installed_launcher_locator_sha256": path_digest(launcher),
+        "installed_plugin_tree_sha256": package_tree_digest(plugin_root),
+        "runtime_manifest_sha256": sha256_file(plugin_root / "runtime" / "manifest.json"),
+    }
+    if core_identity is not None:
+        exact["core_identity"] = core_identity
+    for field, observed in exact.items():
+        if campaign.get(field) != observed:
+            raise FixtureError(f"installed candidate {field} differs from the frozen campaign")
+    return plugin_root
+
+
+def validate_metadata_candidate(metadata: dict[str, Any], launcher: Path, core_identity: str) -> None:
+    campaign_view = {
+        "installed_plugin_version": metadata["installed_plugin_version"],
+        "installed_plugin_root_sha256": metadata["installed_plugin_root_sha256"],
+        "installed_launcher_locator_sha256": metadata["installed_launcher_locator_sha256"],
+        "installed_plugin_tree_sha256": metadata["installed_plugin_tree_sha256"],
+        "runtime_manifest_sha256": metadata["runtime_manifest_sha256"],
+        "core_identity": metadata["core_identity"],
+    }
+    validate_campaign_candidate(campaign_view, launcher, core_identity)
 
 
 def invoke_launcher(launcher: Path, authority: Path, workspace: Path, *args: str) -> dict[str, Any]:
@@ -383,9 +489,16 @@ def prepare_profile(profile: str, workspace: Path, authority: Path, launcher: Pa
         write_json(policy_path, policy)
 
 
-def build_one(batch_root: Path, case: dict[str, Any], run_number: int, launcher: Path) -> Path:
+def build_one(
+    batch_root: Path,
+    case: dict[str, Any],
+    run_number: int,
+    launcher: Path,
+    campaign: dict[str, Any],
+) -> Path:
     if run_number < 1:
         raise FixtureError("run number must be positive")
+    plugin_root = validate_campaign_candidate(campaign, launcher)
     fixture_id = f"{case['id']}-run-{run_number:02d}"
     run_root = batch_root / "runs" / fixture_id
     workspace = run_root / "workspace"
@@ -451,8 +564,12 @@ def build_one(batch_root: Path, case: dict[str, Any], run_number: int, launcher:
         raise FixtureError("default authority changed while a dedicated-state preflight ran")
 
     prepare_profile(profile, workspace, authority, launcher)
+    core_identity = version["result"]["core_identity"]
+    validate_campaign_candidate(campaign, launcher, core_identity)
+    prompt_sequence = case.get("prompt_sequence", [case["prompt"]])
     metadata = {
-        "schema_version": 1,
+        "schema_version": 2,
+        "campaign_id": campaign["campaign_id"],
         "fixture_id": fixture_id,
         "case_id": case["id"],
         "run_number": run_number,
@@ -461,17 +578,27 @@ def build_one(batch_root: Path, case: dict[str, Any], run_number: int, launcher:
         "qualification_order": case.get("qualification_order"),
         "fixture_profile": profile,
         "workspace": str(workspace),
+        "workspace_path_sha256": path_digest(workspace),
         "dedicated_state_dir": str(authority),
         "expected_state_dir_path_sha256": sha256_bytes(str(authority).encode()),
         "project_config": str(codex_dir / "config.toml"),
         "expected_authority_id_sha256": sha256_bytes(status["authority_id"].encode()),
         "installed_plugin_version": plugin_version,
+        "desktop_build": campaign["desktop_build"],
+        "installed_plugin_root_sha256": path_digest(plugin_root),
+        "installed_launcher_locator_sha256": path_digest(launcher),
+        "installed_plugin_tree_sha256": package_tree_digest(plugin_root),
+        "runtime_manifest_sha256": sha256_file(plugin_root / "runtime" / "manifest.json"),
+        "skill_locator_sha256": campaign["skill_locator_sha256"],
+        "case_inventory_sha256": campaign["case_inventory_sha256"],
+        "fixture_builder_sha256": campaign["fixture_builder_sha256"],
         "core_version": version["result"]["core_version"],
-        "core_identity": version["result"]["core_identity"],
+        "core_identity": core_identity,
         "default_authority_before_sha256": default_digest,
         "preparation": "installed-public-cli",
         "prep_state": "ready",
-        "prompt_sequence": case.get("prompt_sequence", [case["prompt"]]),
+        "prompt_sequence": prompt_sequence,
+        "prompt_sha256": sha256_bytes(canonical_bytes(prompt_sequence)),
     }
     metadata["prepared_authority_tree_sha256"] = tree_digest(authority)
     write_json(run_root / "fixture.json", metadata)
@@ -494,10 +621,13 @@ def verify_prep(workspace_value: str, launcher: Path) -> None:
     if (workspace / ".codex" / "config.toml").read_text(encoding="utf-8") != expected_config:
         raise FixtureError("project-scoped Codex state-dir contract drifted")
     version = invoke_launcher(launcher, authority, workspace, "version")["result"]
-    if installed_plugin_version(launcher) != metadata["installed_plugin_version"]:
-        raise FixtureError("installed Plugin version changed after fixture creation")
-    if version["core_identity"] != metadata["core_identity"]:
-        raise FixtureError("installed Core identity changed after fixture creation")
+    validate_metadata_candidate(metadata, launcher, version["core_identity"])
+    if path_digest(workspace) != metadata["workspace_path_sha256"]:
+        raise FixtureError("fixture Workspace locator changed after fixture creation")
+    if sha256_file(CASES_PATH) != metadata["case_inventory_sha256"]:
+        raise FixtureError("canonical case inventory changed after fixture creation")
+    if sha256_file(Path(__file__).resolve()) != metadata["fixture_builder_sha256"]:
+        raise FixtureError("fixture builder changed after fixture creation")
     status = invoke_launcher(launcher, authority, workspace, "project", "status", "--root", str(workspace))["result"]
     authority_hash = sha256_bytes(status["authority_id"].encode())
     if authority_hash != metadata["expected_authority_id_sha256"]:
@@ -589,6 +719,8 @@ def public_snapshot(workspace_value: str, launcher: Path) -> dict[str, Any]:
     workspace = Path(workspace_value).resolve(strict=True)
     metadata = json.loads((workspace.parent / "fixture.json").read_text(encoding="utf-8"))
     authority = Path(metadata["dedicated_state_dir"])
+    version = invoke_launcher(launcher, authority, workspace, "version")["result"]
+    validate_metadata_candidate(metadata, launcher, version["core_identity"])
     status = invoke_launcher(launcher, authority, workspace, "project", "status", "--root", str(workspace))["result"]
     changes: list[dict[str, Any]] = []
     gate_runs: list[dict[str, Any]] = []
@@ -629,6 +761,8 @@ def environment_probe(workspace_value: str, launcher: Path) -> dict[str, Any]:
     authority = Path(metadata["dedicated_state_dir"])
     status = invoke_launcher(launcher, authority, workspace, "project", "status", "--root", str(workspace))["result"]
     version = invoke_launcher(launcher, authority, workspace, "version")["result"]
+    validate_metadata_candidate(metadata, launcher, version["core_identity"])
+    metadata_digest = sha256_file(workspace.parent / "fixture.json")
     return {
         "fixture_state_dir_path_sha256": metadata["expected_state_dir_path_sha256"],
         "operator_state_dir_path_sha256": sha256_bytes(str(authority).encode()),
@@ -639,12 +773,20 @@ def environment_probe(workspace_value: str, launcher: Path) -> dict[str, Any]:
         "fixture_core_identity_sha256": sha256_bytes(metadata["core_identity"].encode()),
         "operator_core_identity_sha256": sha256_bytes(version["core_identity"].encode()),
         "default_authority_sha256": tree_digest(DEFAULT_AUTHORITY),
+        "campaign_id": metadata["campaign_id"],
+        "desktop_build": metadata["desktop_build"],
+        "installed_plugin_tree_sha256": metadata["installed_plugin_tree_sha256"],
+        "installed_launcher_locator_sha256": metadata["installed_launcher_locator_sha256"],
+        "skill_locator_sha256": metadata["skill_locator_sha256"],
+        "prompt_sha256": metadata["prompt_sha256"],
+        "fixture_metadata_sha256": metadata_digest,
+        "workspace_path_sha256": metadata["workspace_path_sha256"],
         "installed_plugin_version": installed_plugin_version(launcher),
         "core_identity": version["core_identity"],
     }
 
 
-def verify_seed(launcher: Path) -> None:
+def verify_seed(launcher: Path, campaign: dict[str, Any]) -> None:
     cases = load_cases()
     representative: dict[str, dict[str, Any]] = {}
     for case in cases.values():
@@ -654,7 +796,7 @@ def verify_seed(launcher: Path) -> None:
     with tempfile.TemporaryDirectory(prefix="ecp-plugin-host-seed-") as temporary:
         batch_root = Path(temporary).resolve()
         for profile in sorted(PROFILES):
-            build_one(batch_root, representative[profile], 1, launcher)
+            build_one(batch_root, representative[profile], 1, launcher, campaign)
     print("validated all five generated fixture profiles with the installed launcher")
 
 
@@ -666,6 +808,7 @@ def parse_args() -> argparse.Namespace:
     create.add_argument("--case-id", required=True)
     create.add_argument("--run-number", required=True, type=int)
     create.add_argument("--launcher", required=True)
+    create.add_argument("--campaign", required=True)
     prep = subparsers.add_parser("verify-prep", help="verify and record one fixture's public prepared state")
     prep.add_argument("--workspace", required=True)
     prep.add_argument("--launcher", required=True)
@@ -677,6 +820,7 @@ def parse_args() -> argparse.Namespace:
     environment.add_argument("--launcher", required=True)
     verify = subparsers.add_parser("verify-seed", help="Core-load/status preflight all five generated profiles")
     verify.add_argument("--launcher", required=True)
+    verify.add_argument("--campaign", required=True)
     return parser.parse_args()
 
 
@@ -692,6 +836,7 @@ def main() -> int:
                 cases[args.case_id],
                 args.run_number,
                 Path(args.launcher),
+                load_campaign(Path(args.campaign)),
             )
             print(metadata)
         elif args.command == "verify-prep":
@@ -701,7 +846,7 @@ def main() -> int:
         elif args.command == "environment-probe":
             print(json.dumps(environment_probe(args.workspace, Path(args.launcher)), ensure_ascii=False, indent=2, sort_keys=True))
         elif args.command == "verify-seed":
-            verify_seed(Path(args.launcher))
+            verify_seed(Path(args.launcher), load_campaign(Path(args.campaign)))
         return 0
     except (FixtureError, OSError, KeyError, ValueError) as error:
         print(f"fixture error: {error}", file=sys.stderr)

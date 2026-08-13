@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,12 @@ import (
 
 	"ecp/internal/ecp"
 )
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) {
+	return 0, errors.New("injected writer failure")
+}
 
 func TestVersionUsesStableEnvelope(t *testing.T) {
 	var stdout, stderr bytes.Buffer
@@ -885,5 +892,21 @@ func TestUsageErrorIsJSONAndExitTwo(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), `"code": "CONFIG_DIGEST_REQUIRED"`) {
 		t.Fatalf("missing policy digest did not return a stable usage error: %s", stderr.String())
+	}
+}
+
+func TestErrorEnvelopeFallsBackToStdoutWhenStderrFails(t *testing.T) {
+	var stdout bytes.Buffer
+	application := CLI{Stdout: &stdout, Stderr: failingWriter{}}
+	if code := application.Run(context.Background(), []string{"unknown"}); code != 1 {
+		t.Fatalf("stderr output failure exit=%d", code)
+	}
+	var result map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("stderr failure lost the fallback JSON envelope: %v\n%s", err, stdout.String())
+	}
+	errorObject, _ := result["error"].(map[string]any)
+	if result["ok"] != false || errorObject["code"] != "ERROR_OUTPUT_FAILED" || !strings.Contains(errorObject["message"].(string), "USAGE") {
+		t.Fatalf("unexpected stderr-failure fallback envelope: %#v", result)
 	}
 }

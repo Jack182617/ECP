@@ -21,6 +21,9 @@ type Service struct {
 	Git          Git
 	Runner       Runner
 	authorityID  string
+	// gateRunFinalizer is a test seam for the post-start durability boundary.
+	// Production Services leave it nil and always use finalizeGateRun.
+	gateRunFinalizer func(context.Context, Service, *Store, *Projection, string, GateRunState, string, string) error
 }
 
 type StartChangeInput struct {
@@ -167,15 +170,30 @@ func (s Service) ProjectStatus(ctx context.Context, start string) (ProjectStatus
 	}
 	projection, err := store.Load(ctx)
 	if err != nil {
-		return ProjectStatus{}, err
-	}
-	if projection.AcceptedTruth != nil {
-		if _, err := store.ReadTruthFiles(projection.AcceptedTruth.Files); err != nil {
+		if !isErrorCodeValue(err, "STATE_NOT_REGISTERED") {
 			return ProjectStatus{}, err
 		}
+		status.Diagnostics = append(status.Diagnostics, VerdictReason{Code: "REGISTRATION_BOOTSTRAP_INCOMPLETE", Message: "the immutable Workspace binding is durable, but its initial authority event batch is not yet committed; retry the exact registration acknowledgement"})
+		if !status.ConfigPresent {
+			status.ConfigState = ProjectConfigMissing
+			status.TruthState = ProjectConfigMissing
+			return status, nil
+		}
+		if configErr != nil {
+			status.ConfigState = ProjectConfigInvalid
+			status.TruthState = ProjectConfigInvalid
+			status.Diagnostics = append(status.Diagnostics, diagnosticFromError(configErr))
+			return status, nil
+		}
+		status.ConfigState = ProjectConfigUnregistered
+		status.TruthState = ProjectConfigUnregistered
+		return status, nil
 	}
-	if projection.Registration == nil || projection.Registration.AuthorityID != service.authorityID || projection.Registration.ProjectID != binding.ProjectID {
-		return ProjectStatus{}, newError(KindIntegrity, "AUTHORITY_REGISTRATION_MISMATCH", "authority history belongs to a different project or authority-state location", nil)
+	if err := validateBindingRegistrationProjection(projection, binding); err != nil {
+		return ProjectStatus{}, err
+	}
+	if _, err := store.ReadTruthFiles(projection.AcceptedTruth.Files); err != nil {
+		return ProjectStatus{}, err
 	}
 	status.Registered = true
 	status.ProjectID = binding.ProjectID
@@ -234,7 +252,7 @@ func (s Service) ProjectStatus(ctx context.Context, start string) (ProjectStatus
 		return status, nil
 	}
 	if config.Truth.Maturity == TruthMaturitySeed {
-		status.Diagnostics = append(status.Diagnostics, VerdictReason{Code: "PROJECT_TRUTH_SEED", Message: "Project Truth is still a bootstrap seed; establish purpose, capabilities, invariants, and components in a bounded onboarding Change"})
+		status.Diagnostics = append(status.Diagnostics, VerdictReason{Code: "PROJECT_TRUTH_SEED", Message: "Project Truth is still a bootstrap seed; enablement ends at READY and truth maturation requires a separate explicitly authorized Change"})
 	}
 	required := requiredGates(config.Gates, config.Policy.DefaultRisk)
 	if len(required) == 0 {
@@ -464,7 +482,14 @@ func (s Service) InitProject(ctx context.Context, start, name string) (ProjectCo
 	}
 	binding, bindingErr := loadWorkspaceBinding(service.StateDir, workspaceID)
 	if bindingErr != nil && !isErrorCodeValue(bindingErr, "WORKSPACE_NOT_REGISTERED") {
-		return ProjectContext{}, bindingErr
+		recoverable, recoveryErr := recoverableWorkspaceBindingRemnant(service.StateDir, workspaceID)
+		if recoveryErr != nil || !recoverable {
+			if recoveryErr != nil {
+				return ProjectContext{}, recoveryErr
+			}
+			return ProjectContext{}, bindingErr
+		}
+		bindingErr = newError(KindNotFound, "WORKSPACE_NOT_REGISTERED", "this Git Workspace has only a recoverable truncated binding remnant", nil)
 	}
 	if bindingErr == nil && binding.AuthorityID != service.authorityID {
 		return ProjectContext{}, newError(KindIntegrity, "AUTHORITY_BINDING_MISMATCH", "Workspace binding belongs to a different authority-state location", nil)
@@ -570,12 +595,30 @@ func (s Service) InspectProject(ctx context.Context, start string) (ProjectInspe
 		if binding.AuthorityID != service.authorityID {
 			return ProjectInspection{}, newError(KindIntegrity, "AUTHORITY_BINDING_MISMATCH", "Workspace binding belongs to a different authority-state location", nil)
 		}
-		inspection.Registered = true
 		inspection.BoundProjectID = binding.ProjectID
 		inspection.InitialConfigDigest = binding.InitialConfigDigest
 		inspection.InitialTruthDigest = binding.InitialTruthDigest
+		store, storeErr := NewStore(service.StateDir, binding.ProjectID, workspaceID, 5*time.Second)
+		if storeErr != nil {
+			return ProjectInspection{}, storeErr
+		}
+		projection, loadErr := store.Load(ctx)
+		if loadErr == nil {
+			if projectionErr := validateBindingRegistrationProjection(projection, binding); projectionErr != nil {
+				return ProjectInspection{}, projectionErr
+			}
+			inspection.Registered = true
+		} else if !isErrorCodeValue(loadErr, "STATE_NOT_REGISTERED") {
+			return ProjectInspection{}, loadErr
+		}
 	} else if !isErrorCodeValue(err, "WORKSPACE_NOT_REGISTERED") {
-		return ProjectInspection{}, err
+		recoverable, recoveryErr := recoverableWorkspaceBindingRemnant(service.StateDir, workspaceID)
+		if recoveryErr != nil || !recoverable {
+			if recoveryErr != nil {
+				return ProjectInspection{}, recoveryErr
+			}
+			return ProjectInspection{}, err
+		}
 	}
 	return inspection, nil
 }
@@ -639,10 +682,39 @@ func (s Service) RegisterProject(ctx context.Context, start, expectedAuthorityID
 	if config.TruthDigest != expectedTruthDigest {
 		return ProjectContext{}, newError(KindConflict, "TRUTH_DIGEST_MISMATCH", "the current candidate Project Truth no longer matches --truth-digest", nil)
 	}
-	if _, err := loadWorkspaceBinding(service.StateDir, workspaceID); err == nil {
-		return ProjectContext{}, newError(KindConflict, "WORKSPACE_ALREADY_REGISTERED", "this Workspace is already registered; use project status", nil)
-	} else if !isErrorCodeValue(err, "WORKSPACE_NOT_REGISTERED") {
-		return ProjectContext{}, err
+	if existing, bindingErr := loadWorkspaceBinding(service.StateDir, workspaceID); bindingErr == nil {
+		store, storeErr := NewStore(service.StateDir, existing.ProjectID, workspaceID, 5*time.Second)
+		if storeErr != nil {
+			return ProjectContext{}, storeErr
+		}
+		projection, loadErr := store.Load(ctx)
+		if loadErr == nil {
+			if projectionErr := validateBindingRegistrationProjection(projection, existing); projectionErr != nil {
+				return ProjectContext{}, projectionErr
+			}
+			if workspaceBindingMatchesRegistration(existing, service, config, workspaceID, actor, reason) {
+				return service.Context(ctx, root)
+			}
+			return ProjectContext{}, newError(KindConflict, "WORKSPACE_ALREADY_REGISTERED", "this Workspace is already registered; use project status", nil)
+		}
+		if !isErrorCodeValue(loadErr, "STATE_NOT_REGISTERED") {
+			return ProjectContext{}, loadErr
+		}
+		if err := validateIncompleteRegistrationRetry(existing, service, config, workspaceID, actor, reason); err != nil {
+			return ProjectContext{}, err
+		}
+		if err := service.bootstrapBoundWorkspace(ctx, config, existing); err != nil {
+			return ProjectContext{}, err
+		}
+		return service.Context(ctx, root)
+	} else if !isErrorCodeValue(bindingErr, "WORKSPACE_NOT_REGISTERED") {
+		recoverable, recoveryErr := recoverableWorkspaceBindingRemnant(service.StateDir, workspaceID)
+		if recoveryErr != nil || !recoverable {
+			if recoveryErr != nil {
+				return ProjectContext{}, recoveryErr
+			}
+			return ProjectContext{}, bindingErr
+		}
 	}
 	binding := WorkspaceBinding{
 		SchemaVersion:       SchemaVersion,
@@ -658,12 +730,61 @@ func (s Service) RegisterProject(ctx context.Context, start, expectedAuthorityID
 		BoundAt:             service.Clock().UTC(),
 	}
 	if err := createWorkspaceBinding(ctx, service.StateDir, binding); err != nil {
-		return ProjectContext{}, err
+		if !isErrorCodeValue(err, "WORKSPACE_ALREADY_REGISTERED") {
+			return ProjectContext{}, err
+		}
+		installed, loadErr := loadWorkspaceBinding(service.StateDir, workspaceID)
+		if loadErr != nil {
+			return ProjectContext{}, err
+		}
+		if retryErr := validateIncompleteRegistrationRetry(installed, service, config, workspaceID, actor, reason); retryErr != nil {
+			return ProjectContext{}, retryErr
+		}
+		binding = installed
 	}
 	if err := service.bootstrapBoundWorkspace(ctx, config, binding); err != nil {
 		return ProjectContext{}, err
 	}
 	return service.Context(ctx, root)
+}
+
+func workspaceBindingMatchesRegistration(binding WorkspaceBinding, service Service, config ConfigBundle, workspaceID, actor, reason string) bool {
+	return binding.SchemaVersion == SchemaVersion &&
+		binding.AuthorityID == service.authorityID &&
+		binding.WorkspaceID == workspaceID &&
+		binding.ProjectID == config.Project.ProjectID &&
+		binding.InitialConfigDigest == config.Digest &&
+		binding.InitialTruthDigest == config.TruthDigest &&
+		binding.Actor == actor &&
+		binding.Reason == reason &&
+		binding.Trust == "local-registration-acknowledgement" &&
+		binding.CoreIdentity == service.CoreIdentity
+}
+
+func validateIncompleteRegistrationRetry(binding WorkspaceBinding, service Service, config ConfigBundle, workspaceID, actor, reason string) error {
+	if binding.AuthorityID != service.authorityID || binding.WorkspaceID != workspaceID {
+		return newError(KindIntegrity, "AUTHORITY_BINDING_MISMATCH", "Workspace binding belongs to a different Workspace or authority-state location", nil)
+	}
+	if binding.ProjectID != config.Project.ProjectID || binding.InitialConfigDigest != config.Digest || binding.InitialTruthDigest != config.TruthDigest {
+		return newError(KindBlocked, "INCOMPLETE_BOOTSTRAP_CONFIG_DRIFT", "Workspace binding exists but the config changed before registration completed; restore the bound initial project and digests", nil)
+	}
+	if binding.Actor != actor || binding.Reason != reason || binding.Trust != "local-registration-acknowledgement" {
+		return newError(KindBlocked, "INCOMPLETE_BOOTSTRAP_ACKNOWLEDGEMENT_DRIFT", "Workspace binding exists but the registration acknowledgement changed before authority bootstrap completed; retry the exact acknowledgement", nil)
+	}
+	if binding.CoreIdentity != service.CoreIdentity {
+		return newError(KindBlocked, "INCOMPLETE_BOOTSTRAP_CORE_DRIFT", "Workspace binding exists but the Core identity changed before authority bootstrap completed; retry with the Core that installed the binding", nil)
+	}
+	return nil
+}
+
+func validateBindingRegistrationProjection(projection Projection, binding WorkspaceBinding) error {
+	if projection.Registration == nil || projection.Registration.AuthorityID != binding.AuthorityID || projection.Registration.ProjectID != binding.ProjectID || projection.Registration.WorkspaceID != binding.WorkspaceID {
+		return newError(KindIntegrity, "AUTHORITY_REGISTRATION_MISMATCH", "authority history belongs to a different project, Workspace, or authority-state location", nil)
+	}
+	if projection.AcceptedConfig == nil || projection.AcceptedTruth == nil {
+		return newError(KindIntegrity, "AUTHORITY_REGISTRATION_INCOMPLETE", "authority history has a registration without its required config and Project Truth acceptance batch", nil)
+	}
+	return nil
 }
 
 func (s Service) bootstrapBoundWorkspace(ctx context.Context, config ConfigBundle, binding WorkspaceBinding) error {
@@ -672,11 +793,17 @@ func (s Service) bootstrapBoundWorkspace(ctx context.Context, config ConfigBundl
 		return err
 	}
 	if store.Exists() {
-		_, err := store.Load(ctx)
-		return err
+		projection, loadErr := store.Load(ctx)
+		if loadErr != nil {
+			return loadErr
+		}
+		return validateBindingRegistrationProjection(projection, binding)
 	}
 	if binding.AuthorityID != s.authorityID || binding.ProjectID != config.Project.ProjectID || binding.InitialConfigDigest != config.Digest || binding.InitialTruthDigest != config.TruthDigest {
 		return newError(KindBlocked, "INCOMPLETE_BOOTSTRAP_CONFIG_DRIFT", "Workspace binding exists but the config changed before registration completed; restore the bound initial digest", nil)
+	}
+	if binding.CoreIdentity != s.CoreIdentity {
+		return newError(KindBlocked, "INCOMPLETE_BOOTSTRAP_CORE_DRIFT", "Workspace binding exists but the Core identity changed before authority bootstrap completed", nil)
 	}
 	registration := ProjectRegistration{
 		SchemaVersion: SchemaVersion,
@@ -718,6 +845,18 @@ func (s Service) bootstrapBoundWorkspace(ctx context.Context, config ConfigBundl
 		PendingEvent{Type: "config_accepted", Origin: "cli", Payload: acceptance},
 		PendingEvent{Type: "project_truth_accepted", Origin: "cli", Payload: truthAcceptance},
 	)
+	if err == nil {
+		return nil
+	}
+	// The initial event batch may have committed even when the caller observed a
+	// terminal I/O or racing-writer error. Read back the authority state before
+	// deciding that an exact registration retry failed.
+	projection, loadErr := store.Load(ctx)
+	if loadErr == nil {
+		if projectionErr := validateBindingRegistrationProjection(projection, binding); projectionErr == nil {
+			return nil
+		}
+	}
 	return err
 }
 
@@ -1652,7 +1791,7 @@ func (s Service) Context(ctx context.Context, start string) (ProjectContext, err
 			contextResult.Assurance = "UNASSESSED"
 			if effective.Truth.Maturity == TruthMaturitySeed {
 				contextResult.Diagnostics = append(contextResult.Diagnostics, VerdictReason{Code: "PROJECT_TRUTH_SEED", Message: "Project Truth is still a bootstrap seed"})
-				contextResult.NextActions = append(contextResult.NextActions, "start one bounded onboarding Change to establish Project Truth from repository evidence and product intent")
+				contextResult.NextActions = append(contextResult.NextActions, "report the seed Truth and keep enablement at READY; start onboarding only after a separate explicit user request through ecp-change")
 			} else {
 				contextResult.NextActions = append(contextResult.NextActions, "start one bounded Change before modifying managed artifacts")
 			}
@@ -1852,11 +1991,16 @@ func (s Service) RunGates(ctx context.Context, start, expectedChangeID, expected
 		state, outcomeCode, reason := terminalGateRunOutcome(returnErr)
 		finalizeContext, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		terminalErr := finalizeGateRun(finalizeContext, service, workspace.Store, &projection, runID, state, outcomeCode, reason)
+		terminalErr := service.finishGateRun(finalizeContext, workspace.Store, &projection, runID, state, outcomeCode, reason)
 		if terminalErr == nil {
 			result.State = state
-		} else if returnErr == nil {
-			returnErr = terminalErr
+		} else {
+			result.State = GateRunInProgress
+			if returnErr == nil {
+				returnErr = terminalErr
+			} else {
+				returnErr = combinedGateRunFinalizationError(returnErr, terminalErr)
+			}
 		}
 	}()
 	for _, gate := range gates {
@@ -1988,6 +2132,34 @@ func finalizeGateRun(ctx context.Context, service Service, store *Store, project
 	}
 	*projection = updated
 	return nil
+}
+
+func (s Service) finishGateRun(ctx context.Context, store *Store, projection *Projection, runID string, state GateRunState, outcomeCode, reason string) error {
+	if s.gateRunFinalizer != nil {
+		return s.gateRunFinalizer(ctx, s, store, projection, runID, state, outcomeCode, reason)
+	}
+	return finalizeGateRun(ctx, s, store, projection, runID, state, outcomeCode, reason)
+}
+
+func combinedGateRunFinalizationError(primary, terminal error) error {
+	return newError(
+		KindIntegrity,
+		"GATE_RUN_TERMINAL_APPEND_FAILED",
+		fmt.Sprintf(
+			"Gate sequence failed with %s, then its terminal append failed with %s; the durable GateRun remains IN_PROGRESS and requires interruption recovery",
+			errorCodeOrUnexpected(primary),
+			errorCodeOrUnexpected(terminal),
+		),
+		errors.Join(primary, terminal),
+	)
+}
+
+func errorCodeOrUnexpected(err error) string {
+	var typed *ECPError
+	if errors.As(err, &typed) && strings.TrimSpace(typed.Code) != "" {
+		return typed.Code
+	}
+	return "UNEXPECTED_ERROR"
 }
 
 func buildGateRunTerminal(service Service, active *GateRun, state GateRunState, outcomeCode, reason string) GateRunTerminal {
@@ -2668,13 +2840,11 @@ func (s Service) loadAuthority(ctx context.Context, start string) (Service, load
 	if err != nil {
 		return Service{}, loadedWorkspace{}, err
 	}
-	if projection.AcceptedTruth != nil {
-		if _, err := workspace.Store.ReadTruthFiles(projection.AcceptedTruth.Files); err != nil {
-			return Service{}, loadedWorkspace{}, err
-		}
+	if err := validateBindingRegistrationProjection(projection, workspace.Binding); err != nil {
+		return Service{}, loadedWorkspace{}, err
 	}
-	if projection.Registration == nil || projection.Registration.AuthorityID != service.authorityID {
-		return Service{}, loadedWorkspace{}, newError(KindIntegrity, "AUTHORITY_REGISTRATION_MISMATCH", "authority history belongs to a different authority-state location", nil)
+	if _, err := workspace.Store.ReadTruthFiles(projection.AcceptedTruth.Files); err != nil {
+		return Service{}, loadedWorkspace{}, err
 	}
 	workspace.Projection = projection
 	return service, workspace, nil

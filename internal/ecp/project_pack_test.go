@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -147,19 +148,20 @@ func TestDualTrackPilotProtocolAndReadinessClaimsStayAligned(t *testing.T) {
 	}
 	files := map[string][]string{
 		filepath.Join(root, "docs", "real-project-pilot.md"): {
-			"一个真正的新项目和一个已经持续开发的旧项目",
-			"每个项目不少于八个真实 Change",
-			"两个项目合计不少于二十个真实 Change",
-			"Plugin 宿主预检的全部用例",
+			"一个真正的新产品或足够早期的产品安全副本",
+			"一个有真实提交历史、架构/数据/API 合同和维护需求的安全副本",
+			"完成两到三个真实、bounded Change",
+			"扩大", "简化后再试", "停止或重新定位",
 		},
 		filepath.Join(root, "docs", "roadmap.md"): {
-			"一个真正的新项目和一个持续开发的旧项目",
-			"每个至少八个真实 Change，合计至少二十个",
-			"fresh-task host-routing matrix",
+			"一个真正的新项目安全副本和一个持续开发的旧项目安全副本",
+			"每条轨道只完成两到三个真实 bounded Change",
+			"fresh-task host canary",
 		},
 		filepath.Join(root, "docs", "verification-matrix.md"): {
-			"Independent greenfield and established products, at least eight Changes each and twenty total",
-			"Four-Skill host activation and output quality",
+			"Independent greenfield and established product safety copies",
+			"two or three bounded Changes and one fresh-task handoff per track",
+			"Exact installed-candidate host activation and output quality",
 			"Fresh-task upgrade, uninstall, reinstall, and full four-Skill pickup",
 		},
 	}
@@ -171,6 +173,46 @@ func TestDualTrackPilotProtocolAndReadinessClaimsStayAligned(t *testing.T) {
 		for _, fragment := range fragments {
 			if !bytes.Contains(content, []byte(fragment)) {
 				t.Fatalf("%s lost pilot-readiness boundary %q", path, fragment)
+			}
+		}
+	}
+}
+
+func TestEnablementStopsAtReadyContract(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	contracts := map[string][]string{
+		filepath.Join(root, "SPEC.md"): {
+			"取得明确确认前，不解析或读取仓库、不调用 `project status`",
+		},
+		filepath.Join(root, "README.md"): {
+			"在用户明确确认前，Adapter 不读取项目状态或内容",
+		},
+		filepath.Join(root, ".ecp", "contracts", "product-boundaries.md"): {
+			"before explicit confirmation it must not inspect or resolve the repository, call ECP",
+		},
+		filepath.Join(root, "docs", "project-pack.md"): {
+			"启用流程只负责把已评审的候选 Project Pack 接受并把 Workspace 带到 `READY`",
+			"不在启用流程中自动创建 Change",
+			"必须由用户另行明确授权",
+		},
+		filepath.Join(root, "plugins", "ecp-codex", "skills", "ecp-enable", "SKILL.md"): {
+			"End the enablement flow at `READY`",
+			"without starting another Change",
+			"requires its own explicit user",
+			"authorization and fresh routing through `ecp-change`",
+		},
+	}
+	for path, fragments := range contracts {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, fragment := range fragments {
+			if !bytes.Contains(content, []byte(fragment)) {
+				t.Fatalf("%s lost enablement READY boundary %q", path, fragment)
 			}
 		}
 	}
@@ -190,7 +232,15 @@ func TestBundledPluginRuntimeIsCompleteAndPathIndependent(t *testing.T) {
 		SchemaVersion int    `json:"schema_version"`
 		PluginName    string `json:"plugin_name"`
 		PluginVersion string `json:"plugin_version"`
-		Artifacts     []struct {
+		SourceCommit  string `json:"source_commit"`
+		SourceClean   bool   `json:"source_clean"`
+		Builder       struct {
+			GoVersion          string   `json:"go_version"`
+			GoExecutableSHA256 string   `json:"go_executable_sha256"`
+			CGOEnabled         bool     `json:"cgo_enabled"`
+			BuildFlags         []string `json:"build_flags"`
+		} `json:"builder"`
+		Artifacts []struct {
 			OS        string `json:"os"`
 			Arch      string `json:"arch"`
 			Path      string `json:"path"`
@@ -212,8 +262,17 @@ func TestBundledPluginRuntimeIsCompleteAndPathIndependent(t *testing.T) {
 	if err := json.Unmarshal(pluginManifestBytes, &pluginManifest); err != nil {
 		t.Fatal(err)
 	}
-	if runtimeManifest.SchemaVersion != 1 || runtimeManifest.PluginName != pluginManifest.Name || runtimeManifest.PluginVersion != pluginManifest.Version {
+	if runtimeManifest.SchemaVersion != 2 || runtimeManifest.PluginName != pluginManifest.Name || runtimeManifest.PluginVersion != pluginManifest.Version {
 		t.Fatalf("runtime and Plugin manifests are not version-bound: runtime=%+v plugin=%+v", runtimeManifest, pluginManifest)
+	}
+	if matched, _ := regexp.MatchString(`^[0-9a-f]{40,64}$`, runtimeManifest.SourceCommit); !matched {
+		t.Fatalf("runtime manifest source_commit is invalid: %q", runtimeManifest.SourceCommit)
+	}
+	if runtimeManifest.Builder.GoVersion == "" || !regexp.MustCompile(`^sha256:[0-9a-f]{64}$`).MatchString(runtimeManifest.Builder.GoExecutableSHA256) {
+		t.Fatalf("runtime manifest builder identity is incomplete: %+v", runtimeManifest.Builder)
+	}
+	if runtimeManifest.Builder.CGOEnabled || !reflect.DeepEqual(runtimeManifest.Builder.BuildFlags, []string{"-trimpath", "-buildvcs=false", "-ldflags=-s -w"}) {
+		t.Fatalf("runtime manifest build contract drifted: %+v", runtimeManifest.Builder)
 	}
 
 	expectedTargets := map[string]struct{}{
@@ -361,12 +420,16 @@ func TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries(t *testing.T) {
 			"Keep uncertainty as `Unknown`",
 			"A name such as `test` or `check` is not safety evidence.",
 			"Measure each exact command with cold and normal local caches",
+			"human-readable Project/Policy/Gate delta",
+			"fresh explicit confirmation for that policy acceptance",
 			"Report success only when Core explicitly returns `enabled: true`",
 		},
 		"ecp-disable": {
 			"only for an explicit whole-project disable request",
 			"Disabled or unregistered mode is an idempotent success.",
 			"Core atomically records it as CANCELLED before project disablement",
+			"unresolved GateRun was recorded `INTERRUPTED`",
+			"a live holder still owns the lease",
 			"Never delete or edit `.ecp`, authority history, Evidence, source files",
 		},
 		"ecp-change": {
@@ -375,6 +438,8 @@ func TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries(t *testing.T) {
 			"Before any repository mutation, run only",
 			"Do not initialize ECP, create a Change, or prompt the user to",
 			"There is no task-level bypass",
+			"If the candidate config is malformed or missing, stop.",
+			"Without that confirmation, stop and preserve the drift.",
 			"Never set, synthesize, or infer a Verdict",
 			"zero-silent-ambiguity guarantee",
 			"Treat a `high` or `critical` effective risk as a pre-write human-confirmation barrier.",
@@ -500,10 +565,10 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	if err := decodeStrictJSON(content, &inventory); err != nil {
 		t.Fatalf("host-routing inventory is not valid JSON: %v", err)
 	}
-	if inventory.SchemaVersion != 3 || inventory.ExecutionSurface != "Fresh Codex Desktop task using the installed Plugin cache" || inventory.AcceptanceRule == "" {
+	if inventory.SchemaVersion != 4 || inventory.ExecutionSurface != "Fresh Codex Desktop task using the installed Plugin cache" || inventory.AcceptanceRule == "" {
 		t.Fatalf("host-routing inventory lacks a versioned installed-host contract: %+v", inventory)
 	}
-	for _, boundary := range []string{"12 qualification cases", "one retry in a fresh fixture", "second INVALID freezes the candidate campaign", "Extended cases are optional diagnostics"} {
+	for _, boundary := range []string{"16 qualification cases", "single installed Plugin candidate", "one retry in a fresh fixture", "second INVALID freezes the candidate campaign", "5 extended cases are optional diagnostics", "Desktop task ledger"} {
 		if !strings.Contains(inventory.AcceptanceRule, boundary) {
 			t.Fatalf("host-routing acceptance rule lost boundary %q: %s", boundary, inventory.AcceptanceRule)
 		}
@@ -512,7 +577,10 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	requiredRecordFields := []string{
 		"schema_version", "campaign_id", "case_id", "run_number", "required_run",
 		"task_id", "fixture_id", "fixture_profile", "initial_project_mode",
-		"environment_probe", "installed_plugin_version", "core_identity", "turn_observations", "selected_skill",
+		"environment_probe", "desktop_build", "installed_plugin_version", "core_identity",
+		"installed_plugin_tree_sha256", "installed_launcher_locator_sha256", "resolved_skill_locator_sha256",
+		"prompt_sha256", "dispatch_intent_sha256", "fixture_metadata_sha256", "workspace_path_sha256", "task_ledger_sha256",
+		"turn_observations", "selected_skill",
 		"observed_status_probe", "observed_repository_mutation", "observed_authority_mutation",
 		"observed_project_mode_mutation", "expected_behavior_conformant", "prohibitions_preserved",
 		"before", "after", "outcome", "failure_codes", "notes",
@@ -568,18 +636,22 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 		{"change-edge-unrelated-external-action", "edge", "enabled-clean", "enabled", "ecp-change", "required", "governed-only", "governed-completion", "forbidden", nil},
 	}
 	expectedQualificationOrder := map[string]int{
-		"check-direct-status-version":             1,
-		"check-negative-generic-read-only-review": 2,
-		"enable-incomplete-configure-ecp":         3,
-		"enable-direct-greenfield":                4,
-		"enable-direct-established":               5,
-		"change-direct-enabled-edit":              6,
-		"change-direct-disabled-edit":             7,
-		"change-edge-enabled-blocked":             8,
-		"disable-direct-whole-workspace":          9,
-		"disable-incomplete-task-bypass":          10,
-		"change-negative-read-only-diagnosis":     11,
-		"change-edge-unrelated-external-action":   12,
+		"check-direct-status-version":              1,
+		"check-indirect-governance-question":       2,
+		"check-negative-generic-read-only-review":  3,
+		"enable-incomplete-configure-ecp":          4,
+		"enable-direct-greenfield":                 5,
+		"enable-direct-established":                6,
+		"enable-indirect-project-governance":       7,
+		"change-direct-enabled-edit":               8,
+		"change-indirect-follow-up-implementation": 9,
+		"change-direct-disabled-edit":              10,
+		"change-edge-enabled-blocked":              11,
+		"disable-direct-whole-workspace":           12,
+		"disable-indirect-stop-project-governance": 13,
+		"disable-incomplete-task-bypass":           14,
+		"change-negative-read-only-diagnosis":      15,
+		"change-edge-unrelated-external-action":    16,
 	}
 	if len(inventory.Cases) != len(expectedCases) {
 		t.Fatalf("host-routing inventory defines %d cases, want exactly %d", len(inventory.Cases), len(expectedCases))
@@ -643,8 +715,8 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 		}
 		profiles[item.FixtureProfile]++
 	}
-	if qualificationCount != 12 || extendedCount != 9 || len(qualificationOrders) != 12 {
-		t.Fatalf("host-routing inventory suite counts are qualification=%d extended=%d orders=%d, want 12/9/12", qualificationCount, extendedCount, len(qualificationOrders))
+	if qualificationCount != 16 || extendedCount != 5 || len(qualificationOrders) != 16 {
+		t.Fatalf("host-routing inventory suite counts are qualification=%d extended=%d orders=%d, want 16/5/16", qualificationCount, extendedCount, len(qualificationOrders))
 	}
 	expectedProfiles := []string{"greenfield-disabled", "established-disabled", "enabled-clean", "enabled-active", "enabled-blocked"}
 	if len(profiles) != len(expectedProfiles) {
@@ -723,8 +795,8 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	var schemaVersion struct {
 		Const int `json:"const"`
 	}
-	if err := json.Unmarshal(resultProperties["schema_version"], &schemaVersion); err != nil || schemaVersion.Const != 2 {
-		t.Fatalf("host-routing result schema_version must have const 2: %v", err)
+	if err := json.Unmarshal(resultProperties["schema_version"], &schemaVersion); err != nil || schemaVersion.Const != 3 {
+		t.Fatalf("host-routing result schema_version must have const 3: %v", err)
 	}
 	readEnum(resultProperties["fixture_profile"], "result fixture_profile", expectedProfiles)
 	readEnum(resultProperties["selected_skill"], "result selected_skill", []string{"none", "ecp-check", "ecp-enable", "ecp-disable", "ecp-change"})
@@ -815,12 +887,13 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	builder := string(builderBytes)
 	for _, boundary := range []string{
 		"require_absolute_outside_source", "refusing to overwrite existing fixture", "GIT_CONFIG_NOSYSTEM",
-		"core.hooksPath=/dev/null", "qualification preflight must use an installed Plugin cache launcher",
+		"core.hooksPath=/dev/null", "qualification preflight must use the Desktop installed Plugin cache launcher",
 		"[shell_environment_policy.set]", "ECP_STATE_DIR", "DEFAULT_AUTHORITY",
 		"prepare_profile", "deterministic disposable fixture registration", "deterministic disposable fixture enablement",
 		"Prepared high-risk fixture Change", "admin/maintenance.txt",
 		"public_list", "must be an array of objects or null",
-		"verify-seed", "create-run", "verify-prep", "environment-probe", "snapshot",
+		"package_tree_digest", "load_campaign", "validate_campaign_candidate",
+		"verify-seed", "create-run", "verify-prep", "environment-probe", "snapshot", "--campaign",
 	} {
 		if !strings.Contains(builder, boundary) {
 			t.Fatalf("host-routing fixture builder lost boundary %q", boundary)
@@ -833,11 +906,13 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	}
 	validator := string(validatorBytes)
 	for _, boundary := range []string{
-		"canonical inventory must define 12 qualification and 9 extended cases",
+		"canonical inventory must define 16 qualification and 5 extended cases",
 		"--results must be a durable root outside source, temporary, authority, and cache trees",
-		"refusing to overwrite canonical record", "product FAIL is terminal",
+		"refusing to overwrite canonical record", "product FAIL is terminal", "freeze",
+		"Desktop inventory must expose exactly one enabled installed ecp-codex provider and locator",
+		"task-ledger", "fixture-metadata", "INVALID failure_codes must come only from the infrastructure-failure taxonomy",
 		"the one fresh-fixture retry also failed infrastructure", "task_id reused",
-		"qualification is serial", "QUALIFIED: 12 qualification cases passed", "record", "validate",
+		"qualification is serial", "QUALIFIED: 16 qualification cases passed", "record", "validate",
 	} {
 		if !strings.Contains(validator, boundary) {
 			t.Fatalf("host-routing result validator lost boundary %q", boundary)
@@ -861,7 +936,7 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 		"if exactly one new task matches", "if zero or multiple tasks match",
 		"never dispatch again into the same fixture after an ambiguous result",
 		"The normal default authority must remain unchanged", "project-scoped configuration",
-		"A second `INVALID` freezes the candidate campaign", "Success is exactly `QUALIFIED: 12 qualification cases passed`",
+		"A second `INVALID` freezes the candidate campaign", "Success is exactly `QUALIFIED: 16 qualification cases passed`",
 		"must never be a qualification fixture or one of the two real-project pilot tracks",
 	} {
 		if !strings.Contains(protocol, boundary) {
@@ -874,7 +949,7 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 		t.Fatal(err)
 	}
 	pilot := string(pilotBytes)
-	qualificationIDs := make([]string, 12)
+	qualificationIDs := make([]string, 16)
 	for caseID, order := range expectedQualificationOrder {
 		qualificationIDs[order-1] = caseID
 	}
@@ -891,9 +966,10 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	}
 	status := strings.Join(strings.Fields(string(statusBytes)), " ")
 	for _, boundary := range []string{
-		"not yet qualified for a real-product pilot or release", "12 fail-fast",
+		"not yet qualified for a real-product pilot or release", "16 fail-fast",
 		"ECP itself is never a host fixture or a real-project pilot track",
-		"dedicated authorities", "Build and install one new cachebuster candidate",
+		"dedicated authorities", "package a new cachebuster candidate",
+		"separately authorized installation",
 		"Only after that gate passes, use safe copies",
 	} {
 		if !strings.Contains(status, boundary) {
