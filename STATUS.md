@@ -7,24 +7,46 @@ next”; detailed contracts remain in the linked documents.
 
 ECP v0.3 has a local Core/CLI, a four-Skill self-contained Codex Plugin source,
 and automated repository-level coverage for the bounded local assurance
-lifecycle. It is **not yet qualified for a real-product pilot or release**.
-Signing, public distribution, protected CI enforcement, isolated execution,
-and longitudinal real-project value remain unverified.
+lifecycle. The exact clean candidate described below is **qualified for a
+controlled real-product pilot through Codex Desktop**. It is not yet a public
+release or a claim of production effectiveness: signing, public distribution,
+protected CI enforcement, stronger process isolation, and longitudinal
+real-project value remain unverified.
 
-The previous duplicated host-routing campaign is terminated. Its completed
-observations may be retained as diagnostic records, but the campaign and its
-disposable Workspaces/authorities do not constitute qualification evidence and
-must not be resumed to reach a historical run count. ECP itself is never a host
-fixture or a real-project pilot track.
+ECP's own source Workspace remains unregistered and disabled. ECP itself was
+not enabled, used as a qualification fixture, or counted as a real-project
+pilot track.
 
 ## Current checkpoint
 
-- The source candidate now stops greenfield enablement when Core reports
-  `READY`, leaves Truth onboarding as a separately authorized later Change, and
-  treats an ambiguous setup request as one clarification question with zero
-  repository/ECP probe before confirmation. The host contract contains 16
-  qualification cases and 5 post-qualification diagnostics, including the four
-  indirect natural-language routing paths.
+- The formal Plugin version is `0.3.0-dev+codex.20260813115751`. Its runtime
+  manifest records `source_commit`
+  `66cf40f422661d98d4cd139d54364f04c4896545` and `source_clean: true`. The
+  active Darwin/arm64 Core identity is
+  `0.3.0-dev+sha256:838212455e6c97c567fef748dd4eb8da95ed268756be9bd411590e13744dd0af`.
+- The previous ECP marketplace/provider entries were removed. The candidate is
+  installed from the sole remaining ECP provider/cache entry, its installed
+  tree matches the packaged source, all Plugin/Skill validators pass using an
+  isolated `/private/tmp` PyYAML 6.0.2 target, and Codex Desktop was restarted
+  before qualification so fresh tasks loaded this exact installed locator.
+- The formal immutable campaign is
+  `/Users/o--o/Study/ECPQualificationResults/ecp-codex-20260813-115751`.
+  The official validator reports: `QUALIFIED: 16 qualification cases passed;
+  0 INVALID attempts and 0 extended diagnostics preserved`.
+- All 16 qualification canaries ran serially in distinct fresh Codex Desktop
+  tasks, each with a unique opaque Git Workspace and dedicated authority. The
+  campaign covered direct, indirect, negative, incomplete, multi-turn,
+  disabled, blocked, enable, disable, governed-change, and forbidden-external-
+  action paths. The final governed case completed one bounded Change, one
+  offline GateRun, one PASS Evidence, and Change completion while preserving
+  the prohibition on commit, push, deploy, and CI mutation.
+- The source candidate stops greenfield enablement when Core reports `READY`,
+  leaves Truth onboarding as a separately authorized later Change, completes
+  the initial bootstrap-to-accepted-candidate transaction without an unrelated
+  second confirmation, and treats an ambiguous setup request as one
+  clarification question with zero repository/ECP probe before confirmation.
+  The host contract contains 16 qualification cases and 5 optional
+  post-qualification diagnostics.
 - Core durability fixes now cover physical repository/authority export aliases,
   crash-safe no-replace Workspace bindings with controlled truncated-remnant
   recovery and exact post-binding bootstrap resumption, fsync-checked
@@ -39,20 +61,16 @@ fixture or a real-project pilot track.
   Desktop task ledger, resolved Skill locator, and rollout readback. `INVALID`
   uses a closed infrastructure taxonomy and cannot hide an observed product
   failure.
-- A new four-platform development artifact has been built and mechanically
-  validated, but its runtime manifest correctly records `source_clean: false`.
-  It is not a formal candidate and has not been installed or qualified. Any
-  earlier installed cache or terminated campaign predates these source changes
-  and is diagnostic only. This work did not modify global Codex configuration
-  or install a Plugin.
-- Repository tests and static Skill checks remain useful mechanism evidence,
-  but they do not prove that Codex Desktop selected the intended installed
-  locator, loaded the dedicated authority, or followed the natural-language
-  lifecycle in a fresh task.
-- The replacement Desktop gate is a **single serial campaign of 16 fail-fast
-  host canaries**, one fresh run per canary, against one exact installed Plugin
-  tree/version, one exact bundled Core identity, and one exact Desktop build.
-  Qualification requires `16/16` for that unchanged candidate.
+- The four-platform runtime artifacts are packaged and mechanically validated.
+  Only the current host's Darwin/arm64 binary was exercised by the Desktop
+  qualification; Linux and Darwin/amd64 runtime behavior remains package-level,
+  not live-host, evidence.
+- Repository tests and static Skill checks remain mechanism evidence. The
+  completed Desktop campaign additionally proves that this Desktop build
+  selected the intended installed locator, loaded each dedicated authority,
+  and followed all 16 natural-language host routes for this exact candidate.
+  It does not prove future Desktop builds, other models, remote CI, production,
+  or long-running real-project value.
 - A canary outcome is either `PASS`, product `FAIL`, or infrastructure
   `INVALID`. The first product `FAIL` stops the campaign and requires a product
   fix, rebuilt exact candidate, and a new campaign. `INVALID` records an
@@ -65,28 +83,26 @@ fixture or a real-project pilot track.
   identities, observations, scores, failures, invalid runs, and retries must
   live in a durable external results root outside the ECP repository and must
   not use `/tmp` or `/private/tmp` as their only copy.
+- Earlier failed campaigns remain immutable diagnostic evidence for the exact
+  candidates that failed. Their failures were fixed in later source commits and
+  they were not resumed, merged into, or counted toward the successful formal
+  campaign.
 
 ## Next actions, in order
 
-1. After separately authorized source commit/clean-epoch, package a new
-   cachebuster candidate. After separately authorized installation of the
-   Plugin, freeze the single-provider Desktop inventory and validate all five
-   deterministic fixture profiles. Never promote the current dirty development
-   artifact.
-2. Restore a usable Codex Desktop dispatch/readback path, then execute the 16 canaries
-   once each, serially and fail-fast, using a fresh
-   disposable Git Workspace and dedicated `ECP_STATE_DIR` for every canary.
-   Preserve every result in the durable external results root and require
-   `16/16` for the exact unchanged candidate. Preserve the immutable campaign,
-   fixture metadata, task ledger, rollout digest, and all failed/invalid runs.
-3. Only after that gate passes, use safe copies of one genuinely new product
-   and one established product. Complete two or three bounded real Changes and
-   one fresh-task handoff in each track. Measure recovered context, useful
-   catches, false blockers, interaction burden, validation time, and truth
-   maintenance cost.
-4. Decide whether to expand, simplify, or stop the rollout from those
+1. Use the installed candidate on safe copies of one genuinely new product and
+   one established product. Enabling remains a separate explicit whole-
+   Workspace decision for each product; Plugin installation alone never enables
+   a project.
+2. Complete two or three bounded real Changes and one fresh-task handoff in
+   each track. Measure recovered context, useful catches, false blockers,
+   interaction burden, validation time, and truth-maintenance cost.
+3. Decide whether to expand, simplify, or stop the rollout from those
    value-versus-friction observations. Do not pre-commit to a larger matrix or a
    fixed Change count merely to manufacture completion.
+4. Only after successful pilot evidence, define a release candidate and add the
+   still-required distribution, signing, CI-enforcement, cross-host runtime,
+   and operational support gates.
 
 The pilot protocol is [docs/real-project-pilot.md](docs/real-project-pilot.md),
 the roadmap is [docs/roadmap.md](docs/roadmap.md), and package boundaries are
