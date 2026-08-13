@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_name": "ecp-codex",
-  "plugin_version": "0.3.0-dev+codex.20260812222500",
+  "plugin_version": "0.3.0-dev+codex.20260813053446",
   "artifacts": [
     {"os":"darwin","arch":"arm64","path":"runtime/darwin-arm64/ecp","sha256":"3f8e913361d573f1605e6af53ba88a7fe5c07ba1ba015293ba3a0733678a0203","size_bytes":3523138},
     {"os":"darwin","arch":"amd64","path":"runtime/darwin-amd64/ecp","sha256":"1b929b943c22755d4ab5efa4ca51674f64162cdaf51fbc85c21661f1c9eb9eef","size_bytes":3819344},
