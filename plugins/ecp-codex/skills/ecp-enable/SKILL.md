@@ -79,14 +79,22 @@ CLI or copy opaque protocol values.
    or missing setup required by this explicit enablement request.
 7. Write only the reviewed minimal `.ecp` candidate while mode remains disabled.
    Partial Draft Config or registration is not successful enablement.
-8. For an unregistered Workspace, run one fresh `ecp project inspect`, then
-   invoke `ecp project register` with the exact authority, Workspace, candidate
-   config, and candidate truth values from that response. For registered config
-   drift, show the exact human-readable Project/Policy/Gate delta and obtain a
-   fresh explicit confirmation for that policy acceptance; the earlier general
-   setup request is not reusable after the reviewed candidate changes. Then use
-   one fresh status and accept only that exact confirmed candidate. Use actor
-   `codex-local-adapter` and a concise reason tied to this request.
+8. For a Workspace that was unregistered at the first status in this same
+   uninterrupted enablement flow, the user's explicit whole-project enable
+   request covers the exact reviewed initial Project Pack candidate, initial
+   registration/acceptance, and final enable transition. This remains one
+   initial enablement transaction even when `project init` bootstrap-registers
+   an empty Draft Config before the reviewed Gate candidate is written; do not
+   misclassify that bootstrap-to-initial-candidate delta as later policy drift
+   or ask for a second confirmation. Show the exact human-readable
+   Project/Policy/Gate delta, then run one fresh `ecp project inspect` or status
+   and register or accept only the exact reviewed candidate from that response.
+   For a Workspace already registered at the first status, or candidate drift
+   encountered outside that uninterrupted initial flow, show the exact
+   human-readable delta and obtain a fresh explicit confirmation before policy
+   acceptance. Never reuse an earlier general setup request for that later
+   drift. Use actor `codex-local-adapter` and a concise reason tied to this
+   request.
 9. Run a fresh `ecp project status`. Require registered state, accepted
    config/truth, at least one applicable safe Gate, and no unsafe effect. Invoke
    `ecp project enable` with only the exact authority ID, Workspace ID,

@@ -421,7 +421,10 @@ func TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries(t *testing.T) {
 			"A name such as `test` or `check` is not safety evidence.",
 			"Measure each exact command with cold and normal local caches",
 			"human-readable Project/Policy/Gate delta",
-			"fresh explicit confirmation for that policy acceptance",
+			"same uninterrupted enablement flow",
+			"do not misclassify that bootstrap-to-initial-candidate delta as later policy drift",
+			"already registered at the first status",
+			"obtain a fresh explicit confirmation before policy acceptance",
 			"Report success only when Core explicitly returns `enabled: true`",
 		},
 		"ecp-disable": {
