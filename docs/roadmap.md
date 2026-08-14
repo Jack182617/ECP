@@ -61,12 +61,13 @@ Phase 1 原计划的 Runner 纵深强化不再整体先行。除阻断真实 Pro
 
 目标：把当前 Assurance Kernel 扩展为 North Star 的最小完整语义闭环。
 
-状态：本地 Core/CLI、自包含四 Skill Codex Plugin runtime、自举 Project Pack 与自动化安全回归已实现；greenfield enable 已收敛为只到 `READY`，模糊 setup 意图在确认前零 probe。旧 host-routing campaign 已终止，其观察只算诊断而不构成 qualification。下一 exact candidate 需先冻结单一 Desktop-installed provider、Desktop build、Plugin tree/Skill locator、Core 与 evaluator contracts，再通过 16 个串行、单次、fail-fast fresh-task host canary。升级/卸载、签名/公开发布、真实独立项目接手/长期价值和受保护 CI consumer 仍未验证。本阶段不能描述为已通过产品退出标准，canonical checkpoint 见 [../STATUS.md](../STATUS.md)。
+状态：本地 Core/CLI、自包含四 Skill Codex Plugin runtime、自举 Project Pack 与自动化安全回归已实现；冻结的 installed candidate `0.3.0-dev+codex.20260813115751` 已通过 16/16 串行 fresh-task host canary，0 INVALID。其后真实项目 exploratory use 暴露了 Truth freshness、adapter payload 猜测和历史输出规模问题；当前 post-qualification source iteration 增加 accepted-Unknown disposition、`schema get`、bounded Change history 和 Core-identity upgrade coverage，但尚未打包、安装或重新 qualification。升级/卸载、签名/公开发布、正式双轨项目接手/长期价值和受保护 CI consumer 仍未验证。本阶段不能描述为已通过产品退出标准，canonical checkpoint 见 [../STATUS.md](../STATUS.md)。
 
 - 严格、版本化且项目独立的 Project Truth schema；
 - Capability、Invariant、Component、Decision、Contract reference 和 Unknown；
 - accepted Project Truth revision 与 candidate drift；
 - Change Contract 中的结构化业务/架构/数据/接口影响；
+- accepted Truth Unknown 的 `PRESERVED/RESOLVED/REFINED` disposition 与 starting/candidate Truth 对账；
 - 覆盖每个 material contract item 的 Requirement decision ledger，阻断 silent unknown，并在 reconciliation 中逐项绑定 review、Gate Evidence 或 external pending；
 - cancelled replacement 的原始 baseline/lineage carry-forward，避免通过 cancel/start 洗掉已有 delta；
 - established path ownership 的 direct component、`depends_on` 反向传递依赖者及其 capability/invariant 影响推断，漏报或未映射最终路径阻止 PASS；
@@ -82,7 +83,7 @@ Phase 1 原计划的 Runner 纵深强化不再整体先行。除阻断真实 Pro
 
 ## Phase 1B — Real Project Pilot
 
-状态：尚未进入。先让 exact Desktop-installed package 的 16 个 fresh-task host canary 串行通过；第一个产品 `FAIL` 即停止 qualification，闭集基础设施问题保留为 `INVALID` 并只在原因修复后使用全新 fixture 重跑一次，任何已观察产品错误都不能改标为 `INVALID`。随后选择一个真正的新项目安全副本和一个持续开发的旧项目安全副本做小规模双轨试点；ECP 自身、ECP worktree、静态 Skill 文本检查或 Core 单测都不能代替这两个独立产品轨道。
+状态：正式试点尚未进入。旧 installed candidate 的 16-case qualification 已完成，但未按注册表/safe-copy/阈值/七日观察窗执行的真实项目使用只算 exploratory evidence。当前 source iteration 在成为新试点候选前必须完成仓库验证、另行授权的 packaging/install/upgrade host 验证，并针对其新 exact Core/Skill identity 重新跑 16 个 fresh-task canary；第一个产品 `FAIL` 即停止，闭集基础设施问题只记 `INVALID`。随后才选择一个真正的新项目安全副本和一个持续开发的旧项目安全副本做小规模双轨试点；ECP 自身、ECP worktree、静态 Skill 文本检查、Core 单测或 exploratory canonical-project use 都不能代替这两个独立产品轨道。
 
 - 每条轨道只完成两到三个真实 bounded Change 与一次没有旧聊天上下文的 fresh-task handoff；
 - 在新项目观察诚实 seed/established Truth 与 Unknown 保留，在旧项目观察历史合同恢复、dirty diff 保护和兼容边界；

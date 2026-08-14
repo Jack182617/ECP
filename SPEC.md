@@ -96,8 +96,8 @@ Project 的一个具体 Git clone/worktree。`workspace_id` 必须由 canonical 
 - scope path roots；
 - non-goals；
 - acceptance criteria；
-- structured impact（capability/invariant/component/decision/contract、journey、data/operation effect、expected change、expected preservation 与 unknown）；
-- `contract_version=2` 的 sorted structured Requirements：每项包含 stable ID、statement、`DECIDED|NOT_APPLICABLE|DEFERRED_SAFE|BLOCKING_UNKNOWN`、rationale、decision source、`AUTOMATED|REVIEW|EXTERNAL` verification、可选 mapped Gate IDs、revisit condition 与对 Change contract item 的 exact coverage；
+- structured impact（capability/invariant/component/decision/contract、journey、data/operation effect、expected change、expected preservation 与 unknown）；其中每个被引用的 accepted Truth Unknown 都必须有 sorted `PRESERVED|RESOLVED|REFINED` disposition；
+- `contract_version=3` 的 sorted structured Requirements：每项包含 stable ID、statement、`DECIDED|NOT_APPLICABLE|DEFERRED_SAFE|BLOCKING_UNKNOWN`、rationale、decision source、`AUTOMATED|REVIEW|EXTERNAL` verification、可选 mapped Gate IDs、revisit condition 与对 Change contract item 的 exact coverage；
 - 可选 `supersedes_change_id` 与不可伪造的 lineage root；
 - user-declared risk；
 - activation baseline；
@@ -110,6 +110,8 @@ v0.3 每个 Workspace 同时最多一个 `ACTIVE` Change。
 `change start` 只允许当前 mode enabled，且必须携带 immediately preceding context 的 exact `authority_id`、`workspace_id`、`activation_token`、已接受 candidate config digest、accepted truth digest 与 source fingerprint。Core 在创建 ACTIVE 事件前重新选择 authority、发现 Workspace、核对同一 activation epoch、稳定读取配置/真相并抓取 baseline；任一目标 stale 都不得创建 Change。
 
 Core 必须在 start 前要求每个 acceptance criterion、user journey、data/operational effect、expected change、expected preservation 与文本 impact unknown 至少被一个 Requirement exact 覆盖。`BLOCKING_UNKNOWN`、无 decision source/rationale、无具体 revisit condition 的 `DEFERRED_SAFE`、未知 mapped Gate、或漏覆盖均不得创建 ACTIVE。`AUTOMATED` 必须映射至少一个 Gate，`REVIEW` 不得伪装 Gate Evidence，`EXTERNAL` 在 v0.3 没有可信 importer 时只能保持 pending。
+
+`contract_version=3` 还要求 `impact.unknown_ids` 中每个 accepted Truth Unknown 恰有一个 disposition：`PRESERVED` 表示该结构化 Unknown 在 candidate Truth 中仍存在且内容不变，`RESOLVED` 表示已移除，`REFINED` 表示仍存在但 statement/risk/resolution condition 等结构化内容已经改变。Core 在 Semantic Reconciliation 时比较 Change starting Truth epoch 与 candidate Truth，声明与实际不符时阻止 assessment/Truth acceptance。历史 `contract_version=0/2` 继续按其原合同回放，不被追加强制字段。
 
 若当前 source 仍不同于同 activation 中最新 cancelled Change 的 baseline，新 Change 必须用 exact `supersedes_change_id` 指向该项，继承其原 baseline 与 lineage root，并让 scope 覆盖全部 inherited touched paths；否则拒绝 start。取消和重开不得把旧 edits、风险或越界路径洗入新 baseline。
 
@@ -173,7 +175,7 @@ NONE ──start──> ACTIVE ──complete with current PASS──> COMPLETED
 - `COMPLETED` 只表示某个最终 subject 曾获得 PASS 并被记录；完成请求必须同时携带 exact Change ID 和 immediately preceding Verdict 的 subject digest，Core 重算 activation、source、plan 与 Verdict 后精确匹配才可保存最终 Verdict payload 与摘要，后续代码变化不会篡改该历史事实。受支持的 Adapter 在普通实现获得当前 PASS 后自动完成，不要求用户手工运行 completion。
 - `CANCELLED` 只表示用户明确放弃当前 ACTIVE Change；取消必须记录 actor/reason/time，不要求 PASS、不删除 Evidence、不修改工作树，也不得被解释为 waiver。
 - cancelled Change 的 source edits 若仍存在，后续 replacement 必须显式 supersede 并继承原 baseline/lineage；没有残留 delta 时可以正常创建独立 Change。
-- 取消请求必须携带用户在同一条 immediately preceding ACTIVE `change list` 记录中确认的 exact authority ID、Workspace ID 和 Change ID；Core 在终态 lease 内重新加载 authority 后核对三者，缺失、无 active 或不匹配均不得取消另一套 state、Workspace 或其他 Change。
+- 取消请求必须携带同一条 immediately preceding `change list --summary --state ACTIVE --limit 1` 记录中的 exact authority ID、Workspace ID 和 Change ID；Core 在终态 lease 内重新加载 authority 后核对三者，缺失、无 active 或不匹配均不得取消另一套 state、Workspace 或其他 Change。
 - 显式 project disable 是独立的项目级意图：它可以原子取消 immediately preceding status 已观察的 ACTIVE Change 并关闭项目。单独 `change cancel` 则保持项目 enabled；任何 blocker 都不得触发自动 cancel/disable。
 - 完成后继续修改必须创建新 Change。
 - authority-only Change history 必须返回 Project/Workspace/activation identity、完整 goal/scope/non-goals/acceptance/structured Impact、全部 Semantic Assessment 与 terminal completion/cancellation，使接手者不依赖旧聊天补齐“为什么改、预计保持什么、最终如何判断”。
@@ -417,6 +419,10 @@ fresh-task host routing、真实项目、发布或生产证明：
 73. source 仍不同于最新 cancelled Change baseline 时，无 `supersedes_change_id` 的新 Change 必须拒绝；合法 replacement 必须继承原 baseline/lineage 和 inherited touched paths，不能通过 cancel/start 洗掉 delta。
 74. established Project Truth 必须从 scope/touched path 反推 direct component、`depends_on` 反向传递依赖者及其 capability/invariant；漏报或未映射 final path 阻止 PASS，且 inferred facts 仍保守参与 effective risk 和 Gate plan。
 75. Risk Gate 必须只在 path/component/capability/invariant selector 适用时选择；无 selector Gate 保持 universal，Invariant/Requirement 显式 Gate 始终强制，因而计划既不得遗漏必要 Gate，也不得无理由运行 unrelated affected/full Gate。
+76. `schema get` 必须在不加载仓库或 authority 的情况下返回 installed Core 当前 Change contract version，以及 risk、Gate tier、Requirement、semantic category/behavior 和 Unknown disposition 的封闭机器枚举；Adapter 不得用记忆字段替代该结果。
+77. 新 Change 引用 accepted Truth Unknown 时缺少、重复、越界或无效 disposition 必须在 ACTIVE 前拒绝；Semantic Reconciliation 必须验证 `PRESERVED/RESOLVED/REFINED` 与 starting/candidate Truth 的实际关系，旧 v2 Change 无该字段仍可读取。
+78. `change list --summary` 必须提供 newest-first、可按 lifecycle state 和 1–1000 limit 限定的 authority-only 摘要；`change get` 必须恢复一个 exact full contract/assessment/terminal record；兼容的无参数 `change list` 仍返回完整历史。
+79. 同一 authority state 在 Core identity 变化后必须保留 Workspace enabled mode、ACTIVE/terminal Change 与完整历史；旧 Core 的 plan/Evidence 不得满足新 evaluator，只有用新 identity 重建 plan 并产生 fresh Evidence 后才能恢复 PASS。
 
 “确定性 Verdict”指同一精确 subject、同一 Effective Config 与同一有效 Evidence 集合产生相同的 status、reasons、assessments 与 `subject_digest`。`evaluated_at` 是观测元数据，不属于 `subject_digest`；完成事件保存当次最终 Verdict payload，因此历史核验不依赖再次调用只支持 ACTIVE Change 的 `verdict`。
 

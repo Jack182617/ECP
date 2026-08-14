@@ -1,6 +1,6 @@
 # Independent Real-Project Pilot
 
-ECP 的价值不能由 ECP 仓库自己的单元测试、静态 Skill 文本或大量合成任务证明。真实试点只回答一个产品问题：ECP 在长期 AI 开发中保存项目事实、约束变更并支持跨 task 接手所带来的价值，是否大于它增加的交互和维护成本。本文件定义一个有退出条件的小试点，不声称试点已经完成。
+ECP 的价值不能由 ECP 仓库自己的单元测试、静态 Skill 文本或大量合成任务证明。真实试点只回答一个产品问题：ECP 在长期 AI 开发中保存项目事实、约束变更并支持跨 task 接手所带来的价值，是否大于它增加的交互和维护成本。本文件定义一个有退出条件的小试点，不声称试点已经完成。未使用 safe copy、试点前冻结注册表、预设阈值和七日观察窗的真实项目使用只能记为 exploratory evidence；它可以发现产品问题，但不能事后补记为本试点样本。
 
 ## 前置 host canary gate
 
@@ -84,7 +84,7 @@ Canary gate 通过后，选择两个与 ECP 实现独立、可安全本地验证
 
 1. 在 fresh task 中只读恢复产品目的、关键 Invariant、Component、Contract、Decision、Unknown、branch/HEAD/dirty diff 和验证边界；
 2. 建立或审阅最小 Project Truth，并让未经确认的产品选择保持为 Unknown；
-3. 完成两到三个真实、bounded Change。组合应尽量包含一次 ordinary Change 和一次会检验 durable truth freshness 的 semantic Change，但不要为了覆盖表格而虚构需求；
+3. 完成两到三个真实、bounded Change。组合应尽量包含一次 ordinary Change 和一次会检验 durable truth freshness 的 semantic Change；后者若引用 accepted Truth Unknown，必须预先声明 `PRESERVED/RESOLVED/REFINED` disposition，并在 completion 前核对实际 Truth 结果，但不要为了覆盖表格而虚构需求；
 4. 换到一个没有前述聊天上下文的 fresh task，完成一次真实接手请求，验证其只依赖当前仓库与 accepted authority state，而非隐藏聊天约定。
 
 每次 Change 只运行能证明其契约的最小相关 Gate。遇到真实 product failure 时停止该轨道并诊断，不用重复任务或扩大验证掩盖问题。两到三个 Change 是用于判断方向的 discovery sample，不是对完整产品可靠性的统计证明。

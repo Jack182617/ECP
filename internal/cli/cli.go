@@ -76,6 +76,11 @@ func (c CLI) Run(ctx context.Context, args []string) int {
 
 func (c CLI) dispatch(ctx context.Context, args []string) (any, int, error) {
 	switch args[0] {
+	case "schema":
+		if len(args) != 2 || args[1] != "get" {
+			return nil, 0, usageError("schema requires get")
+		}
+		return ecp.ContractSchema(), 0, nil
 	case "version":
 		if len(args) != 1 {
 			return nil, 0, usageError("version accepts no arguments")
@@ -368,7 +373,7 @@ func (c CLI) truth(ctx context.Context, args []string) (any, int, error) {
 
 func (c CLI) change(ctx context.Context, args []string) (any, int, error) {
 	if len(args) == 0 {
-		return nil, 0, usageError("change requires start, list, cancel, or complete")
+		return nil, 0, usageError("change requires start, list, get, cancel, or complete")
 	}
 	switch args[0] {
 	case "start":
@@ -388,7 +393,7 @@ func (c CLI) change(ctx context.Context, args []string) (any, int, error) {
 		var scope, nonGoals, acceptance stringList
 		var capabilities, invariants, components, decisions, contracts, truthUnknownIDs stringList
 		var userJourneys, dataEffects, operationalEffects, expectedChanges, expectedPreservations, impactUnknowns stringList
-		var requirementJSON stringList
+		var requirementJSON, unknownDispositionJSON stringList
 		set.Var(&scope, "scope", "repository-relative path root; repeatable")
 		set.Var(&nonGoals, "non-goal", "explicit non-goal; repeatable")
 		set.Var(&acceptance, "acceptance", "acceptance criterion; repeatable")
@@ -398,6 +403,7 @@ func (c CLI) change(ctx context.Context, args []string) (any, int, error) {
 		set.Var(&decisions, "impact-decision", "affected Project Truth decision ID; repeatable")
 		set.Var(&contracts, "impact-contract", "affected Project Truth contract ID; repeatable")
 		set.Var(&truthUnknownIDs, "impact-unknown-id", "affected accepted Project Truth unknown ID; repeatable")
+		set.Var(&unknownDispositionJSON, "unknown-disposition", "exact UnknownDisposition JSON object for an affected accepted unknown; repeatable and sorted by unknown_id")
 		set.Var(&userJourneys, "impact-journey", "affected user journey; repeatable")
 		set.Var(&dataEffects, "impact-data", "data effect; repeatable")
 		set.Var(&operationalEffects, "impact-operation", "operational effect; repeatable")
@@ -416,6 +422,14 @@ func (c CLI) change(ctx context.Context, args []string) (any, int, error) {
 			}
 			parsedRequirements = append(parsedRequirements, parsed)
 		}
+		parsedUnknownDispositions := make([]ecp.UnknownDisposition, 0, len(unknownDispositionJSON))
+		for _, value := range unknownDispositionJSON {
+			parsed, err := ecp.ParseUnknownDispositionJSON(value)
+			if err != nil {
+				return nil, 0, err
+			}
+			parsedUnknownDispositions = append(parsedUnknownDispositions, parsed)
+		}
 		result, err := c.Service.StartChange(ctx, *root, ecp.StartChangeInput{
 			Title:              *title,
 			Goal:               *goal,
@@ -430,6 +444,7 @@ func (c CLI) change(ctx context.Context, args []string) (any, int, error) {
 				DecisionIDs:           decisions,
 				ContractIDs:           contracts,
 				UnknownIDs:            truthUnknownIDs,
+				UnknownDispositions:   parsedUnknownDispositions,
 				UserJourneys:          userJourneys,
 				DataEffects:           dataEffects,
 				OperationalEffects:    operationalEffects,
@@ -461,10 +476,29 @@ func (c CLI) change(ctx context.Context, args []string) (any, int, error) {
 	case "list":
 		set := newFlagSet("change list")
 		root := set.String("root", ".", "repository path")
+		summary := set.Bool("summary", false, "return newest-first bounded lifecycle summaries instead of full contracts")
+		state := set.String("state", "", "optional ACTIVE, COMPLETED, or CANCELLED filter for --summary")
+		limit := set.Int("limit", 0, "optional maximum summary count, 1-1000; zero means all")
 		if err := parseFlags(set, args[1:]); err != nil {
 			return nil, 0, err
 		}
+		if *summary {
+			result, err := c.Service.ListChangeSummaries(ctx, *root, ecp.ChangeState(strings.ToUpper(strings.TrimSpace(*state))), *limit)
+			return result, 0, err
+		}
+		if strings.TrimSpace(*state) != "" || *limit != 0 {
+			return nil, 0, usageError("--state and --limit require --summary")
+		}
 		result, err := c.Service.ListChanges(ctx, *root)
+		return result, 0, err
+	case "get":
+		set := newFlagSet("change get")
+		root := set.String("root", ".", "repository path")
+		changeID := set.String("change", "", "exact Change ID")
+		if err := parseFlags(set, args[1:]); err != nil {
+			return nil, 0, err
+		}
+		result, err := c.Service.GetChange(ctx, *root, *changeID)
 		return result, 0, err
 	case "cancel":
 		set := newFlagSet("change cancel")
@@ -666,7 +700,7 @@ func operationName(args []string) string {
 		return "help"
 	}
 	switch args[0] {
-	case "project", "context", "policy", "truth", "change", "gate", "acknowledgement", "evidence", "authority":
+	case "schema", "project", "context", "policy", "truth", "change", "gate", "acknowledgement", "evidence", "authority":
 		if len(args) > 1 && !strings.HasPrefix(args[1], "-") {
 			return args[0] + "." + args[1]
 		}
@@ -677,6 +711,7 @@ func operationName(args []string) string {
 const helpText = `ECP — AI-native Project Continuity and Change Control v0.3
 
 Usage:
+  ecp schema get
   ecp project init --name NAME [--root PATH]
   ecp project inspect [--root PATH]
   ecp project register --authority AUTHORITY_ID --workspace WORKSPACE_ID
@@ -713,6 +748,7 @@ Usage:
                    [--impact-capability ID ...] [--impact-invariant ID ...]
                    [--impact-component ID ...] [--impact-decision ID ...]
                    [--impact-contract ID ...] [--impact-unknown-id ID ...]
+                   [--unknown-disposition JSON ...]
                    [--impact-project-purpose]
                    [--impact-journey TEXT ...] [--impact-data TEXT ...]
                    [--impact-operation TEXT ...]
@@ -721,7 +757,8 @@ Usage:
                    --requirement JSON [--requirement JSON ...]
                    [--supersedes-change CANCELLED_CHANGE_ID]
                    [--root PATH]
-  ecp change list [--root PATH]
+  ecp change list [--summary [--state ACTIVE|COMPLETED|CANCELLED] [--limit N]] [--root PATH]
+  ecp change get --change CHANGE_ID [--root PATH]
   ecp change cancel --authority AUTHORITY_ID --workspace WORKSPACE_ID
                     --change CHANGE_ID --actor ACTOR --reason REASON [--root PATH]
   ecp gate plan [--root PATH]

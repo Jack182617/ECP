@@ -143,6 +143,32 @@ or deletion.
    unsupported or incompatible authority/config schema, stop fail-closed; do
    not edit the external state store or invent an implicit migration.
 
+Source edits in the ECP repository have no effect on an existing project until
+a new Plugin version is packaged, validated, explicitly installed, and loaded
+by a fresh Codex task. Installation does not rewrite project source, `.ecp`,
+Workspace bindings, mode, or authority history. The compatibility contract is:
+
+- existing Change contract versions 0 and 2 remain replayable; only newly
+  started Changes use contract version 3 and require accepted-Unknown
+  dispositions;
+- an enabled/disabled Workspace remains in the same mode and ACTIVE/terminal
+  history remains queryable across a Core identity change;
+- plans and Evidence remain in history but a new Core identity makes the old
+  execution-bound Evidence inapplicable; an ACTIVE Change must obtain a fresh
+  plan and rerun its required Gates before PASS/completion;
+- completed historical PASS remains an immutable historical result for its old
+  exact evaluator identity, not a current re-attestation by the new Core;
+- Skill/reference changes affect routing in fresh tasks that load the new
+  installed locator; they do not retroactively rewrite prior task output;
+- unsupported schema or event history stops fail-closed. v0.3 has no implicit
+  migration and no authority restore/import fallback.
+
+`TestCoreIdentityUpgradePreservesAuthorityAndRequiresFreshEvidence` automates
+the in-process authority/mode/history/Evidence transition. It is repository
+mechanism evidence only; a real installed Plugin upgrade, restart, four-Skill
+pickup, uninstall, reinstall, and rollback still require separate host
+validation.
+
 ### Failure recovery and rollback
 
 - Never point a Skill at an older cache directory, hand-edit cached files, copy
@@ -183,17 +209,17 @@ signature: an attacker able to replace the Plugin can replace the launcher,
 binary, checksum, and manifest together. The Core binary digest provides exact
 Evidence compatibility identity, not publisher provenance.
 
-The terminated host-routing campaign recorded in
-`docs/plugin-host-evaluation.md` is diagnostic only. Its observations and
-disposable fixtures do not qualify any current package and must not be resumed
-to reach a historical run count. Qualification restarts only after the
-greenfield `READY` boundary is fixed and a new exact candidate is packaged,
-installed, identity-checked, and frozen for the 12-canary gate.
+Terminated earlier host-routing campaigns recorded in
+`docs/plugin-host-evaluation.md` are diagnostic only and were not resumed to
+reach a historical run count. The later frozen installed candidate
+`0.3.0-dev+codex.20260813115751` completed the separate 16-canary campaign at
+16/16 with 0 INVALID attempts. That result applies only to that exact package,
+Desktop inventory, Skill locators, Core identity, and evaluator contract.
 
 The current source package is still unsigned, unnotarized, and unpublished in
-the universal directory. A complete 12-canary exact-candidate result, the
-trusted project-scoped dedicated-state handoff, upgrade, uninstall,
-reinstallation, and longitudinal real-project value have not been validated.
+the universal directory. The trusted project-scoped dedicated-state handoff,
+installed upgrade, uninstall, reinstallation, and longitudinal real-project
+value have not been formally validated.
 Keep these claims separate: source and repository checks are mechanism
 evidence, while host routing, lifecycle compatibility, publisher provenance,
 and product value remain independent release requirements. A separate release

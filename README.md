@@ -50,6 +50,7 @@ The repository currently contains:
 
 - a Go Core and CLI implementing workspace-local project mode, bounded Change
   lifecycles, accepted Project Truth, structured requirements and impact,
+  explicit accepted-Unknown dispositions, bounded/exact history queries,
   GateRun history, evidence applicability, and derived verdicts;
 - a self-contained `ecp-codex` Plugin with four focused Skills for checking,
   enabling, disabling, and governing changes;
@@ -61,7 +62,9 @@ The repository currently contains:
   build, installed Plugin candidate, and bundled Core identity.
 
 That qualification establishes behavior only for the frozen candidate and
-host campaign. It does not establish future-host compatibility, public
+host campaign. The current source contains a newer post-qualification
+iteration and is not an installed or qualified replacement candidate. Neither
+state establishes future-host compatibility, public
 distribution provenance, protected CI enforcement, production effectiveness,
 or long-term value in real projects.
 
@@ -185,9 +188,12 @@ and [SECURITY.md](SECURITY.md) for vulnerability reporting.
   unverified surfaces
 - [CHANGELOG.md](CHANGELOG.md) — user-visible changes
 
-The next product gate is a bounded pilot on safe copies of one genuinely new
-project and one established project. ECP's own source repository is not a
-fixture or real-project pilot track.
+The next engineering gates are repository validation, an explicitly
+authorized newly versioned package, installed upgrade/rollback validation, and
+a fresh 16-case qualification for that exact candidate. Only then is the next
+product gate a bounded pilot on safe copies of one genuinely new project and
+one established project. ECP's own source repository is not a fixture or
+real-project pilot track.
 
 ## Contributing
 

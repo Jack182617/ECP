@@ -23,6 +23,14 @@ func ParseRequirementAssessmentJSON(value string) (RequirementAssessment, error)
 	return assessment, nil
 }
 
+func ParseUnknownDispositionJSON(value string) (UnknownDisposition, error) {
+	var disposition UnknownDisposition
+	if err := decodeStrictJSON([]byte(value), &disposition); err != nil {
+		return UnknownDisposition{}, newError(KindUsage, "INVALID_UNKNOWN_DISPOSITION_JSON", "--unknown-disposition must be one exact UnknownDisposition JSON object", err)
+	}
+	return disposition, nil
+}
+
 func validateChangeImpact(impact ChangeImpact, truth ProjectTruthConfig) error {
 	capabilities := truthIDSetCapabilities(truth.Capabilities)
 	invariants := truthIDSetInvariants(truth.Invariants)
@@ -66,6 +74,92 @@ func validateChangeImpact(impact ChangeImpact, truth ProjectTruthConfig) error {
 		return newError(KindUsage, "EMPTY_CHANGE_IMPACT", "Change impact must reference Project Truth or explicitly describe an affected journey, data/operational effect, or unknown", nil)
 	}
 	return nil
+}
+
+func validateUnknownDispositions(impact ChangeImpact, truth ProjectTruthConfig, required bool) error {
+	if !required && len(impact.UnknownDispositions) == 0 {
+		return nil
+	}
+	known := truthIDSetUnknowns(truth.Unknowns)
+	impacted := truthStringSet(impact.UnknownIDs)
+	seen := make(map[string]struct{}, len(impact.UnknownDispositions))
+	previousID := ""
+	for _, disposition := range impact.UnknownDispositions {
+		if err := validateIdentifier(disposition.UnknownID, "unknown disposition id"); err != nil {
+			return newError(KindUsage, "INVALID_UNKNOWN_DISPOSITION", "unknown disposition contains an invalid unknown_id", err)
+		}
+		if previousID != "" && disposition.UnknownID <= previousID {
+			return newError(KindUsage, "INVALID_UNKNOWN_DISPOSITION", "unknown dispositions must be unique and sorted by unknown_id", nil)
+		}
+		previousID = disposition.UnknownID
+		if _, ok := known[disposition.UnknownID]; !ok {
+			return newError(KindUsage, "UNKNOWN_TRUTH_REFERENCE", fmt.Sprintf("unknown disposition references unknown Project Truth ID %q", disposition.UnknownID), nil)
+		}
+		if _, ok := impacted[disposition.UnknownID]; !ok {
+			return newError(KindUsage, "UNKNOWN_DISPOSITION_OUTSIDE_IMPACT", fmt.Sprintf("unknown disposition %q is not declared by impact.unknown_ids", disposition.UnknownID), nil)
+		}
+		switch disposition.Outcome {
+		case UnknownDispositionPreserved, UnknownDispositionResolved, UnknownDispositionRefined:
+		default:
+			return newError(KindUsage, "INVALID_UNKNOWN_DISPOSITION", fmt.Sprintf("unknown disposition %q must be PRESERVED, RESOLVED, or REFINED", disposition.UnknownID), nil)
+		}
+		seen[disposition.UnknownID] = struct{}{}
+	}
+	if required {
+		for _, unknownID := range impact.UnknownIDs {
+			if _, ok := seen[unknownID]; !ok {
+				return newError(KindBlocked, "UNKNOWN_DISPOSITION_REQUIRED", fmt.Sprintf("accepted Project Truth unknown %q requires an explicit PRESERVED, RESOLVED, or REFINED disposition", unknownID), nil)
+			}
+		}
+	}
+	if len(seen) != len(impacted) {
+		return newError(KindUsage, "UNKNOWN_DISPOSITION_MISMATCH", "unknown dispositions must map exactly to impact.unknown_ids", nil)
+	}
+	return nil
+}
+
+func validateUnknownDispositionOutcomes(impact ChangeImpact, starting, candidate ProjectTruthConfig) error {
+	startingByID := make(map[string]TruthUnknown, len(starting.Unknowns))
+	for _, unknown := range starting.Unknowns {
+		startingByID[unknown.ID] = unknown
+	}
+	candidateByID := make(map[string]TruthUnknown, len(candidate.Unknowns))
+	for _, unknown := range candidate.Unknowns {
+		candidateByID[unknown.ID] = unknown
+	}
+	for _, disposition := range impact.UnknownDispositions {
+		before, beforeOK := startingByID[disposition.UnknownID]
+		after, afterOK := candidateByID[disposition.UnknownID]
+		if !beforeOK {
+			return newError(KindIntegrity, "CHANGE_START_UNKNOWN_MISSING", fmt.Sprintf("starting Project Truth no longer contains declared unknown %q", disposition.UnknownID), nil)
+		}
+		switch disposition.Outcome {
+		case UnknownDispositionPreserved:
+			if !afterOK || truthItemDigest(before) != truthItemDigest(after) {
+				return newError(KindBlocked, "UNKNOWN_DISPOSITION_UNSATISFIED", fmt.Sprintf("Project Truth unknown %q was declared PRESERVED but is absent or changed", disposition.UnknownID), nil)
+			}
+		case UnknownDispositionResolved:
+			if afterOK {
+				return newError(KindBlocked, "UNKNOWN_DISPOSITION_UNSATISFIED", fmt.Sprintf("Project Truth unknown %q was declared RESOLVED but remains present", disposition.UnknownID), nil)
+			}
+		case UnknownDispositionRefined:
+			if !afterOK || truthItemDigest(before) == truthItemDigest(after) {
+				return newError(KindBlocked, "UNKNOWN_DISPOSITION_UNSATISFIED", fmt.Sprintf("Project Truth unknown %q was declared REFINED but is absent or unchanged", disposition.UnknownID), nil)
+			}
+		default:
+			return newError(KindIntegrity, "INVALID_UNKNOWN_DISPOSITION", fmt.Sprintf("Change contains unsupported unknown disposition %q", disposition.Outcome), nil)
+		}
+	}
+	return nil
+}
+
+func unknownDispositionExpectsChange(impact ChangeImpact) bool {
+	for _, disposition := range impact.UnknownDispositions {
+		if disposition.Outcome == UnknownDispositionResolved || disposition.Outcome == UnknownDispositionRefined {
+			return true
+		}
+	}
+	return false
 }
 
 func validateChangeRequirements(requirements []ChangeRequirement, acceptance []string, impact ChangeImpact, gates GatesConfig, required bool) error {

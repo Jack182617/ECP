@@ -6,8 +6,9 @@ import (
 )
 
 const (
-	SchemaVersion = 1
-	CoreVersion   = "0.3.0-dev"
+	SchemaVersion                = 1
+	CoreVersion                  = "0.3.0-dev"
+	CurrentChangeContractVersion = 3
 )
 
 type Risk string
@@ -275,20 +276,38 @@ type Change struct {
 // ChangeImpact is a compact impact hypothesis, not a second requirements
 // document. References are checked against the accepted Project Truth.
 type ChangeImpact struct {
-	ProjectPurpose        bool     `json:"project_purpose"`
-	CapabilityIDs         []string `json:"capability_ids"`
-	InvariantIDs          []string `json:"invariant_ids"`
-	ComponentIDs          []string `json:"component_ids"`
-	DecisionIDs           []string `json:"decision_ids"`
-	ContractIDs           []string `json:"contract_ids"`
-	UnknownIDs            []string `json:"unknown_ids"`
-	UserJourneys          []string `json:"user_journeys"`
-	DataEffects           []string `json:"data_effects"`
-	OperationalEffects    []string `json:"operational_effects"`
-	ExpectedChanges       []string `json:"expected_changes"`
-	ExpectedPreservations []string `json:"expected_preservations"`
-	Unknowns              []string `json:"unknowns"`
+	ProjectPurpose        bool                 `json:"project_purpose"`
+	CapabilityIDs         []string             `json:"capability_ids"`
+	InvariantIDs          []string             `json:"invariant_ids"`
+	ComponentIDs          []string             `json:"component_ids"`
+	DecisionIDs           []string             `json:"decision_ids"`
+	ContractIDs           []string             `json:"contract_ids"`
+	UnknownIDs            []string             `json:"unknown_ids"`
+	UnknownDispositions   []UnknownDisposition `json:"unknown_dispositions,omitempty"`
+	UserJourneys          []string             `json:"user_journeys"`
+	DataEffects           []string             `json:"data_effects"`
+	OperationalEffects    []string             `json:"operational_effects"`
+	ExpectedChanges       []string             `json:"expected_changes"`
+	ExpectedPreservations []string             `json:"expected_preservations"`
+	Unknowns              []string             `json:"unknowns"`
 }
+
+// UnknownDisposition prevents a Change from mentioning an accepted Project
+// Truth unknown without deciding what the finished Change must do with it.
+// Core verifies the declared outcome against the starting and candidate Truth
+// epochs during semantic reconciliation.
+type UnknownDisposition struct {
+	UnknownID string                    `json:"unknown_id"`
+	Outcome   UnknownDispositionOutcome `json:"outcome"`
+}
+
+type UnknownDispositionOutcome string
+
+const (
+	UnknownDispositionPreserved UnknownDispositionOutcome = "PRESERVED"
+	UnknownDispositionResolved  UnknownDispositionOutcome = "RESOLVED"
+	UnknownDispositionRefined   UnknownDispositionOutcome = "REFINED"
+)
 
 type ChangeRequirementStatus string
 
@@ -828,6 +847,43 @@ type ChangeSummary struct {
 	Baseline            SnapshotRef `json:"baseline"`
 	SupersedesChangeID  string      `json:"supersedes_change_id,omitempty"`
 	LineageRootChangeID string      `json:"lineage_root_change_id,omitempty"`
+}
+
+// ChangeHistorySummary is the bounded default history projection used by
+// adapters that only need lifecycle orientation. Exact contracts remain
+// available through change get and the compatibility-preserving full list.
+type ChangeHistorySummary struct {
+	SchemaVersion       int         `json:"schema_version"`
+	ContractVersion     int         `json:"contract_version,omitempty"`
+	ProjectID           string      `json:"project_id"`
+	AuthorityID         string      `json:"authority_id"`
+	WorkspaceID         string      `json:"workspace_id"`
+	ChangeID            string      `json:"change_id"`
+	Title               string      `json:"title"`
+	State               ChangeState `json:"state"`
+	DeclaredRisk        Risk        `json:"declared_risk"`
+	Scope               []string    `json:"scope"`
+	SupersedesChangeID  string      `json:"supersedes_change_id,omitempty"`
+	LineageRootChangeID string      `json:"lineage_root_change_id,omitempty"`
+	CreatedAt           time.Time   `json:"created_at"`
+	FinishedAt          time.Time   `json:"finished_at,omitempty"`
+}
+
+// ContractSchemaView is a machine-readable description of the closed enums
+// accepted by the installed Core. It is intentionally available without
+// loading or registering a repository.
+type ContractSchemaView struct {
+	SchemaVersion              int                         `json:"schema_version"`
+	CoreVersion                string                      `json:"core_version"`
+	ChangeContractVersion      int                         `json:"change_contract_version"`
+	Risks                      []Risk                      `json:"risks"`
+	GateTiers                  []GateTier                  `json:"gate_tiers"`
+	RequirementStatuses        []ChangeRequirementStatus   `json:"requirement_statuses"`
+	RequirementVerifications   []RequirementVerification   `json:"requirement_verifications"`
+	RequirementOutcomes        []RequirementOutcome        `json:"requirement_outcomes"`
+	SemanticBehaviors          []SemanticBehavior          `json:"semantic_behaviors"`
+	SemanticCategories         []string                    `json:"semantic_categories"`
+	UnknownDispositionOutcomes []UnknownDispositionOutcome `json:"unknown_disposition_outcomes"`
 }
 
 type GatePlan struct {

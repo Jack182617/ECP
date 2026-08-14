@@ -58,6 +58,7 @@ not enable the current Workspace.
 
 | Command | Result and rule |
 | --- | --- |
+| `ecp schema get` | Read the installed Core's current Change contract version and closed risk, Gate tier, Requirement, semantic, and accepted-Unknown disposition enums. It loads no repository or authority state and is the adapter's authoritative payload-vocabulary preflight. |
 | `ecp project status [--root PATH]` | Read-only mode probe. It executes no project code, does not source-snapshot, and returns disabled without creating `.ecp` or authority state for an unregistered Workspace. It returns `authority_id`, `workspace_id`, and opaque `activation_token` for an immediately following mode transition. Optional `active_gate_run` makes assurance `INDETERMINATE`; do not guess whether it is live or abandoned. |
 | `ecp project init --name NAME [--root PATH]` | Create a new Draft Config and bootstrap registration/initial acceptance. Invoke only inside an explicit current project-enablement request and only when `.ecp` is absent. It does not enable ECP. |
 | `ecp project inspect [--root PATH]` | Read the exact candidate identity/digest without executing project code or registering it. Use after the final setup edit for existing unregistered `.ecp`. |
@@ -68,8 +69,9 @@ not enable the current Workspace.
 | `ecp context get [--root PATH]` | Read exact lifecycle context, accepted/candidate truth digests, source fingerprint, and optional unresolved `active_gate_run` for a registered Workspace. One response supplies start preconditions; a valid candidate truth drift may be entered only through an explicit recovery/adoption Change. |
 | `ecp policy get [--digest SHA256] [--root PATH]` | Recover the latest or one exact historical authority-backed accepted Project/Policy/Gates payload. It is authority-only and remains available when candidate control files drift or are malformed; it does not accept or rewrite the candidate. |
 | `ecp truth get [--digest SHA256] [--root PATH]` | Recover the latest or one exact historical authority-backed accepted structured Project Truth and exact UTF-8 `truth.json`/contract contents from private content-addressed blobs. It is authority-only and remains usable when the repository candidate drifts or is malformed; the optional digest must name a real accepted epoch, and missing, unsafe, or corrupt blobs are integrity failures. |
-| `ecp change start ... --expect-change TEXT... --expect-preserve TEXT... --requirement JSON... [--supersedes-change CANCELLED_ID] [--impact-project-purpose] [--impact-unknown-id ID...] --authority ID --workspace ID --activation-token SHA256 --config-digest SHA256 --truth-digest SHA256 --source-fingerprint SHA256` | Create one bounded ACTIVE Change with structured Impact and a sorted Requirement decision ledger against the exact immediately preceding context. Every acceptance/preservation/journey/data/operation/expected-change/impact-unknown item needs exact coverage; `BLOCKING_UNKNOWN` is refused. Existing protected facts require exact IDs. If source differs from the latest cancelled Change baseline, the replacement must explicitly supersede it and carries the original baseline/lineage. `--truth-digest` is accepted truth, never an unaccepted candidate. A stale activation/config/truth/source/target conflicts before append. |
-| `ecp change list [--root PATH]` | Read ACTIVE, COMPLETED, and CANCELLED history through the authority-only path, including full goal/scope/non-goals/acceptance/structured Impact and Semantic Assessment history. It remains available when Draft Config is malformed. |
+| `ecp change start ... --expect-change TEXT... --expect-preserve TEXT... --requirement JSON... [--supersedes-change CANCELLED_ID] [--impact-project-purpose] [--impact-unknown-id ID... --unknown-disposition JSON...] --authority ID --workspace ID --activation-token SHA256 --config-digest SHA256 --truth-digest SHA256 --source-fingerprint SHA256` | Create one bounded ACTIVE Change with structured Impact and a sorted Requirement decision ledger against the exact immediately preceding context. Every acceptance/preservation/journey/data/operation/expected-change/impact-unknown item needs exact coverage; `BLOCKING_UNKNOWN` is refused. Every accepted Truth Unknown named by `--impact-unknown-id` needs one sorted exact disposition declaring `PRESERVED`, `RESOLVED`, or `REFINED`; reconciliation verifies that outcome against the starting and candidate Truth epochs. Existing protected facts require exact IDs. If source differs from the latest cancelled Change baseline, the replacement must explicitly supersede it and carries the original baseline/lineage. `--truth-digest` is accepted truth, never an unaccepted candidate. A stale activation/config/truth/source/target conflicts before append. |
+| `ecp change list [--summary [--state ACTIVE\|COMPLETED\|CANCELLED] [--limit N]] [--root PATH]` | Read authority-backed Change history even when Draft Config is malformed. `--summary` returns newest-first lifecycle summaries and supports an optional state filter and limit of 1–1000; use it for routine orientation. Without `--summary`, the compatibility path returns every full contract, Semantic Assessment, completion, and cancellation and may be large. |
+| `ecp change get --change ID [--root PATH]` | Read one exact full Change history item through the authority-only path. Use after a bounded summary query when exact goal, Impact, Requirements, assessment, or terminal record is required. |
 | `ecp change cancel --authority ID --workspace ID --change ID --actor LABEL --reason TEXT` | Cancel exactly one immediately observed ACTIVE Change while keeping project mode enabled. User intent must explicitly target abandonment of that Change. |
 | `ecp truth diff [--root PATH]` | Read-only comparison of candidate Project Truth against the accepted epoch for the ACTIVE Change. Returns exact previous/candidate digests, deterministic structural/file delta, and protected flag; it never accepts the candidate. |
 | `ecp truth reconcile --authority ID --workspace ID --activation-token SHA256 --change ID --source-fingerprint SHA256 --previous-truth-digest SHA256 --candidate-truth-digest SHA256 --behavior PRESERVED\|CHANGED\|UNKNOWN --summary TEXT --category TEXT... --requirement-result JSON... [--confirm-protected] --actor LABEL --reason TEXT` | Record the exact semantic outcome and one sorted result for every Requirement. Automated items map to their declared Gate IDs; review, not-applicable, deferred-safe, and external-pending outcomes must match the start contract. `PRESERVED` requires zero truth delta and no expected change. `UNKNOWN` remains non-PASS. A nonzero CHANGED delta requires exact Impact coverage and protected confirmation, then atomically accepts candidate truth. |
@@ -143,6 +145,22 @@ Use `NOT_APPLICABLE` for that status, `DEFERRED_SAFE` for that status,
 `AUTOMATED` results carry the exact sorted `required_gate_ids` as
 `evidence_gate_ids`; reviewed results omit that field.
 
+The exact `--unknown-disposition` JSON shape is:
+
+```json
+{
+  "unknown_id": "exact-accepted-truth-unknown-id",
+  "outcome": "PRESERVED"
+}
+```
+
+Dispositions are unique and sorted by `unknown_id`, and map exactly to every
+ID supplied through `--impact-unknown-id`. `PRESERVED` requires the exact
+structured TruthUnknown to remain present and unchanged; `RESOLVED` requires it
+to be absent; `REFINED` requires it to remain present with changed structured
+content. These outcomes apply to accepted Truth Unknown IDs, not to free-text
+`--impact-unknown` startup uncertainty.
+
 - `project register` consumes one `project inspect` result:
   `authority_id`, `workspace_id`, `candidate_config_digest`, and
   `candidate_truth_digest`.
@@ -165,6 +183,11 @@ Use `NOT_APPLICABLE` for that status, `DEFERRED_SAFE` for that status,
 - `--requirement` values are exact JSON objects sorted by `id`. Core rejects
   unknown/duplicate fields, unresolved status, invalid verification mode,
   unknown Gate IDs, and uncovered Change contract items.
+- Read `schema get` from the same installed launcher before constructing a new
+  Change or semantic assessment. Its closed enums supersede remembered Skill
+  text if an adapter/candidate mismatch is detected; stop on such mismatch.
+- `--unknown-disposition` values are exact JSON objects sorted by `unknown_id`.
+  Core rejects missing, duplicate, unsupported, or out-of-impact dispositions.
 - `--supersedes-change` names only the latest cancelled Change in the current
   activation. It is required when that Change's original baseline still differs
   from current source and cannot be used to absorb paths outside the new scope.
@@ -182,8 +205,9 @@ Use `NOT_APPLICABLE` for that status, `DEFERRED_SAFE` for that status,
   not be used to infer that an old-looking `IN_PROGRESS` is abandoned.
 - `acknowledgement record` and `change complete` consume one immediately
   preceding Verdict's `change_id` and `subject_digest`.
-- `change cancel` consumes one immediately preceding ACTIVE history item's
-  authority, Workspace, and Change IDs.
+- `change cancel` consumes one immediately preceding
+  `change list --summary --state ACTIVE --limit 1` item's authority, Workspace,
+  and Change IDs.
 - `authority health` consumes no copied opaque precondition. It is a potentially
   nontrivial local diagnostic because it hashes every referenced historical
   object and waits for both authority leases; invoke it for an explicit health,

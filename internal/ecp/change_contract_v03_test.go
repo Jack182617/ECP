@@ -7,6 +7,163 @@ import (
 	"testing"
 )
 
+func TestAcceptedTruthUnknownRequiresDispositionAndSemanticOutcome(t *testing.T) {
+	ctx := context.Background()
+	repo := createTestRepository(t)
+	service := newTestService(t)
+	bootstrapProjectWithGate(t, ctx, service, repo, passingGitGate())
+
+	missing, err := startTestChange(t, ctx, service, repo, StartChangeInput{
+		Title: "Omit unknown disposition", Goal: "Prove accepted unknowns cannot silently survive a Change", Scope: []string{"src"},
+		AcceptanceCriteria: []string{"the accepted unknown has an explicit outcome"}, Risk: RiskModerate,
+		Impact: ChangeImpact{UnknownIDs: []string{"project-purpose-unreviewed"}},
+	})
+	if err == nil || !isErrorCode(err, "UNKNOWN_DISPOSITION_REQUIRED") || missing.ChangeID != "" {
+		t.Fatalf("Change without an accepted unknown disposition was not blocked: change=%+v err=%v", missing, err)
+	}
+
+	change, err := startTestChange(t, ctx, service, repo, StartChangeInput{
+		Title: "Resolve accepted unknown", Goal: "Bind the declared outcome to semantic reconciliation", Scope: []string{"src"},
+		AcceptanceCriteria: []string{"the accepted unknown is removed from Project Truth"}, Risk: RiskModerate,
+		Impact: ChangeImpact{
+			UnknownIDs:          []string{"project-purpose-unreviewed"},
+			UnknownDispositions: []UnknownDisposition{{UnknownID: "project-purpose-unreviewed", Outcome: UnknownDispositionResolved}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if change.ContractVersion != CurrentChangeContractVersion {
+		t.Fatalf("new Change contract_version=%d want=%d", change.ContractVersion, CurrentChangeContractVersion)
+	}
+	current, err := service.Context(ctx, repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	diff, err := service.TruthDiff(ctx, repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = assessTestSemantic(t, ctx, service, repo, SemanticAssessmentInput{
+		ExpectedAuthority: current.AuthorityID, ExpectedWorkspace: current.WorkspaceID, ExpectedActivation: current.ActivationToken,
+		ExpectedChangeID: change.ChangeID, ExpectedSource: current.Source.Fingerprint, ExpectedPreviousTruth: diff.PreviousTruthDigest,
+		ExpectedCandidateTruth: diff.CandidateTruthDigest, Behavior: SemanticBehaviorPreserved,
+		Summary: "No Project Truth item changed.", Categories: []string{"project-truth"}, Actor: "reviewer", Reason: "exercise the declared resolution",
+	})
+	if err == nil || !isErrorCode(err, "UNKNOWN_DISPOSITION_UNSATISFIED") {
+		t.Fatalf("semantic reconciliation accepted an unresolved RESOLVED disposition: %v", err)
+	}
+}
+
+func TestUnknownDispositionOutcomeMatrix(t *testing.T) {
+	starting := DefaultProjectTruth("unknown-disposition")
+	original := starting.Unknowns[0]
+	preserved := starting
+	resolved := starting
+	resolved.Unknowns = nil
+	refined := starting
+	refined.Unknowns = append([]TruthUnknown(nil), starting.Unknowns...)
+	refined.Unknowns[0].ResolutionCondition = "A reviewed product purpose is recorded with evidence."
+
+	cases := []struct {
+		name      string
+		outcome   UnknownDispositionOutcome
+		candidate ProjectTruthConfig
+		wantError bool
+	}{
+		{name: "preserved", outcome: UnknownDispositionPreserved, candidate: preserved},
+		{name: "resolved", outcome: UnknownDispositionResolved, candidate: resolved},
+		{name: "refined", outcome: UnknownDispositionRefined, candidate: refined},
+		{name: "resolved-but-present", outcome: UnknownDispositionResolved, candidate: preserved, wantError: true},
+		{name: "refined-but-unchanged", outcome: UnknownDispositionRefined, candidate: preserved, wantError: true},
+		{name: "preserved-but-changed", outcome: UnknownDispositionPreserved, candidate: refined, wantError: true},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			impact := ChangeImpact{
+				UnknownIDs:          []string{original.ID},
+				UnknownDispositions: []UnknownDisposition{{UnknownID: original.ID, Outcome: test.outcome}},
+			}
+			err := validateUnknownDispositionOutcomes(impact, starting, test.candidate)
+			if (err != nil) != test.wantError {
+				t.Fatalf("outcome %s error=%v wantError=%t", test.outcome, err, test.wantError)
+			}
+		})
+	}
+}
+
+func TestRefinedUnknownDispositionIsAnExpectedSemanticChange(t *testing.T) {
+	ctx := context.Background()
+	repo := createTestRepository(t)
+	service := newTestService(t)
+	bootstrapProjectWithGate(t, ctx, service, repo, passingGitGate())
+	change, err := startTestChange(t, ctx, service, repo, StartChangeInput{
+		Title: "Refine accepted unknown", Goal: "Make the resolution condition more actionable", Scope: []string{"src"},
+		AcceptanceCriteria: []string{"the accepted unknown names its concrete evidence requirement"}, Risk: RiskModerate,
+		Impact: ChangeImpact{
+			UnknownIDs:          []string{"project-purpose-unreviewed"},
+			UnknownDispositions: []UnknownDisposition{{UnknownID: "project-purpose-unreviewed", Outcome: UnknownDispositionRefined}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate, err := LoadConfig(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate.Truth.Unknowns[0].ResolutionCondition = "Record a reviewed product purpose with exact local Evidence."
+	if err := writePrettyJSON(filepath.Join(repo, ".ecp", "truth.json"), candidate.Truth, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	diff, err := service.TruthDiff(ctx, repo)
+	if err != nil || !diff.Changed {
+		t.Fatalf("refined candidate truth was not detected: %+v err=%v", diff, err)
+	}
+	current, err := service.Context(ctx, repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assessment, err := assessTestSemantic(t, ctx, service, repo, SemanticAssessmentInput{
+		ExpectedAuthority: current.AuthorityID, ExpectedWorkspace: current.WorkspaceID, ExpectedActivation: current.ActivationToken,
+		ExpectedChangeID: change.ChangeID, ExpectedSource: current.Source.Fingerprint, ExpectedPreviousTruth: diff.PreviousTruthDigest,
+		ExpectedCandidateTruth: diff.CandidateTruthDigest, Behavior: SemanticBehaviorChanged,
+		Summary: "The accepted uncertainty remains open with a more exact resolution condition.", Categories: []string{"project-truth"},
+		Actor: "reviewer", Reason: "confirm the exact refined accepted Unknown", ConfirmProtected: true,
+	})
+	if err != nil || assessment.Behavior != SemanticBehaviorChanged {
+		t.Fatalf("refined Unknown alone did not count as an expected semantic change: %+v err=%v", assessment, err)
+	}
+}
+
+func TestCompactChangeHistoryFiltersAndExactGet(t *testing.T) {
+	ctx := context.Background()
+	repo := createTestRepository(t)
+	service := newTestService(t)
+	bootstrapProjectWithGate(t, ctx, service, repo, passingGitGate())
+	change, err := startTestChange(t, ctx, service, repo, StartChangeInput{
+		Title: "Compact history", Goal: "Keep routine history queries bounded", Scope: []string{"src"},
+		AcceptanceCriteria: []string{"summary omits the full contract while exact get preserves it"}, Risk: RiskModerate,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cancelTestChange(t, ctx, service, repo, change.ChangeID, "owner", "exercise terminal history"); err != nil {
+		t.Fatal(err)
+	}
+	summaries, err := service.ListChangeSummaries(ctx, repo, ChangeCancelled, 1)
+	if err != nil || len(summaries) != 1 || summaries[0].ChangeID != change.ChangeID || summaries[0].FinishedAt.IsZero() {
+		t.Fatalf("unexpected compact history: %+v err=%v", summaries, err)
+	}
+	exact, err := service.GetChange(ctx, repo, change.ChangeID)
+	if err != nil || exact.Goal != change.Goal || len(exact.AcceptanceCriteria) != 1 || exact.Cancellation == nil {
+		t.Fatalf("exact Change retrieval lost contract history: %+v err=%v", exact, err)
+	}
+	if _, err := service.ListChangeSummaries(ctx, repo, ChangeState("BROKEN"), 0); err == nil || !isErrorCode(err, "INVALID_CHANGE_STATE") {
+		t.Fatalf("invalid summary state was accepted: %v", err)
+	}
+}
+
 func TestChangeRequirementsRejectSilentAmbiguityAndUncoveredContract(t *testing.T) {
 	ctx := context.Background()
 	repo := createTestRepository(t)

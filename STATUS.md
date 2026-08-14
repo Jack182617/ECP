@@ -1,6 +1,6 @@
 # ECP Current Status
 
-Canonical status as of 2026-08-13. This file answers “where are we and what is
+Canonical status as of 2026-08-14. This file answers “where are we and what is
 next”; detailed contracts remain in the linked documents.
 
 ## Verdict
@@ -16,6 +16,10 @@ real-project value remain unverified.
 ECP's own source Workspace remains unregistered and disabled. ECP itself was
 not enabled, used as a qualification fixture, or counted as a real-project
 pilot track.
+
+The qualified installed candidate remains unchanged. The current source
+Workspace is now a post-qualification development iteration and is not yet a
+packaged, installed, or Desktop-qualified replacement candidate.
 
 ## Current checkpoint
 
@@ -88,22 +92,47 @@ pilot track.
   candidates that failed. Their failures were fixed in later source commits and
   they were not resumed, merged into, or counted toward the successful formal
   campaign.
+- Exploratory use in one established real project completed multiple bounded
+  local Changes and demonstrated that enabled routing, authority history,
+  Gate/Evidence/Verdict, cancellation, and completion work outside synthetic
+  fixtures. It also exposed actionable friction: an affected accepted Truth
+  Unknown could remain stale after a related PASS Change; adapters could guess
+  unsupported enum/payload fields or omit required semantic categories;
+  routine full-history reads grew rapidly; conservative impact could trigger
+  broad risk/confirmation and full-build cost. This use was on the canonical
+  project Workspace without the pilot preregistration, safe-copy controls,
+  frozen thresholds, or seven-day observation window, so it is exploratory
+  product evidence, not a completed Phase 1B pilot.
+- The current source iteration addresses those observations with Change
+  contract version 3 accepted-Unknown dispositions, an authority-independent
+  `schema get` machine contract, bounded/filterable Change history plus exact
+  single-Change recovery, strengthened Skill routing/reporting language, and
+  an automated Core-identity upgrade transition test. Historical contract
+  versions 0/2 remain readable. The current worktree passes `git diff --check`,
+  `go vet ./...`, all 26 Python qualification-protocol tests, and
+  `go test ./... -count=1` (including the 79-scenario traceability matrix).
+  This is repository evidence only: the changes do not affect an installed
+  Plugin or existing project until a new package is explicitly built,
+  validated, installed, and loaded by a fresh task.
 
 ## Next actions, in order
 
-1. Use the installed candidate on safe copies of one genuinely new product and
-   one established product. Enabling remains a separate explicit whole-
-   Workspace decision for each product; Plugin installation alone never enables
-   a project.
-2. Complete two or three bounded real Changes and one fresh-task handoff in
-   each track. Measure recovered context, useful catches, false blockers,
-   interaction burden, validation time, and truth-maintenance cost.
-3. Decide whether to expand, simplify, or stop the rollout from those
-   value-versus-friction observations. Do not pre-commit to a larger matrix or a
-   fixed Change count merely to manufacture completion.
-4. Only after successful pilot evidence, define a release candidate and add the
-   still-required distribution, signing, CI-enforcement, cross-host runtime,
-   and operational support gates.
+1. Review and intentionally accept the current source diff. Commit remains a
+   separate explicit action; repository-green does not make a package.
+2. In a separately authorized distribution step, allocate a new Plugin
+   cachebuster, package all runtimes, run package/Skill validation, and inspect
+   the exact candidate without overwriting the qualified installed cache.
+3. Before using that candidate on an existing project, validate upgrade on a
+   disposable enabled Workspace with preserved authority: mode/history survive,
+   old Evidence becomes inapplicable, fresh Evidence restores PASS, fresh tasks
+   load all four new Skills, and uninstall/reinstall/rollback boundaries remain
+   honest. Installation, removal, or global Codex configuration still requires
+   explicit user authorization.
+4. Re-run the 16 fresh-task Desktop canaries for the new frozen candidate. The
+   prior 16/16 result does not transfer across Core/Skill identity changes.
+5. Only then run the preregistered greenfield and established safe-copy pilot
+   tracks, including the seven-day observation window, and decide whether to
+   expand, simplify, or stop from value-versus-friction evidence.
 
 The pilot protocol is [docs/real-project-pilot.md](docs/real-project-pilot.md),
 the roadmap is [docs/roadmap.md](docs/roadmap.md), and package boundaries are
