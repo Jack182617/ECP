@@ -173,13 +173,13 @@ and is not resumed or counted toward this gate.
 | --- | --- | --- |
 | Local v0.3 Core/CLI semantic loop | Implementation plus the 79-scenario mapping above | Locally automated |
 | User does not handwrite product code or operate ECP CLI | Four-Skill contracts, CLI hiding rules, 16-canary evidence, and pilot protocol | Exact candidate qualified; longitudinal user-friction proof remains open |
-| Exact installed-candidate host activation and output quality | 16-canary protocol in `docs/plugin-host-evaluation.md` and `docs/real-project-pilot.md` | `QUALIFIED` for `0.3.0-dev+codex.20260813115751`: 16/16, 0 INVALID |
+| Exact installed-candidate host activation and output quality | 16-canary protocol in `docs/plugin-host-evaluation.md` and `docs/real-project-pilot.md` | `QUALIFIED` for `0.3.0-dev+codex.20260814091408`: 16/16, 0 INVALID |
 | New task recovers without historical chat | Authority truth/policy/history tests | Mechanism proven; independent-project task proof missing |
 | Independent greenfield and established product safety copies | two or three bounded Changes and one fresh-task handoff per track in `docs/real-project-pilot.md` | `X` — discovery pilot not performed |
 | Multi-year complexity/capacity/retention | Segmentation, health, and explicit bounds | `X` — not proven; retention/repair/GC absent |
 | Team/cross-machine authority continuity | Project Pack is portable; local Evidence is Workspace-bound | `X` — no lineage/import/shared-authority protocol |
 | Installed-copy launcher, exact identity, default-disabled status, and `READY` boundary | Cache-layout tests plus completed 16-canary protocol | Qualified for the frozen installed candidate only |
-| Fresh-task upgrade, uninstall, reinstall, and full four-Skill pickup | Core identity transition test plus distribution/host-routing protocol | Authority/mode/Evidence transition locally automated; installed host lifecycle `X` — not performed |
+| Fresh-task upgrade, uninstall, reinstall, and full four-Skill pickup | Core identity transition test plus distribution/host-routing protocol | Installed old-to-current upgrade and current-locator fresh-task pickup passed; uninstall, remove-then-reinstall, rollback, and another host remain open |
 | Trusted Plugin distribution | Checksums and reproducible package | `X` — unsigned, unnotarized, unpublished |
 | Protected CI/release enforcement | `docs/ci-consumer-contract.md` only | `X` — not implemented or deployed |
 | Isolated/hermetic Gate execution | Timeout/process-group/bounded-output hardening | `X` — no sandbox/VM, network or same-user isolation |
@@ -192,7 +192,7 @@ candidate implements its bounded Core/CLI/Skill contracts on the tested host.
 It cannot establish the full North Star product claim. The frozen installed
 candidate has completed its 16-canary Desktop gate, but the broader claim
 remains unproven until the bounded greenfield and established safe-copy pilots,
-their fresh-task handoffs, installed upgrade/uninstall/reinstall lifecycle,
+their fresh-task handoffs, the remaining uninstall/reinstall/rollback lifecycle,
 and the chosen CI/isolation boundaries provide their own evidence.
 The pilot's immediate decision is whether observed value exceeds friction and
 warrants expansion; it is not a shortcut to release readiness or a reason to

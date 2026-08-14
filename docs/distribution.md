@@ -164,10 +164,15 @@ Workspace bindings, mode, or authority history. The compatibility contract is:
   migration and no authority restore/import fallback.
 
 `TestCoreIdentityUpgradePreservesAuthorityAndRequiresFreshEvidence` automates
-the in-process authority/mode/history/Evidence transition. It is repository
-mechanism evidence only; a real installed Plugin upgrade, restart, four-Skill
-pickup, uninstall, reinstall, and rollback still require separate host
-validation.
+the in-process authority/mode/history/Evidence transition. A separate disposable
+host lifecycle has now exercised an actual installed transition from
+`0.3.0-dev+codex.20260813115751` to
+`0.3.0-dev+codex.20260814091408`: enabled mode and authority history survived,
+old execution-bound Evidence became stale under the new Core identity, a fresh
+plan/GateRun restored PASS and completed the ACTIVE Change, and independent
+fresh tasks loaded the current installed locator. This does not validate
+uninstall, remove-then-reinstall, forward rollback, or another host/account;
+those remain separate operations.
 
 ### Failure recovery and rollback
 
@@ -211,15 +216,16 @@ Evidence compatibility identity, not publisher provenance.
 
 Terminated earlier host-routing campaigns recorded in
 `docs/plugin-host-evaluation.md` are diagnostic only and were not resumed to
-reach a historical run count. The later frozen installed candidate
-`0.3.0-dev+codex.20260813115751` completed the separate 16-canary campaign at
+reach a historical run count. The current frozen installed candidate
+`0.3.0-dev+codex.20260814091408` completed a new separate 16-canary campaign at
 16/16 with 0 INVALID attempts. That result applies only to that exact package,
-Desktop inventory, Skill locators, Core identity, and evaluator contract.
+Desktop inventory, Skill locators, Core identity, and evaluator contract; the
+earlier qualified package remains historical evidence for its own identity.
 
 The current source package is still unsigned, unnotarized, and unpublished in
-the universal directory. The trusted project-scoped dedicated-state handoff,
-installed upgrade, uninstall, reinstallation, and longitudinal real-project
-value have not been formally validated.
+the universal directory. Uninstall, remove-then-reinstall, forward rollback,
+cross-machine/team handoff, and longitudinal real-project value have not been
+formally validated.
 Keep these claims separate: source and repository checks are mechanism
 evidence, while host routing, lifecycle compatibility, publisher provenance,
 and product value remain independent release requirements. A separate release

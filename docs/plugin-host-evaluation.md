@@ -6,9 +6,15 @@ for one exact installed `ecp-codex` package. It checks the host adapter's Skill
 selection and repository/authority safety; it does not turn Plugin routing into
 an OS, shell, CI, or release enforcement boundary.
 
-No qualification canary has passed yet. Do not start a real-project pilot until
-the installed Skill locator resolves one newly frozen candidate and the
-canonical validator reports `QUALIFIED` for all 16 cases.
+The current accepted campaign is `ecp-codex-20260814-091408-r3`, bound to
+Codex Desktop `com.openai.codex|26.810.41047|6570`, installed Plugin
+`0.3.0-dev+codex.20260814091408`, and Core
+`0.3.0-dev+sha256:73cb39fcbac178a313ed9e18ef4a0b45e87db70c726e95962c46d43e9c485ac4`.
+The canonical validator reports `QUALIFIED: 16 qualification cases passed; 0
+INVALID attempts and 0 extended diagnostics preserved`. This qualifies only
+that unchanged exact candidate/environment for the separately controlled pilot;
+it is not a production, release, signing, CI-enforcement, or product-value
+verdict.
 
 ## Canonical artifacts and acceptance rule
 
@@ -349,6 +355,13 @@ The terminated older duplicated-run campaign and earlier smoke tasks are
 diagnostic only. They used a stale installed locator and/or non-canonical
 fixtures and count as zero qualification passes. They must not be resumed to
 reach a historical run count.
+
+The current accepted campaign ran all 16 cases serially in independent fresh
+Desktop tasks, opaque disposable Git Workspaces, and dedicated authorities. It
+preserved zero product `FAIL`, zero infrastructure `INVALID`, and zero extended
+diagnostics. A separate installed-upgrade lifecycle also preserved mode and
+history while requiring fresh Evidence under the new Core identity. The
+real-project pilot itself has not been executed or counted by either result.
 
 The real-project pilot may begin only after:
 

@@ -17,21 +17,15 @@ ECP's own source Workspace remains unregistered and disabled. ECP itself was
 not enabled, used as a qualification fixture, or counted as a real-project
 pilot track.
 
-The previously qualified installed candidate remains the only candidate with a
-completed 16-canary Desktop campaign. The current source iteration has now been
-packaged and installed as a replacement local candidate, with source/cache
-identity and read-only launcher acceptance completed in the installing task. It
-is not yet fresh-task accepted or Desktop-qualified.
+The current installed candidate is now the only candidate accepted for the next
+controlled pilot decision. It has passed independent fresh-task installed-copy
+acceptance, an isolated installed-Core upgrade lifecycle, and a new 16-canary
+Codex Desktop qualification campaign. The earlier qualified package remains
+historical evidence for its own identity and is not carried forward.
 
 ## Current checkpoint
 
-- The last Desktop-qualified Plugin version is
-  `0.3.0-dev+codex.20260813115751`. Its runtime
-  manifest records `source_commit`
-  `66cf40f422661d98d4cd139d54364f04c4896545` and `source_clean: true`. The
-  active Darwin/arm64 Core identity is
-  `0.3.0-dev+sha256:838212455e6c97c567fef748dd4eb8da95ed268756be9bd411590e13744dd0af`.
-- The replacement local candidate is
+- The current Desktop-qualified Plugin version is
   `0.3.0-dev+codex.20260814091408`. Its runtime manifest records
   `source_commit` `b950ac78112bc9570e58c0723b7dcd56c22b067c` and
   `source_clean: true`; its Darwin/arm64 Core identity is
@@ -39,17 +33,17 @@ is not yet fresh-task accepted or Desktop-qualified.
   All four packaged targets reproduced byte-for-byte across two independent
   builds. The installed cache is byte-for-byte identical to the reviewed
   Plugin source; the official Plugin validator, all four Skill validators,
-  installed `version`, `schema get`, and read-only project status pass. The
-  installing task does not prove fresh-task Skill pickup, restart behavior, or
-  a new 16-canary qualification campaign.
+  installed `version`, `schema get`, and read-only project status pass.
+  Independent fresh tasks after Desktop restart loaded this exact installed
+  Skill locator and reported the same Plugin/Core identity without changing the
+  source Workspace's disabled mode.
 - The previous ECP marketplace/provider entries were removed. At qualification
-  time, `0.3.0-dev+codex.20260813115751` was installed from the sole remaining
-  ECP provider/cache entry; its installed tree matched the packaged source, all
-  Plugin/Skill validators passed using an isolated `/private/tmp` PyYAML 6.0.2
-  target, and Codex Desktop was restarted so fresh qualification tasks loaded
-  that exact installed locator.
+  time, the current package was the sole enabled installed `ecp-codex` provider;
+  its installed tree matched the packaged source and every scored task used its
+  installed launcher rather than a repository, temporary, ambient, or remembered
+  binary.
 - The formal immutable campaign is
-  `<durable-results-root>/ecp-codex-20260813-115751`; the private local root is
+  `<durable-results-root>/ecp-codex-20260814-091408-r3`; the private local root is
   intentionally not recorded in this public repository.
   The official validator reports: `QUALIFIED: 16 qualification cases passed;
   0 INVALID attempts and 0 extended diagnostics preserved`.
@@ -60,6 +54,13 @@ is not yet fresh-task accepted or Desktop-qualified.
   action paths. The final governed case completed one bounded Change, one
   offline GateRun, one PASS Evidence, and Change completion while preserving
   the prohibition on commit, push, deploy, and CI mutation.
+- A separate disposable installed-upgrade lifecycle moved one enabled Workspace
+  with dedicated authority from the earlier qualified package to the current
+  package. Workspace mode, ACTIVE/terminal Change history, GateRun history, and
+  Evidence remained queryable; the new Core rejected the old execution-bound
+  Evidence as stale, required a new plan and GateRun, then returned PASS and
+  completed the Change. No real project, default authority, or ECP source
+  Workspace was used for that lifecycle.
 - The source candidate stops greenfield enablement when Core reports `READY`,
   leaves Truth onboarding as a separately authorized later Change, completes
   the initial bootstrap-to-accepted-candidate transaction without an unrelated
@@ -106,7 +107,10 @@ is not yet fresh-task accepted or Desktop-qualified.
 - Earlier failed campaigns remain immutable diagnostic evidence for the exact
   candidates that failed. Their failures were fixed in later source commits and
   they were not resumed, merged into, or counted toward the successful formal
-  campaign.
+  campaign. A preflight-only default-authority sentinel mismatch was likewise
+  preserved rather than scored; the validator now uses the fixture builder's
+  deterministic nonempty tree contract, including regular files and symlinks,
+  and the successful campaign started from a new immutable results root.
 - Exploratory use in one established real project completed multiple bounded
   local Changes and demonstrated that enabled routing, authority history,
   Gate/Evidence/Verdict, cancellation, and completion work outside synthetic
@@ -124,29 +128,25 @@ is not yet fresh-task accepted or Desktop-qualified.
   single-Change recovery, strengthened Skill routing/reporting language, and
   an automated Core-identity upgrade transition test. Historical contract
   versions 0/2 remain readable. The current worktree passes `git diff --check`,
-  `go vet ./...`, all 26 Python qualification-protocol tests, and
+  `go vet ./...`, all 27 Python qualification-protocol tests, and
   `go test ./... -count=1` (including the 79-scenario traceability matrix).
-  The changes are now packaged, validated, and installed locally. They still do
-  not affect another installation, and the current task cannot prove that a
-  fresh Desktop task loaded the new Skill locator. No existing project's mode,
-  authority history, source, or `.ecp` was rewritten by installation.
+  The changes are now packaged, validated, installed locally, fresh-task
+  accepted, upgrade-checked, and Desktop-qualified. They still do not affect
+  another installation. No existing real project's mode, authority history,
+  source, or `.ecp` was rewritten by installation or qualification.
 
 ## Next actions, in order
 
-1. Restart Codex Desktop and use a fresh task for installed-copy acceptance:
-   confirm the new Plugin/Skill locator, exact Core identity, published contract
-   schema, and unchanged project mode.
-2. Before using that candidate on an existing project, validate upgrade on a
-   disposable enabled Workspace with preserved authority: mode/history survive,
-   old Evidence becomes inapplicable, fresh Evidence restores PASS, fresh tasks
-   load all four new Skills, and uninstall/reinstall/rollback boundaries remain
-   honest. Installation, removal, or global Codex configuration still requires
-   explicit user authorization.
-3. Re-run the 16 fresh-task Desktop canaries for the new frozen candidate. The
-   prior 16/16 result does not transfer across Core/Skill identity changes.
-4. Only then run the preregistered greenfield and established safe-copy pilot
-   tracks, including the seven-day observation window, and decide whether to
-   expand, simplify, or stop from value-versus-friction evidence.
+1. Run the separately owned, preregistered greenfield and established safe-copy
+   pilot tracks without using ECP's source Workspace, a production Workspace, a
+   release branch, or a project's only copy.
+2. Complete the fixed seven-day observation window and Owner review, then decide
+   whether to expand, simplify and retry, or stop from the frozen
+   value-versus-friction thresholds.
+3. Treat uninstall, remove-then-reinstall, forward rollback, cross-machine/team
+   handoff, signing/notarization, public distribution, and release as separate
+   explicitly authorized evidence gates; qualification and pilot permission do
+   not complete any of them.
 
 The pilot protocol is [docs/real-project-pilot.md](docs/real-project-pilot.md),
 the roadmap is [docs/roadmap.md](docs/roadmap.md), and package boundaries are

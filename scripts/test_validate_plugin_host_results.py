@@ -14,11 +14,16 @@ import unittest
 
 
 SCRIPT = Path(__file__).with_name("validate-plugin-host-results.py")
+FIXTURE_SCRIPT = Path(__file__).with_name("plugin-host-fixture.py")
 SCHEMA = SCRIPT.parents[1] / "docs" / "plugin-host-evaluation-result.schema.json"
 SPEC = importlib.util.spec_from_file_location("plugin_host_results", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 validator = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(validator)
+FIXTURE_SPEC = importlib.util.spec_from_file_location("plugin_host_fixture", FIXTURE_SCRIPT)
+assert FIXTURE_SPEC is not None and FIXTURE_SPEC.loader is not None
+fixture = importlib.util.module_from_spec(FIXTURE_SPEC)
+FIXTURE_SPEC.loader.exec_module(fixture)
 
 
 def digest(character: str) -> str:
@@ -432,6 +437,19 @@ class ValidatorTests(unittest.TestCase):
                 "version": "0.3.0-dev+codex.test",
             }
             self.assertIsNone(validator.installed_path_from(symlinked, cache_root))
+
+    def test_nonempty_default_authority_uses_fixture_sentinel_digest(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            authority = Path(temporary) / "state-v1"
+            nested = authority / "projects" / "project-1"
+            nested.mkdir(parents=True)
+            (nested / "events.json").write_text('{"event":"accepted"}\n', encoding="utf-8")
+            (authority / "latest").symlink_to("projects/project-1")
+
+            self.assertEqual(
+                validator.sentinel_tree_digest(authority),
+                fixture.tree_digest(authority),
+            )
 
     def test_extended_case_requires_completed_qualification(self) -> None:
         extended = next(case for case in self.cases.values() if case["suite"] == "extended")

@@ -29,6 +29,18 @@ ECP 的价值不能由 ECP 仓库自己的单元测试、静态 Skill 文本或�
 
 Workspace 和 authority 可以在证据冻结后删除；campaign manifest、不可变 task ledger/rollout readback、fixture metadata、exact identities、原始观测、分类理由和所有 `FAIL`/`INVALID`/retry 必须写入 ECP 仓库之外的持久 results root。`/tmp`、`/private/tmp` 或 Codex task 聊天不能是结果的唯一保存位置。已经终止的旧 campaign 只保留诊断意义，不得恢复来追求历史 run count，也不构成 qualification。
 
+当前前置 gate 已由 campaign `ecp-codex-20260814-091408-r3` 满足。它绑定
+Codex Desktop `com.openai.codex|26.810.41047|6570`、installed Plugin
+`0.3.0-dev+codex.20260814091408` 和 Core
+`0.3.0-dev+sha256:73cb39fcbac178a313ed9e18ef4a0b45e87db70c726e95962c46d43e9c485ac4`；
+官方 validator 结果是 `QUALIFIED: 16 qualification cases passed; 0 INVALID
+attempts and 0 extended diagnostics preserved`。另一个隔离的 installed-upgrade
+lifecycle 已验证 mode/history 保留、旧 Evidence 失效和新 Evidence 恢复 PASS。
+这些结果只打开下一步试点入口：两条 safe-copy 轨道、试点前冻结注册表、Owner
+确认和七日观察窗仍未执行，也不得由 exploratory 真实项目使用或 qualification
+结果代替。若 Plugin/Core/Skill、Desktop build/inventory 或 evaluator 合同变化，
+必须为新 exact candidate 重新通过前置 gate。
+
 ## 两条安全副本轨道
 
 Canary gate 通过后，选择两个与 ECP 实现独立、可安全本地验证的仓库副本：

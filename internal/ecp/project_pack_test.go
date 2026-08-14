@@ -938,7 +938,7 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	}
 	protocol := strings.Join(strings.Fields(string(protocolBytes)), " ")
 	for _, boundary := range []string{
-		"No qualification canary has passed yet", "Each scored task is fresh", "no evaluator follow-up is part of this protocol",
+		"The current accepted campaign is", "Each scored task is fresh", "no evaluator follow-up is part of this protocol",
 		"The profiles are deterministic states, not reusable instances",
 		"Every attempt is immutable and consumed",
 		"must not search for or read", "this inventory, protocol, result schema, campaign results",
@@ -986,9 +986,9 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 		"ECP itself was not enabled, used as a qualification fixture, or counted as a real-project pilot track",
 		"dedicated authorities",
 		"Earlier failed campaigns remain immutable diagnostic evidence",
-		"The prior 16/16 result does not transfer across Core/Skill identity changes",
-		"Only then run the preregistered greenfield and established safe-copy pilot tracks",
-		"Installation, removal, or global Codex configuration still requires explicit user authorization",
+		"historical evidence for its own identity and is not carried forward",
+		"Run the separately owned, preregistered greenfield and established safe-copy pilot tracks",
+		"explicitly authorized evidence gates",
 	} {
 		if !strings.Contains(status, boundary) {
 			t.Fatalf("canonical status lost host-routing boundary %q", boundary)
