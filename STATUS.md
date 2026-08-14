@@ -17,22 +17,37 @@ ECP's own source Workspace remains unregistered and disabled. ECP itself was
 not enabled, used as a qualification fixture, or counted as a real-project
 pilot track.
 
-The qualified installed candidate remains unchanged. The current source
-Workspace is now a post-qualification development iteration and is not yet a
-packaged, installed, or Desktop-qualified replacement candidate.
+The previously qualified installed candidate remains the only candidate with a
+completed 16-canary Desktop campaign. The current source iteration has now been
+packaged and installed as a replacement local candidate, with source/cache
+identity and read-only launcher acceptance completed in the installing task. It
+is not yet fresh-task accepted or Desktop-qualified.
 
 ## Current checkpoint
 
-- The formal Plugin version is `0.3.0-dev+codex.20260813115751`. Its runtime
+- The last Desktop-qualified Plugin version is
+  `0.3.0-dev+codex.20260813115751`. Its runtime
   manifest records `source_commit`
   `66cf40f422661d98d4cd139d54364f04c4896545` and `source_clean: true`. The
   active Darwin/arm64 Core identity is
   `0.3.0-dev+sha256:838212455e6c97c567fef748dd4eb8da95ed268756be9bd411590e13744dd0af`.
-- The previous ECP marketplace/provider entries were removed. The candidate is
-  installed from the sole remaining ECP provider/cache entry, its installed
-  tree matches the packaged source, all Plugin/Skill validators pass using an
-  isolated `/private/tmp` PyYAML 6.0.2 target, and Codex Desktop was restarted
-  before qualification so fresh tasks loaded this exact installed locator.
+- The replacement local candidate is
+  `0.3.0-dev+codex.20260814091408`. Its runtime manifest records
+  `source_commit` `b950ac78112bc9570e58c0723b7dcd56c22b067c` and
+  `source_clean: true`; its Darwin/arm64 Core identity is
+  `0.3.0-dev+sha256:73cb39fcbac178a313ed9e18ef4a0b45e87db70c726e95962c46d43e9c485ac4`.
+  All four packaged targets reproduced byte-for-byte across two independent
+  builds. The installed cache is byte-for-byte identical to the reviewed
+  Plugin source; the official Plugin validator, all four Skill validators,
+  installed `version`, `schema get`, and read-only project status pass. The
+  installing task does not prove fresh-task Skill pickup, restart behavior, or
+  a new 16-canary qualification campaign.
+- The previous ECP marketplace/provider entries were removed. At qualification
+  time, `0.3.0-dev+codex.20260813115751` was installed from the sole remaining
+  ECP provider/cache entry; its installed tree matched the packaged source, all
+  Plugin/Skill validators passed using an isolated `/private/tmp` PyYAML 6.0.2
+  target, and Codex Desktop was restarted so fresh qualification tasks loaded
+  that exact installed locator.
 - The formal immutable campaign is
   `<durable-results-root>/ecp-codex-20260813-115751`; the private local root is
   intentionally not recorded in this public repository.
@@ -111,26 +126,25 @@ packaged, installed, or Desktop-qualified replacement candidate.
   versions 0/2 remain readable. The current worktree passes `git diff --check`,
   `go vet ./...`, all 26 Python qualification-protocol tests, and
   `go test ./... -count=1` (including the 79-scenario traceability matrix).
-  This is repository evidence only: the changes do not affect an installed
-  Plugin or existing project until a new package is explicitly built,
-  validated, installed, and loaded by a fresh task.
+  The changes are now packaged, validated, and installed locally. They still do
+  not affect another installation, and the current task cannot prove that a
+  fresh Desktop task loaded the new Skill locator. No existing project's mode,
+  authority history, source, or `.ecp` was rewritten by installation.
 
 ## Next actions, in order
 
-1. Review and intentionally accept the current source diff. Commit remains a
-   separate explicit action; repository-green does not make a package.
-2. In a separately authorized distribution step, allocate a new Plugin
-   cachebuster, package all runtimes, run package/Skill validation, and inspect
-   the exact candidate without overwriting the qualified installed cache.
-3. Before using that candidate on an existing project, validate upgrade on a
+1. Restart Codex Desktop and use a fresh task for installed-copy acceptance:
+   confirm the new Plugin/Skill locator, exact Core identity, published contract
+   schema, and unchanged project mode.
+2. Before using that candidate on an existing project, validate upgrade on a
    disposable enabled Workspace with preserved authority: mode/history survive,
    old Evidence becomes inapplicable, fresh Evidence restores PASS, fresh tasks
    load all four new Skills, and uninstall/reinstall/rollback boundaries remain
-   honest. Installation, removal, or global Codex configuration still requires
+   honest. Removal or further global Codex configuration still requires
    explicit user authorization.
-4. Re-run the 16 fresh-task Desktop canaries for the new frozen candidate. The
+3. Re-run the 16 fresh-task Desktop canaries for the new frozen candidate. The
    prior 16/16 result does not transfer across Core/Skill identity changes.
-5. Only then run the preregistered greenfield and established safe-copy pilot
+4. Only then run the preregistered greenfield and established safe-copy pilot
    tracks, including the seven-day observation window, and decide whether to
    expand, simplify, or stop from value-versus-friction evidence.
 
