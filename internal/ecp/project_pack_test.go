@@ -411,6 +411,7 @@ func TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries(t *testing.T) {
 			"Never infer current state from `.ecp`, Plugin installation, chat history",
 			"also run `ecp version` through the same launcher",
 			"label that fact `unverified`",
+			"change list --summary",
 			"Never invoke project init/register/enable/disable",
 		},
 		"ecp-enable": {
@@ -446,12 +447,15 @@ func TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries(t *testing.T) {
 			"Without that confirmation, stop and preserve the drift.",
 			"Never set, synthesize, or infer a Verdict",
 			"zero-silent-ambiguity guarantee",
+			"Run `ecp schema get` once",
+			"--unknown-disposition",
 			"Treat a `high` or `critical` effective risk as a pre-write human-confirmation barrier.",
 			"keep the Change ACTIVE and stop with no repository write, GateRun, or Evidence.",
 			"This human decision is not yet a Core acknowledgement event",
 			"--supersedes-change",
 			"inferred_impact",
 			"Do not run unrelated full suites merely for completeness.",
+			"not general network isolation",
 			"Local PASS does not mean defect-free, committed, pushed, deployed, published",
 		},
 	}
@@ -525,6 +529,9 @@ func TestBundledSkillsEncodeFocusedAdapterSafetyBoundaries(t *testing.T) {
 		"Never open or traverse the live `ECP_STATE_DIR`",
 		"obtain explicit confirmation before the first repository write or Gate run",
 		"This is a human decision, not a premature Core acknowledgement.",
+		"`ecp schema get`",
+		"`ecp change list [--summary",
+		"The exact `--unknown-disposition` JSON shape is:",
 	} {
 		if !strings.Contains(cliContract, boundary) {
 			t.Fatalf("Plugin CLI contract lost adapter boundary %q", boundary)
@@ -931,7 +938,7 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	}
 	protocol := strings.Join(strings.Fields(string(protocolBytes)), " ")
 	for _, boundary := range []string{
-		"No qualification canary has passed yet", "Each scored task is fresh", "no evaluator follow-up is part of this protocol",
+		"The current accepted campaign is", "Each scored task is fresh", "no evaluator follow-up is part of this protocol",
 		"The profiles are deterministic states, not reusable instances",
 		"Every attempt is immutable and consumed",
 		"must not search for or read", "this inventory, protocol, result schema, campaign results",
@@ -979,8 +986,9 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 		"ECP itself was not enabled, used as a qualification fixture, or counted as a real-project pilot track",
 		"dedicated authorities",
 		"Earlier failed campaigns remain immutable diagnostic evidence",
-		"Use the installed candidate on safe copies of one genuinely new product and one established product",
-		"Enabling remains a separate explicit whole- Workspace decision",
+		"historical evidence for its own identity and is not carried forward",
+		"Run the separately owned, preregistered greenfield and established safe-copy pilot tracks",
+		"explicitly authorized evidence gates",
 	} {
 		if !strings.Contains(status, boundary) {
 			t.Fatalf("canonical status lost host-routing boundary %q", boundary)
@@ -1053,7 +1061,7 @@ func TestVerificationMatrixCoversCanonicalScenariosAndExistingTests(t *testing.T
 		}
 		matrixRows[value] = struct{}{}
 	}
-	if len(scenarios) != 75 || len(matrixRows) != len(scenarios) {
+	if len(scenarios) != 79 || len(matrixRows) != len(scenarios) {
 		t.Fatalf("acceptance traceability count mismatch: SPEC=%d matrix=%d", len(scenarios), len(matrixRows))
 	}
 	for scenario := range scenarios {

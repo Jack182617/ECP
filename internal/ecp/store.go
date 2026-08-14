@@ -927,7 +927,7 @@ func validateStartedChange(change Change, accepted ConfigAcceptance, acceptedTru
 		change.DeclaredRisk.Rank() == 0 || !isSHA256Digest(change.Baseline.Fingerprint) || !isSHA256Digest(change.ContractDigest) {
 		return newError(KindIntegrity, "CHANGE_START_INVALID", "Change start event contains an invalid contract, state, epoch, or baseline", nil)
 	}
-	if change.ContractVersion != 0 && change.ContractVersion != 2 {
+	if change.ContractVersion != 0 && change.ContractVersion != 2 && change.ContractVersion != CurrentChangeContractVersion {
 		return newError(KindIntegrity, "CHANGE_START_INVALID", "Change start event contains an unsupported contract_version", nil)
 	}
 	if err := validateIdentifier(change.ChangeID, "change_id"); err != nil {
@@ -938,6 +938,9 @@ func validateStartedChange(change Change, accepted ConfigAcceptance, acceptedTru
 	}
 	if err := validateChangeImpact(change.Impact, acceptedTruth.Truth); err != nil {
 		return newError(KindIntegrity, "CHANGE_IMPACT_INVALID", "Change impact is invalid or references facts outside the accepted Project Truth", err)
+	}
+	if err := validateUnknownDispositions(change.Impact, acceptedTruth.Truth, change.ContractVersion >= CurrentChangeContractVersion); err != nil {
+		return newError(KindIntegrity, "CHANGE_UNKNOWN_DISPOSITIONS_INVALID", "Change unknown dispositions are invalid or incomplete", err)
 	}
 	if err := validateChangeRequirements(change.Requirements, change.AcceptanceCriteria, change.Impact, accepted.Gates, change.ContractVersion >= 2); err != nil {
 		return newError(KindIntegrity, "CHANGE_REQUIREMENTS_INVALID", "Change requirement decisions or coverage are invalid", err)
@@ -1201,6 +1204,15 @@ func applyEvent(projection *Projection, event Event) error {
 			if semantic == nil || semantic.PreviousTruthDigest != acceptance.PreviousTruthDigest || semantic.CurrentTruthDigest != acceptance.TruthDigest || semantic.Behavior != SemanticBehaviorChanged {
 				return newError(KindIntegrity, "TRUTH_ACCEPTANCE_SEMANTIC_MISMATCH", "Project Truth evolution lacks a matching semantic assessment", nil)
 			}
+			if active.ContractVersion >= CurrentChangeContractVersion {
+				startingTruth, err := acceptedTruthAtDigest(*projection, active.TruthDigest)
+				if err != nil {
+					return err
+				}
+				if err := validateUnknownDispositionOutcomes(active.Impact, startingTruth, acceptance.Truth); err != nil {
+					return newError(KindIntegrity, "TRUTH_UNKNOWN_DISPOSITION_INVALID", "accepted Project Truth does not satisfy the Change unknown dispositions", err)
+				}
+			}
 		}
 		copyOfAcceptance := acceptance
 		projection.AcceptedTruth = &copyOfAcceptance
@@ -1390,6 +1402,15 @@ func applyEvent(projection *Projection, event Event) error {
 		}
 		if err := validateRequirementAssessments(*change, assessment.RequirementAssessments); err != nil {
 			return newError(KindIntegrity, "SEMANTIC_REQUIREMENTS_INVALID", "semantic assessment does not reconcile the Change requirements", err)
+		}
+		if change.ContractVersion >= CurrentChangeContractVersion && assessment.CurrentTruthDigest == projection.AcceptedTruth.TruthDigest {
+			startingTruth, err := acceptedTruthAtDigest(*projection, change.TruthDigest)
+			if err != nil {
+				return err
+			}
+			if err := validateUnknownDispositionOutcomes(change.Impact, startingTruth, projection.AcceptedTruth.Truth); err != nil {
+				return newError(KindIntegrity, "SEMANTIC_UNKNOWN_DISPOSITION_INVALID", "semantic assessment does not satisfy the Change unknown dispositions", err)
+			}
 		}
 		for _, existing := range projection.SemanticAssessments[assessment.ChangeID] {
 			if existing.AssessmentID == assessment.AssessmentID {

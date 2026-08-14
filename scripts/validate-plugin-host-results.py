@@ -267,9 +267,30 @@ def tree_digest(root: Path) -> str:
 
 
 def sentinel_tree_digest(root: Path) -> str:
+    """Hash authority state with the fixture builder's sentinel contract."""
+    digest = hashlib.sha256()
     if not root.exists() and not root.is_symlink():
-        return sha256_bytes(b"absent\0")
-    return tree_digest(root)
+        digest.update(b"absent\0")
+        return "sha256:" + digest.hexdigest()
+    if root.is_symlink() or not root.is_dir():
+        raise ValidationError(f"authority sentinel is not a real directory: {root}")
+    digest.update(b"directory\0")
+    for path in sorted(root.rglob("*"), key=lambda item: item.relative_to(root).as_posix()):
+        relative = path.relative_to(root).as_posix().encode("utf-8")
+        info = path.lstat()
+        digest.update(relative + b"\0" + oct(stat.S_IMODE(info.st_mode)).encode() + b"\0")
+        if stat.S_ISREG(info.st_mode):
+            digest.update(b"file\0" + str(info.st_size).encode() + b"\0")
+            with path.open("rb") as handle:
+                while chunk := handle.read(1024 * 1024):
+                    digest.update(chunk)
+        elif stat.S_ISDIR(info.st_mode):
+            digest.update(b"directory\0")
+        elif stat.S_ISLNK(info.st_mode):
+            digest.update(b"symlink\0" + os.readlink(path).encode("utf-8") + b"\0")
+        else:
+            digest.update(b"special\0")
+    return "sha256:" + digest.hexdigest()
 
 
 def case_prompt_digest(case: dict[str, Any]) -> str:

@@ -97,8 +97,12 @@ The authoritative scenario wording remains in `SPEC.md` section 12.
 | 73 | Cancelled edits require explicit supersession and original baseline/lineage carry-forward | `TestCancelledChangeMustCarryOriginalBaseline` | A |
 | 74 | Paths infer component/capability/invariant closure and expose under-declaration | `TestInferredImpactSelectsAffectedGatesAndBlocksUnderDeclaration` | A |
 | 75 | Gate selectors omit unrelated affected Gates while universal and explicit relation Gates remain required | `TestInferredImpactSelectsAffectedGatesAndBlocksUnderDeclaration` | A |
+| 76 | Installed Core publishes its closed machine contract without loading a project | `TestSchemaGetPublishesClosedMachineContract` | A |
+| 77 | Accepted Truth Unknowns require exact dispositions whose reconciliation matches starting/candidate Truth; v2 remains readable | `TestAcceptedTruthUnknownRequiresDispositionAndSemanticOutcome`; `TestUnknownDispositionOutcomeMatrix`; `TestRefinedUnknownDispositionIsAnExpectedSemanticChange`; `TestV2ChangeImpactRemainsReadableWithoutUnknownDisposition` | A |
+| 78 | Routine Change history is bounded/filterable and one exact full record remains recoverable | `TestCompactChangeHistoryFiltersAndExactGet`; `TestCLIChangeStartAndTruthReconcileMachineContract` | A |
+| 79 | Core identity upgrade preserves mode/history, invalidates old Evidence, and accepts fresh upgraded-Core Evidence | `TestCoreIdentityUpgradePreservesAuthorityAndRequiresFreshEvidence` | A |
 
-The deterministic Verdict clause following scenario 75 is covered separately by
+The deterministic Verdict clause following scenario 79 is covered separately by
 `TestVerdictIsDeterministicApartFromObservationTime`: repeated evaluation of the
 same exact subject must produce identical decision fields and subject digest;
 only `evaluated_at` may differ.
@@ -167,15 +171,15 @@ and is not resumed or counted toward this gate.
 
 | Requirement | Current repository evidence | Status |
 | --- | --- | --- |
-| Local v0.3 Core/CLI semantic loop | Implementation plus the 75-scenario mapping above | Locally automated |
-| User does not handwrite product code or operate ECP CLI | Four-Skill contracts, CLI hiding rules, and canary/pilot protocols | Statically specified; host canaries and real-use proof missing |
-| Exact installed-candidate host activation and output quality | 16-canary protocol in `docs/plugin-host-evaluation.md` and `docs/real-project-pilot.md` | `X` — previous campaign terminated; new exact-candidate gate not performed |
+| Local v0.3 Core/CLI semantic loop | Implementation plus the 79-scenario mapping above | Locally automated |
+| User does not handwrite product code or operate ECP CLI | Four-Skill contracts, CLI hiding rules, 16-canary evidence, and pilot protocol | Exact candidate qualified; longitudinal user-friction proof remains open |
+| Exact installed-candidate host activation and output quality | 16-canary protocol in `docs/plugin-host-evaluation.md` and `docs/real-project-pilot.md` | `QUALIFIED` for `0.3.0-dev+codex.20260814091408`: 16/16, 0 INVALID |
 | New task recovers without historical chat | Authority truth/policy/history tests | Mechanism proven; independent-project task proof missing |
 | Independent greenfield and established product safety copies | two or three bounded Changes and one fresh-task handoff per track in `docs/real-project-pilot.md` | `X` — discovery pilot not performed |
 | Multi-year complexity/capacity/retention | Segmentation, health, and explicit bounds | `X` — not proven; retention/repair/GC absent |
 | Team/cross-machine authority continuity | Project Pack is portable; local Evidence is Workspace-bound | `X` — no lineage/import/shared-authority protocol |
-| Installed-copy launcher, exact identity, default-disabled status, and `READY` boundary | Cache-layout tests plus 16-canary protocol | Repository mechanism evidence only; exact candidate not qualified |
-| Fresh-task upgrade, uninstall, reinstall, and full four-Skill pickup | Distribution policy and host-routing protocol only | `X` — not performed |
+| Installed-copy launcher, exact identity, default-disabled status, and `READY` boundary | Cache-layout tests plus completed 16-canary protocol | Qualified for the frozen installed candidate only |
+| Fresh-task upgrade, uninstall, reinstall, and full four-Skill pickup | Core identity transition test plus distribution/host-routing protocol | Installed old-to-current upgrade and current-locator fresh-task pickup passed; uninstall, remove-then-reinstall, rollback, and another host remain open |
 | Trusted Plugin distribution | Checksums and reproducible package | `X` — unsigned, unnotarized, unpublished |
 | Protected CI/release enforcement | `docs/ci-consumer-contract.md` only | `X` — not implemented or deployed |
 | Isolated/hermetic Gate execution | Timeout/process-group/bounded-output hardening | `X` — no sandbox/VM, network or same-user isolation |
@@ -185,10 +189,11 @@ and is not resumed or counted toward this gate.
 
 Passing this repository's checks can establish that the current local v0.3
 candidate implements its bounded Core/CLI/Skill contracts on the tested host.
-It cannot establish the full North Star product claim. That claim remains
-unproven until the exact-candidate 12-canary gate, the bounded greenfield and
-established safe-copy pilots, their fresh-task handoffs, desktop lifecycle
-validation, and the chosen CI/isolation boundaries provide their own evidence.
+It cannot establish the full North Star product claim. The frozen installed
+candidate has completed its 16-canary Desktop gate, but the broader claim
+remains unproven until the bounded greenfield and established safe-copy pilots,
+their fresh-task handoffs, the remaining uninstall/reinstall/rollback lifecycle,
+and the chosen CI/isolation boundaries provide their own evidence.
 The pilot's immediate decision is whether observed value exceeds friction and
 warrants expansion; it is not a shortcut to release readiness or a reason to
 weaken the North Star.

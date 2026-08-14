@@ -21,6 +21,8 @@ repository binary, a temporary build, or a remembered installation path.
 2. Run `ecp project status --root ROOT` for current project mode.
 3. When the request concerns installation, runtime version, Core identity, or
    installation acceptance, also run `ecp version` through the same launcher.
+   Run `ecp schema get` only when the request concerns the installed machine
+   contract or supported enum vocabulary.
 4. Parse the versioned JSON contract. A status exit of 3 or 4 may still contain
    `ok: true`; report the returned `enabled` mode and assurance instead of
    treating the exit code alone as failure.
@@ -35,8 +37,12 @@ repository binary, a temporary build, or a remembered installation path.
 ## Focused read-only queries
 
 - Accepted Project/Policy/Gates: `ecp policy get`.
-- Accepted Project Truth/contracts: `ecp truth get`.
-- Change history: `ecp change list`.
+- Accepted Project Truth/contracts: `ecp truth get`; this is a potentially
+  large exact payload, so do not fetch it for an ordinary status-only check.
+- Change history: use `ecp change list --summary` by default, with `--state`
+  and `--limit` when the request is bounded. Use `ecp change get --change ID`
+  only for an exact selected Change. Preserve the compatibility full
+  `ecp change list` only for an explicitly requested complete-history audit.
 - Evidence: `ecp evidence list`, with `--change` only for an exact requested
   Change.
 - GateRun history: `ecp gate history`, with `--change` only for an exact

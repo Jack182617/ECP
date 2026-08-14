@@ -253,10 +253,11 @@ func TestProtectedProjectTruthEvolutionRequiresExactConfirmation(t *testing.T) {
 		Title: "Establish Project Truth", Goal: "Replace the bootstrap seed with evidence-backed truth", Scope: []string{"src"},
 		AcceptanceCriteria: []string{"truth is established and accepted"}, Risk: RiskModerate,
 		Impact: ChangeImpact{
-			ProjectPurpose: true,
-			ContractIDs:    []string{"project-boundaries"},
-			UnknownIDs:     []string{"project-purpose-unreviewed"},
-			Unknowns:       []string{"new established truth entities cannot be referenced before they are accepted"},
+			ProjectPurpose:      true,
+			ContractIDs:         []string{"project-boundaries"},
+			UnknownIDs:          []string{"project-purpose-unreviewed"},
+			UnknownDispositions: []UnknownDisposition{{UnknownID: "project-purpose-unreviewed", Outcome: UnknownDispositionResolved}},
+			Unknowns:            []string{"new established truth entities cannot be referenced before they are accepted"},
 		},
 	})
 	if err != nil {

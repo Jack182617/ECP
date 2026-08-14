@@ -1,6 +1,6 @@
 # Independent Real-Project Pilot
 
-ECP 的价值不能由 ECP 仓库自己的单元测试、静态 Skill 文本或大量合成任务证明。真实试点只回答一个产品问题：ECP 在长期 AI 开发中保存项目事实、约束变更并支持跨 task 接手所带来的价值，是否大于它增加的交互和维护成本。本文件定义一个有退出条件的小试点，不声称试点已经完成。
+ECP 的价值不能由 ECP 仓库自己的单元测试、静态 Skill 文本或大量合成任务证明。真实试点只回答一个产品问题：ECP 在长期 AI 开发中保存项目事实、约束变更并支持跨 task 接手所带来的价值，是否大于它增加的交互和维护成本。本文件定义一个有退出条件的小试点，不声称试点已经完成。未使用 safe copy、试点前冻结注册表、预设阈值和七日观察窗的真实项目使用只能记为 exploratory evidence；它可以发现产品问题，但不能事后补记为本试点样本。
 
 ## 前置 host canary gate
 
@@ -28,6 +28,18 @@ ECP 的价值不能由 ECP 仓库自己的单元测试、静态 Skill 文本或�
 执行采用 fail-fast：第一个产品 `FAIL` 立即终止该 candidate 的 qualification，修复后以新 candidate 开始新 campaign。fixture、Desktop trust/config、task dispatch 或宿主不可用导致的观测记为 `INVALID`，必须保留但不计入产品分母；第一次 `INVALID` 只有在纠正基础设施原因后，才允许使用全新 fixture 重跑该 canary 一次。第二次仍为 `INVALID` 时冻结该 candidate campaign，不再追加第三次尝试。`INVALID` 不能改写成 `PASS`，产品 `FAIL` 也不能用 retry 覆盖。
 
 Workspace 和 authority 可以在证据冻结后删除；campaign manifest、不可变 task ledger/rollout readback、fixture metadata、exact identities、原始观测、分类理由和所有 `FAIL`/`INVALID`/retry 必须写入 ECP 仓库之外的持久 results root。`/tmp`、`/private/tmp` 或 Codex task 聊天不能是结果的唯一保存位置。已经终止的旧 campaign 只保留诊断意义，不得恢复来追求历史 run count，也不构成 qualification。
+
+当前前置 gate 已由 campaign `ecp-codex-20260814-091408-r3` 满足。它绑定
+Codex Desktop `com.openai.codex|26.810.41047|6570`、installed Plugin
+`0.3.0-dev+codex.20260814091408` 和 Core
+`0.3.0-dev+sha256:73cb39fcbac178a313ed9e18ef4a0b45e87db70c726e95962c46d43e9c485ac4`；
+官方 validator 结果是 `QUALIFIED: 16 qualification cases passed; 0 INVALID
+attempts and 0 extended diagnostics preserved`。另一个隔离的 installed-upgrade
+lifecycle 已验证 mode/history 保留、旧 Evidence 失效和新 Evidence 恢复 PASS。
+这些结果只打开下一步试点入口：两条 safe-copy 轨道、试点前冻结注册表、Owner
+确认和七日观察窗仍未执行，也不得由 exploratory 真实项目使用或 qualification
+结果代替。若 Plugin/Core/Skill、Desktop build/inventory 或 evaluator 合同变化，
+必须为新 exact candidate 重新通过前置 gate。
 
 ## 两条安全副本轨道
 
@@ -84,7 +96,7 @@ Canary gate 通过后，选择两个与 ECP 实现独立、可安全本地验证
 
 1. 在 fresh task 中只读恢复产品目的、关键 Invariant、Component、Contract、Decision、Unknown、branch/HEAD/dirty diff 和验证边界；
 2. 建立或审阅最小 Project Truth，并让未经确认的产品选择保持为 Unknown；
-3. 完成两到三个真实、bounded Change。组合应尽量包含一次 ordinary Change 和一次会检验 durable truth freshness 的 semantic Change，但不要为了覆盖表格而虚构需求；
+3. 完成两到三个真实、bounded Change。组合应尽量包含一次 ordinary Change 和一次会检验 durable truth freshness 的 semantic Change；后者若引用 accepted Truth Unknown，必须预先声明 `PRESERVED/RESOLVED/REFINED` disposition，并在 completion 前核对实际 Truth 结果，但不要为了覆盖表格而虚构需求；
 4. 换到一个没有前述聊天上下文的 fresh task，完成一次真实接手请求，验证其只依赖当前仓库与 accepted authority state，而非隐藏聊天约定。
 
 每次 Change 只运行能证明其契约的最小相关 Gate。遇到真实 product failure 时停止该轨道并诊断，不用重复任务或扩大验证掩盖问题。两到三个 Change 是用于判断方向的 discovery sample，不是对完整产品可靠性的统计证明。

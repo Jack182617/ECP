@@ -78,7 +78,7 @@ Project Truth 不是代码的自然语言副本，而是代码、Schema、测试
 
 ## 6. Change 与语义变化
 
-每个 mutating request 必须在首次仓库写入前形成 Change Contract。Change 必须声明预期影响的 Capability、Invariant、Component、Contract、Decision 和 Unknown，以及预期保持或改变的语义类别。
+每个 mutating request 必须在首次仓库写入前形成 Change Contract。Change 必须声明预期影响的 Capability、Invariant、Component、Contract、Decision 和 Unknown，以及预期保持或改变的语义类别。若一个已接受 Unknown 进入影响范围，合同还必须明确它在完成时保持、解决还是被更精确地重述，并由最终 Project Truth 结果核对，不能因代码 Gate 通过而让 durable Unknown 静默过期。
 
 Change 还必须把所有已发现的 material ambiguity 变成逐项、可审计的 Requirement：正常/加载/空态/成功/失败/重试/取消/超时/权限/并发/持久化/兼容/无障碍等情形只在与本需求相关时进入，并分别标记为当前已决定、不适用、安全延期或阻塞未知。每个验收项、保持项、用户旅程、数据/运行影响、预期变化和未知项都必须有精确覆盖与验证方式。ECP 的承诺是“零静默歧义”，不是声称已经发现宇宙中所有未来边界；一旦 material 问题被发现但无法从 accepted fact 或当前用户决定中推出，首次写入必须暂停。
 

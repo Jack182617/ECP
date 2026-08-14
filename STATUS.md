@@ -1,6 +1,6 @@
 # ECP Current Status
 
-Canonical status as of 2026-08-13. This file answers “where are we and what is
+Canonical status as of 2026-08-14. This file answers “where are we and what is
 next”; detailed contracts remain in the linked documents.
 
 ## Verdict
@@ -17,20 +17,33 @@ ECP's own source Workspace remains unregistered and disabled. ECP itself was
 not enabled, used as a qualification fixture, or counted as a real-project
 pilot track.
 
+The current installed candidate is now the only candidate accepted for the next
+controlled pilot decision. It has passed independent fresh-task installed-copy
+acceptance, an isolated installed-Core upgrade lifecycle, and a new 16-canary
+Codex Desktop qualification campaign. The earlier qualified package remains
+historical evidence for its own identity and is not carried forward.
+
 ## Current checkpoint
 
-- The formal Plugin version is `0.3.0-dev+codex.20260813115751`. Its runtime
-  manifest records `source_commit`
-  `66cf40f422661d98d4cd139d54364f04c4896545` and `source_clean: true`. The
-  active Darwin/arm64 Core identity is
-  `0.3.0-dev+sha256:838212455e6c97c567fef748dd4eb8da95ed268756be9bd411590e13744dd0af`.
-- The previous ECP marketplace/provider entries were removed. The candidate is
-  installed from the sole remaining ECP provider/cache entry, its installed
-  tree matches the packaged source, all Plugin/Skill validators pass using an
-  isolated `/private/tmp` PyYAML 6.0.2 target, and Codex Desktop was restarted
-  before qualification so fresh tasks loaded this exact installed locator.
+- The current Desktop-qualified Plugin version is
+  `0.3.0-dev+codex.20260814091408`. Its runtime manifest records
+  `source_commit` `b950ac78112bc9570e58c0723b7dcd56c22b067c` and
+  `source_clean: true`; its Darwin/arm64 Core identity is
+  `0.3.0-dev+sha256:73cb39fcbac178a313ed9e18ef4a0b45e87db70c726e95962c46d43e9c485ac4`.
+  All four packaged targets reproduced byte-for-byte across two independent
+  builds. The installed cache is byte-for-byte identical to the reviewed
+  Plugin source; the official Plugin validator, all four Skill validators,
+  installed `version`, `schema get`, and read-only project status pass.
+  Independent fresh tasks after Desktop restart loaded this exact installed
+  Skill locator and reported the same Plugin/Core identity without changing the
+  source Workspace's disabled mode.
+- The previous ECP marketplace/provider entries were removed. At qualification
+  time, the current package was the sole enabled installed `ecp-codex` provider;
+  its installed tree matched the packaged source and every scored task used its
+  installed launcher rather than a repository, temporary, ambient, or remembered
+  binary.
 - The formal immutable campaign is
-  `<durable-results-root>/ecp-codex-20260813-115751`; the private local root is
+  `<durable-results-root>/ecp-codex-20260814-091408-r3`; the private local root is
   intentionally not recorded in this public repository.
   The official validator reports: `QUALIFIED: 16 qualification cases passed;
   0 INVALID attempts and 0 extended diagnostics preserved`.
@@ -41,6 +54,13 @@ pilot track.
   action paths. The final governed case completed one bounded Change, one
   offline GateRun, one PASS Evidence, and Change completion while preserving
   the prohibition on commit, push, deploy, and CI mutation.
+- A separate disposable installed-upgrade lifecycle moved one enabled Workspace
+  with dedicated authority from the earlier qualified package to the current
+  package. Workspace mode, ACTIVE/terminal Change history, GateRun history, and
+  Evidence remained queryable; the new Core rejected the old execution-bound
+  Evidence as stale, required a new plan and GateRun, then returned PASS and
+  completed the Change. No real project, default authority, or ECP source
+  Workspace was used for that lifecycle.
 - The source candidate stops greenfield enablement when Core reports `READY`,
   leaves Truth onboarding as a separately authorized later Change, completes
   the initial bootstrap-to-accepted-candidate transaction without an unrelated
@@ -87,23 +107,46 @@ pilot track.
 - Earlier failed campaigns remain immutable diagnostic evidence for the exact
   candidates that failed. Their failures were fixed in later source commits and
   they were not resumed, merged into, or counted toward the successful formal
-  campaign.
+  campaign. A preflight-only default-authority sentinel mismatch was likewise
+  preserved rather than scored; the validator now uses the fixture builder's
+  deterministic nonempty tree contract, including regular files and symlinks,
+  and the successful campaign started from a new immutable results root.
+- Exploratory use in one established real project completed multiple bounded
+  local Changes and demonstrated that enabled routing, authority history,
+  Gate/Evidence/Verdict, cancellation, and completion work outside synthetic
+  fixtures. It also exposed actionable friction: an affected accepted Truth
+  Unknown could remain stale after a related PASS Change; adapters could guess
+  unsupported enum/payload fields or omit required semantic categories;
+  routine full-history reads grew rapidly; conservative impact could trigger
+  broad risk/confirmation and full-build cost. This use was on the canonical
+  project Workspace without the pilot preregistration, safe-copy controls,
+  frozen thresholds, or seven-day observation window, so it is exploratory
+  product evidence, not a completed Phase 1B pilot.
+- The current source iteration addresses those observations with Change
+  contract version 3 accepted-Unknown dispositions, an authority-independent
+  `schema get` machine contract, bounded/filterable Change history plus exact
+  single-Change recovery, strengthened Skill routing/reporting language, and
+  an automated Core-identity upgrade transition test. Historical contract
+  versions 0/2 remain readable. The current worktree passes `git diff --check`,
+  `go vet ./...`, all 27 Python qualification-protocol tests, and
+  `go test ./... -count=1` (including the 79-scenario traceability matrix).
+  The changes are now packaged, validated, installed locally, fresh-task
+  accepted, upgrade-checked, and Desktop-qualified. They still do not affect
+  another installation. No existing real project's mode, authority history,
+  source, or `.ecp` was rewritten by installation or qualification.
 
 ## Next actions, in order
 
-1. Use the installed candidate on safe copies of one genuinely new product and
-   one established product. Enabling remains a separate explicit whole-
-   Workspace decision for each product; Plugin installation alone never enables
-   a project.
-2. Complete two or three bounded real Changes and one fresh-task handoff in
-   each track. Measure recovered context, useful catches, false blockers,
-   interaction burden, validation time, and truth-maintenance cost.
-3. Decide whether to expand, simplify, or stop the rollout from those
-   value-versus-friction observations. Do not pre-commit to a larger matrix or a
-   fixed Change count merely to manufacture completion.
-4. Only after successful pilot evidence, define a release candidate and add the
-   still-required distribution, signing, CI-enforcement, cross-host runtime,
-   and operational support gates.
+1. Run the separately owned, preregistered greenfield and established safe-copy
+   pilot tracks without using ECP's source Workspace, a production Workspace, a
+   release branch, or a project's only copy.
+2. Complete the fixed seven-day observation window and Owner review, then decide
+   whether to expand, simplify and retry, or stop from the frozen
+   value-versus-friction thresholds.
+3. Treat uninstall, remove-then-reinstall, forward rollback, cross-machine/team
+   handoff, signing/notarization, public distribution, and release as separate
+   explicitly authorized evidence gates; qualification and pilot permission do
+   not complete any of them.
 
 The pilot protocol is [docs/real-project-pilot.md](docs/real-project-pilot.md),
 the roadmap is [docs/roadmap.md](docs/roadmap.md), and package boundaries are

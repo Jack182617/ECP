@@ -96,9 +96,9 @@ Authority Health Inspector 是另一条不依赖 candidate `.ecp` 的 authority-
 
 ### Change Engine
 
-只在 project mode enabled 时维护单 ACTIVE Change、activation ID、baseline、scope、acceptance、structured Impact、Requirement decision ledger、starting truth digest、risk 和 `ACTIVE → COMPLETED|CANCELLED` 生命周期。每个验收、保持、旅程、数据/运行影响、预期变化与已发现 unknown 必须被一个 exact Requirement 覆盖；每项保存当前要求、状态、理由、决策来源、验证方式和可选 revisit 条件。`BLOCKING_UNKNOWN` 可以在 Adapter 草稿中表达，但 Core 在第一次实现写入前拒绝启动它。
+只在 project mode enabled 时维护单 ACTIVE Change、activation ID、baseline、scope、acceptance、structured Impact、Requirement decision ledger、starting truth digest、risk 和 `ACTIVE → COMPLETED|CANCELLED` 生命周期。每个验收、保持、旅程、数据/运行影响、预期变化与已发现 unknown 必须被一个 exact Requirement 覆盖；每项保存当前要求、状态、理由、决策来源、验证方式和可选 revisit 条件。`BLOCKING_UNKNOWN` 可以在 Adapter 草稿中表达，但 Core 在第一次实现写入前拒绝启动它。每个 Impact 引用的 accepted Truth Unknown 还必须有 `PRESERVED/RESOLVED/REFINED` disposition，使 durable truth freshness 成为可核验合同而不是事后提醒。
 
-单独 cancellation 是带 actor/reason 的终态补偿事件，保持项目 enabled；project disable 若观察到 ACTIVE GateRun/Change，则在同一次 append 中依次记录 `INTERRUPTED`、Change cancellation 与新 disabled activation。这样三项要么全部落盘，要么都不落盘；它们都不要求 PASS、不删除 Evidence、不修改工作树。若取消项留下源码 delta，replacement 必须显式 supersede 最新取消项、继承它的原始 baseline/lineage，并把 inherited touched paths 纳入新 scope；否则 Core 不允许把这些旧修改吸收到一个伪装成干净的新 baseline。状态不保存“verified=true”；assurance 每次根据当前 activation 与 subject 重算。Contract version 0 的已记录历史继续按旧 subject/risk/Gate 语义重放，新 Change 使用 version 2 合同。
+单独 cancellation 是带 actor/reason 的终态补偿事件，保持项目 enabled；project disable 若观察到 ACTIVE GateRun/Change，则在同一次 append 中依次记录 `INTERRUPTED`、Change cancellation 与新 disabled activation。这样三项要么全部落盘，要么都不落盘；它们都不要求 PASS、不删除 Evidence、不修改工作树。若取消项留下源码 delta，replacement 必须显式 supersede 最新取消项、继承它的原始 baseline/lineage，并把 inherited touched paths 纳入新 scope；否则 Core 不允许把这些旧修改吸收到一个伪装成干净的新 baseline。状态不保存“verified=true”；assurance 每次根据当前 activation 与 subject 重算。Contract version 0/2 的已记录历史继续按原 subject/risk/Gate 语义重放，新 Change 使用 version 3 合同。
 
 ### Gate Runner
 
@@ -205,6 +205,7 @@ receive expected authority id + workspace id + activation token + config digest 
 → allow a valid candidate truth drift only as a recovery/adoption proposal; never bind it as starting authority
 → ensure no ACTIVE change
 → normalize scope and validate structured Impact references, expected changes/preservations, and unknowns
+→ require one sorted PRESERVED/RESOLVED/REFINED disposition for every accepted Truth Unknown ID in Impact
 → require a sorted Requirement decision ledger with exact coverage of every material contract item
 → reject BLOCKING_UNKNOWN; validate status, rationale, source, verification mode, revisit condition and mapped Gate IDs
 → infer component/capability/invariant from scope path ownership; reject undeclared or unmapped scope impact
@@ -223,6 +224,7 @@ receive expected authority id + workspace id + activation token + config digest 
 ```text
 load ACTIVE Change + previous accepted truth + candidate truth
 → compute deterministic structural/file delta
+→ compare every accepted-Unknown disposition against starting and candidate Truth
 → require existing delta coverage by exact Change Impact references; a concrete startup unknown covers additions only
 → bind assessment to exact activation + Change + final source fingerprint
 → require one sorted result for every Requirement; automated results name exact mapped Gates,
@@ -273,7 +275,7 @@ Gate 不通过自然语言告诉 Core 自己是否通过。Core 只使用 wait s
 
 ### Compute Verdict
 
-Verdict 是只读重算。其 `subject_digest` 覆盖 exact authority/Workspace/activation 与其他裁决输入。Evaluator 还会对当前 source/config/risk/execution context 重建 Gate plan，只有 Evidence 保存的 `activation_id` 属于当前 enabled epoch、且 `plan_digest` 与当前 plan 一致才可适用。历史 Evidence 永久保留，但只有与当前 subject 完全匹配的 Evidence 可满足 Requirement。任何 `IN_PROGRESS` GateRun 都使当前 Verdict `INDETERMINATE`，因为只读调用不能知道持有者仍在执行还是已经消失。`change list`、`evidence list` 和 `gate history` 通过 authority-only loader 提供历史查询，即使当前 Draft Config malformed/missing 或项目已 disabled 仍可读取；event hash 损坏到无法构造 projection 时返回 integrity error，而不是虚构一个 Verdict。
+Verdict 是只读重算。其 `subject_digest` 覆盖 exact authority/Workspace/activation 与其他裁决输入。Evaluator 还会对当前 source/config/risk/execution context 重建 Gate plan，只有 Evidence 保存的 `activation_id` 属于当前 enabled epoch、且 `plan_digest` 与当前 plan 一致才可适用。历史 Evidence 永久保留，但只有与当前 subject 完全匹配的 Evidence 可满足 Requirement。任何 `IN_PROGRESS` GateRun 都使当前 Verdict `INDETERMINATE`，因为只读调用不能知道持有者仍在执行还是已经消失。`change list --summary`、`change get`、兼容的完整 `change list`、`evidence list` 和 `gate history` 通过 authority-only loader 提供历史查询，即使当前 Draft Config malformed/missing 或项目已 disabled 仍可读取；event hash 损坏到无法构造 projection 时返回 integrity error，而不是虚构一个 Verdict。
 
 ### Complete Change
 
@@ -285,7 +287,7 @@ Adapter 把 immediately preceding PASS Verdict 的 Change ID 与 subject digest 
 
 ### Cancel Change
 
-`change cancel --authority AUTHORITY_ID --workspace WORKSPACE_ID --change CHANGE_ID --actor --reason` 只读取 physical Git identity、Workspace binding 和 event projection，不依赖当前 Draft Config。三个 opaque target 必须来自 immediately preceding `change list` 的同一条 ACTIVE 记录。它与 Gate/Complete/project disable 共享 lease；进入 lease 后 Core 重新加载 authority，并要求项目仍 enabled、authority、Workspace 与当前 ACTIVE ID 仍精确相等，否则返回 conflict。随后才使用 revision CAS 追加 `change_cancelled`。该路径用于安全放弃无法或不应继续的 Change并保持项目 enabled，不会修改源码、误操作另一套 state/Workspace 或误取消后来创建的 Change，也不会把 BLOCKED 变成 PASS。显式 project disable 则采用前述原子 cancellation + disablement 路径。
+`change cancel --authority AUTHORITY_ID --workspace WORKSPACE_ID --change CHANGE_ID --actor --reason` 只读取 physical Git identity、Workspace binding 和 event projection，不依赖当前 Draft Config。三个 opaque target 必须来自 immediately preceding `change list --summary --state ACTIVE --limit 1` 的同一条 ACTIVE 记录。它与 Gate/Complete/project disable 共享 lease；进入 lease 后 Core 重新加载 authority，并要求项目仍 enabled、authority、Workspace 与当前 ACTIVE ID 仍精确相等，否则返回 conflict。随后才使用 revision CAS 追加 `change_cancelled`。该路径用于安全放弃无法或不应继续的 Change并保持项目 enabled，不会修改源码、误操作另一套 state/Workspace 或误取消后来创建的 Change，也不会把 BLOCKED 变成 PASS。显式 project disable 则采用前述原子 cancellation + disablement 路径。
 
 ### GateRun continuity 与 Partial Sequence
 

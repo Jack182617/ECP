@@ -31,6 +31,16 @@ remain governed and unavailable for supported Codex mutations until a
 compatible Plugin is reinstalled or the project is explicitly disabled before
 uninstall.
 
+Changing ECP source has no effect on an existing project until a new Plugin
+cachebuster is packaged, validated, explicitly installed, and loaded by a
+fresh task. Across a compatible Core identity transition, Workspace mode and
+authority history remain unchanged and historical Change contracts remain
+readable. Old plans and Evidence remain historical records but cannot satisfy
+the new evaluator identity; an ACTIVE Change must obtain a fresh plan and
+fresh required Evidence. Completed history is not rewritten or silently
+re-attested. Unsupported authority/config/event schemas stop fail-closed; v0.3
+does not perform implicit state migration or restore/import.
+
 Checksums establish package consistency, not publisher identity. A release may
 be described as trusted distribution only after its binaries and Plugin package
 are built by the designated release process, signed/notarized where applicable,

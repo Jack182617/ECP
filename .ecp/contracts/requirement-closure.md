@@ -16,3 +16,11 @@ Verification is deliberately separate from decision status:
 - `EXTERNAL` remains `EXTERNAL_PENDING` and blocks local PASS until Core has a separately trusted external Evidence class. v0.3 does not import or attest that class.
 
 A requirement summary, semantic assessment, chat statement, or acknowledgement cannot substitute for mapped automated Evidence. Removing a contract item requires a new Change contract; it cannot make an already-started obligation disappear.
+
+Accepted Project Truth Unknowns are a separate durable-freshness obligation.
+Every accepted Unknown ID referenced by a version 3 Change must have one sorted
+disposition: `PRESERVED` keeps the same structured Unknown, `RESOLVED` removes
+it, and `REFINED` keeps it with changed structured content. Core compares the
+Change's starting Truth epoch with the candidate Truth during Semantic
+Reconciliation and blocks an outcome that does not match. Historical Change
+contract versions 0 and 2 remain readable without this new field.

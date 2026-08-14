@@ -21,6 +21,15 @@ func (failingWriter) Write([]byte) (int, error) {
 	return 0, errors.New("injected writer failure")
 }
 
+func containsCLIString(values []string, wanted string) bool {
+	for _, value := range values {
+		if value == wanted {
+			return true
+		}
+	}
+	return false
+}
+
 func TestVersionUsesStableEnvelope(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	application := CLI{Stdout: &stdout, Stderr: &stderr}
@@ -33,6 +42,27 @@ func TestVersionUsesStableEnvelope(t *testing.T) {
 	}
 	if result["schema_version"] != float64(1) || result["operation"] != "version" || result["ok"] != true {
 		t.Fatalf("unexpected envelope: %#v", result)
+	}
+}
+
+func TestSchemaGetPublishesClosedMachineContract(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	application := CLI{Stdout: &stdout, Stderr: &stderr}
+	if code := application.Run(context.Background(), []string{"schema", "get"}); code != 0 {
+		t.Fatalf("schema get exit=%d stderr=%s", code, stderr.String())
+	}
+	var envelope struct {
+		Operation string                 `json:"operation"`
+		OK        bool                   `json:"ok"`
+		Result    ecp.ContractSchemaView `json:"result"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil || !envelope.OK || envelope.Operation != "schema.get" {
+		t.Fatalf("invalid schema envelope: %+v err=%v", envelope, err)
+	}
+	if envelope.Result.ChangeContractVersion != ecp.CurrentChangeContractVersion ||
+		!containsCLIString(envelope.Result.SemanticCategories, "project-truth") ||
+		len(envelope.Result.UnknownDispositionOutcomes) != 3 {
+		t.Fatalf("schema omitted current Change contract enums: %+v", envelope.Result)
 	}
 }
 
@@ -482,6 +512,28 @@ func TestCLIChangeStartAndTruthReconcileMachineContract(t *testing.T) {
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &startEnvelope); err != nil || startEnvelope.Result.ChangeID == "" || startEnvelope.Result.TruthDigest != current.CandidateTruth || len(startEnvelope.Result.Impact.ExpectedChanges) != 1 || len(startEnvelope.Result.Impact.ExpectedPreservations) != 1 {
 		t.Fatalf("invalid CLI Change result: %+v err=%v", startEnvelope.Result, err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := application.Run(ctx, []string{"change", "list", "--summary", "--state", "ACTIVE", "--limit", "1", "--root", repo}); code != 0 {
+		t.Fatalf("CLI compact change list exit=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var summaryEnvelope struct {
+		Result []ecp.ChangeHistorySummary `json:"result"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &summaryEnvelope); err != nil || len(summaryEnvelope.Result) != 1 || summaryEnvelope.Result[0].ChangeID != startEnvelope.Result.ChangeID {
+		t.Fatalf("invalid CLI compact Change history: %+v err=%v", summaryEnvelope.Result, err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := application.Run(ctx, []string{"change", "get", "--change", startEnvelope.Result.ChangeID, "--root", repo}); code != 0 {
+		t.Fatalf("CLI change get exit=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	var getEnvelope struct {
+		Result ecp.ChangeHistoryItem `json:"result"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &getEnvelope); err != nil || getEnvelope.Result.Goal != startEnvelope.Result.Goal || getEnvelope.Result.ContractVersion != ecp.CurrentChangeContractVersion {
+		t.Fatalf("invalid CLI exact Change result: %+v err=%v", getEnvelope.Result, err)
 	}
 	stdout.Reset()
 	stderr.Reset()

@@ -75,14 +75,20 @@ Complete lifecycle setup before the first repository write.
 3. Run `ecp truth get` to recover accepted structured Project Truth and exact
    contracts. If an accepted blob is missing, unsafe, or corrupt, stop; never
    substitute candidate text, chat memory, or an earlier summary.
-4. Run `ecp context get` once. Retain the exact authority, Workspace,
+4. Run `ecp schema get` once for the selected installed Core. Use only its
+   published Change contract version and closed risk, Requirement, semantic,
+   and Unknown-disposition enums; never guess a field or reuse an older task's
+   payload vocabulary.
+5. Run `ecp context get` once. Retain the exact authority, Workspace,
    activation token, accepted config/truth digests, candidate truth digest,
    source fingerprint, and ACTIVE Change summary as one observation. Use it as
    the immediate precondition source for Change start.
-5. Continue an ACTIVE Change only when its goal, scope, Impact, and Requirement
-   ledger still match the current request. If the request materially changed,
-   ask whether to continue or cancel; do not silently rewrite the contract.
-6. Close only material ambiguity. Derive relevant normal, loading, empty,
+6. If context reports an ACTIVE Change, use its internal ID in one exact
+   `ecp change get` query before deciding to continue. Continue only when its
+   goal, scope, Impact, Unknown dispositions, and Requirement ledger still
+   match the current request. If the request materially changed, ask whether
+   to continue or cancel; do not silently rewrite the contract.
+7. Close only material ambiguity. Derive relevant normal, loading, empty,
    success, failure, cancellation, timeout, retry/idempotency, permission,
    offline/concurrent, persistence, accessibility, compatibility, and recovery
    behavior from accepted Project Truth, code, tests, and the user request.
@@ -102,7 +108,14 @@ Complete lifecycle setup before the first repository write.
    Cover every acceptance criterion, preservation, journey, data/operation
    effect, expected semantic change, and impact unknown. This is a
    zero-silent-ambiguity guarantee, not omniscience.
-7. If no Change is active, invoke `ecp change start` with the smallest accurate
+   Every accepted Project Truth Unknown named by `impact.unknown_ids` also
+   requires one sorted `--unknown-disposition` object with the same
+   `unknown_id` and outcome `PRESERVED`, `RESOLVED`, or `REFINED`. Use
+   `PRESERVED` only when the exact TruthUnknown remains unchanged, `RESOLVED`
+   only when it will be removed, and `REFINED` only when it will remain with a
+   materially updated statement/risk/resolution condition. This is separate
+   from free-text impact uncertainty.
+8. If no Change is active, invoke `ecp change start` with the smallest accurate
    title, goal, repository-relative scope, non-goals, acceptance criteria,
    risk, structured Impact, expected changes/preservations, and sorted
    Requirements. Reference accepted Project Truth IDs where known; use a
@@ -110,12 +123,14 @@ Complete lifecycle setup before the first repository write.
    preconditions from the immediately preceding context. If a cancelled Change
    left source changes, use its exact ID as `--supersedes-change` and cover all
    inherited touched paths; never reset the baseline to hide prior work.
-8. Run `ecp gate plan` before editing. Inspect every command, cwd, executable,
+9. Run `ecp gate plan` before editing. Inspect every command, cwd, executable,
    inherited environment name, declared effect, selector, and effective risk.
    Impacted invariant Gates and automated Requirement Gates remain mandatory.
-   Stop if any effect exceeds authorization. Do not run unrelated full suites
-   merely for completeness.
-9. Treat a `high` or `critical` effective risk as a pre-write human-confirmation
+   Stop if any effect exceeds authorization. `requires_network: false` is a
+   declared Gate contract, not general network isolation: ECP v0.3 does not
+   sandbox same-user project code. Do not run unrelated full suites merely for
+   completeness.
+10. Treat a `high` or `critical` effective risk as a pre-write human-confirmation
    barrier. Explain the concrete human-readable risk, bounded scope, and planned
    local Gates, then obtain fresh explicit confirmation before the first write
    or Gate run. If confirmation is absent, keep the Change ACTIVE and stop with
@@ -123,11 +138,14 @@ Complete lifecycle setup before the first repository write.
    displayed action. This human decision is not yet a Core acknowledgement
    event. Scope, effective risk,
    protected semantics, or authorized-effect drift requires fresh confirmation.
-10. Implement only the bounded Change, preserving unrelated user work and the
+   One fresh confirmation of the displayed plan/risk/scope satisfies this
+   barrier; do not ask again unless one of those facts or an authorized effect
+   changes.
+11. Implement only the bounded Change, preserving unrelated user work and the
    repository architecture. Do not edit Control Config during an ordinary
    product Change. Edit candidate Project Truth/contracts only for intentional,
    declared durable semantic changes.
-11. After material edits, run a fresh `ecp context get`, then `ecp truth diff`,
+12. After material edits, run a fresh `ecp context get`, then `ecp truth diff`,
     and reconcile every Requirement:
 
     - `PRESERVED` requires no expected semantic change and an empty truth delta.
@@ -135,27 +153,30 @@ Complete lifecycle setup before the first repository write.
       delta requires exact Impact coverage, a product-language explanation to
       the user, fresh explicit confirmation, and `--confirm-protected`.
     - `UNKNOWN` records unresolved semantics and intentionally prevents PASS.
+    - Core compares each accepted-Unknown disposition to the Change's starting
+      Truth epoch: preserved must have unchanged structured content, resolved must
+      be absent, and refined must remain with changed structured content.
     - A delta beyond declared Impact blocks this Change. Do not broaden it
       after implementation; cancel explicitly and start a superseding contract.
 
     Include one sorted result for every Requirement. Never omit a difficult
     item or convert review/external verification into fake automated Evidence.
-12. Run a fresh `ecp gate plan`. Confirm `inferred_impact` has no undeclared
+13. Run a fresh `ecp gate plan`. Confirm `inferred_impact` has no undeclared
     component, capability, invariant, or unmapped final path. Use only the exact
     Change ID and plan digest from that plan for `ecp gate run`. Never execute a
     configured command directly and call it ECP Evidence. If this final plan
     introduces or changes a high/critical risk, stop before the Gate run and
-    obtain a fresh human confirmation under step 9.
-13. Treat GateRun as durable. `COMPLETED` means every selected Gate produced
+    obtain a fresh human confirmation under step 10.
+14. Treat GateRun as durable. `COMPLETED` means every selected Gate produced
     Evidence, not that every item passed. Preserve any structured
     `partial_result` after a run error. Never silently refresh and retry a stale
     Change, activation, source, config, or plan.
-14. Invoke `ecp verdict` and trust only its current structured result. If the
+15. Invoke `ecp verdict` and trust only its current structured result. If the
     sole blocker is `ACKNOWLEDGEMENT_REQUIRED`, record the immediately returned
-    exact subject only when the step 9 confirmation still applies. Otherwise
+    exact subject only when the step 10 confirmation still applies. Otherwise
     explain the current risk and wait. Never infer acknowledgement from Change
     start, a Gate plan, the implementation request, or stale confirmation.
-15. For an immediately preceding current `PASS`, automatically invoke
+16. For an immediately preceding current `PASS`, automatically invoke
     `ecp change complete` with its exact Change ID and subject digest. For
     `BLOCKED` or `INDETERMINATE`, do not complete or auto-cancel; report the
     smallest evidence-backed blocker and leave the Change ACTIVE.
@@ -163,7 +184,8 @@ Complete lifecycle setup before the first repository write.
 ## Explicit recovery and administrative writes
 
 - Cancel an exact ACTIVE Change only when the user explicitly abandons it:
-  read one immediately preceding `ecp change list` result, then invoke
+  read one immediately preceding
+  `ecp change list --summary --state ACTIVE --limit 1` result, then invoke
   `ecp change cancel` with its exact authority, Workspace, and Change IDs.
 - Export authority history only after an explicit backup/export request and a
   confirmed new destination outside both the Git repository and live authority.

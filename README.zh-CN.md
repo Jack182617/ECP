@@ -3,9 +3,9 @@
 [English](README.md) | 简体中文
 
 > 当前结论与下一步以 [STATUS.md](STATUS.md) 为准：一个冻结的精确候选已经
-> 通过 16 个串行 fail-fast host canary，具备进入受控真实产品试点的资格；
-> 它仍不是公开发布版、生产有效性证明或长期价值结论。ECP 自身不作为
-> fixture 或真实产品试点项目。
+> 通过 16 个串行 fail-fast host canary；当前源码则是更新的资格后迭代，尚未
+> 打包、安装或重新 qualification。两者都仍不是公开发布版、生产有效性证明
+> 或长期价值结论。ECP 自身不作为 fixture 或真实产品试点项目。
 
 ECP 是一套面向长期 AI 原生软件开发的、多项目通用、工具无关、local-first 的项目连续性与可信变更控制系统。它不替代 Codex、IDE、Git、测试框架或 CI；它让项目自身长期保存关键产品与工程事实，并把一次工程变更的目标、影响、风险、验证命令、执行证据和裁决绑定到同一个精确的软件状态上。
 
@@ -64,7 +64,7 @@ Project 注册、配置接受与 enablement 使用 `codex-local-adapter` 作为�
 
 1. 读取项目模式；
 2. 恢复与请求目标/范围/Requirement 一致的 ACTIVE Change，或为当前请求创建一个最小 Change；
-3. 用已接受的 Project Truth 建立结构化 Impact，并把相关的正常、加载、空态、成功、失败、重试、取消、超时、权限、并发、持久化、兼容、无障碍等 material 问题逐项确定为 `DECIDED`、`NOT_APPLICABLE`、`DEFERRED_SAFE` 或 `BLOCKING_UNKNOWN`；每个验收/保持/旅程/数据/运行/预期变化/未知项都必须有精确 Requirement 覆盖，阻塞未知在首次写入前询问产品而不是由 AI 猜测；
+3. 用已接受的 Project Truth 建立结构化 Impact，并把相关的正常、加载、空态、成功、失败、重试、取消、超时、权限、并发、持久化、兼容、无障碍等 material 问题逐项确定为 `DECIDED`、`NOT_APPLICABLE`、`DEFERRED_SAFE` 或 `BLOCKING_UNKNOWN`；每个验收/保持/旅程/数据/运行/预期变化/未知项都必须有精确 Requirement 覆盖，阻塞未知在首次写入前询问产品而不是由 AI 猜测；若 Impact 引用 accepted Truth Unknown，还必须声明其最终为 `PRESERVED`、`RESOLVED` 或 `REFINED`，Core 会在语义对账时核对真实结果；
 4. 审阅 Core 根据 scope/path ownership、声明 Impact、风险、Invariant 和 Requirement 关系选择的最小充分 Gate plan，确认它没有超出用户授权，也没有为了“完整”运行无关全量流程；
 5. 若计划的 effective risk 需要 high-risk acknowledgement，先用人类可读语言说明具体风险并取得用户的明确当前确认；确认前不得发生第一次产品文件写入或 Gate 执行，用户不确认时保留 bounded Change 为 `ACTIVE`，不写产品文件、不创建 GateRun 或 Evidence；
 6. 在 Change 范围内实现修改并保留无关工作；
@@ -127,7 +127,7 @@ Codex 会先确认一个尚不存在、位于仓库和 live authority 之外的�
 - accepted Project/Policy/Gates revisions 同样保留在 authority history，`policy get` 可在候选 control drift/malformed 时恢复 latest 或指定历史结构化配置，但读取本身不会改写或接受候选。
 - authority history 可导出为确定性、私有只读且可离线语义核验的精确引用 bundle；导出不包含孤儿状态、不修改 live authority，也不等于签名备份或已支持恢复。
 - `authority health` 可在不依赖候选 `.ecp` 的一致 authority 快照上核验全部历史引用并披露容量、remnant、orphan、unsafe entry 和 lease-released unresolved GateRun；它是有界诊断，不是清理、修复、restore、GC、签名或 attestation。
-- Change Contract 绑定启动时 truth digest 与结构化 Impact；最终 Verdict 则绑定最终 accepted truth digest、适用于最终 source fingerprint 的 semantic assessment，以及同一 truth/source 的 Gate Evidence。
+- Change Contract 绑定启动时 truth digest 与结构化 Impact；version 3 对每个受影响的 accepted Truth Unknown 绑定 `PRESERVED/RESOLVED/REFINED` disposition，历史 version 0/2 保持可读；最终 Verdict 则绑定最终 accepted truth digest、适用于最终 source fingerprint 的 semantic assessment，以及同一 truth/source 的 Gate Evidence。
 - Change Contract 的 Requirement ledger 为每个验收、保持、旅程、数据/运行影响、预期变化和已发现未知项保存明确 status、rationale、decision source、verification mode 与 exact coverage；`BLOCKING_UNKNOWN` 不能启动，自动项必须由当前 mapped Gate Evidence 满足，外部项在 v0.3 保持阻塞。
 - 最近取消 Change 留下的源码 delta 必须由 replacement Change 显式继承原 baseline/lineage；否则 Core 拒绝开始，避免通过取消和重开洗掉风险、scope 或 Evidence 责任。
 - Impact 不是说明文字：受影响 invariant（包括经 capability/component/decision 关系解析出的 invariant）的风险会抬高 effective risk，其 `gate_ids` 会无条件进入 Required Gates。真相演进时对 starting/final 两个 epoch 取风险与 Gate 并集，因此不能在同一个 Change 中先删保护规则再自证通过。

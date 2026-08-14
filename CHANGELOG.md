@@ -15,6 +15,11 @@ host identities named in [STATUS.md](STATUS.md).
 - Contribution, security, and community conduct policies.
 - GitHub issue forms, pull request template, and focused continuous
   integration checks.
+- Machine-readable `schema get`, compact/filterable Change history, exact
+  single-Change recovery, and Core-identity upgrade compatibility coverage.
+- Change contract version 3 accepted-Unknown dispositions, verified as
+  `PRESERVED`, `RESOLVED`, or `REFINED` against starting/candidate Project
+  Truth while retaining read compatibility for contract versions 0 and 2.
 
 ### Changed
 
@@ -22,6 +27,9 @@ host identities named in [STATUS.md](STATUS.md).
   from a signed public release, protected enforcement, and real-project proof.
 - Machine-specific qualification paths are represented by durable placeholder
   roots in repository documentation.
+- Adapter Skills now preflight the installed machine contract, default to
+  bounded history reads, avoid duplicate unchanged risk confirmations, and
+  state the non-sandbox network boundary explicitly.
 
 ## 0.3.0 development candidate
 

@@ -208,7 +208,7 @@
     {
       "id": "unknowns-remain-visible",
       "name": "Unknowns are not converted into facts",
-      "statement": "Material uncertainty must remain an explicit Unknown or a blocking UNKNOWN semantic assessment and cannot be presented as verified truth or PASS.",
+      "statement": "Material uncertainty must remain an explicit Unknown or a blocking UNKNOWN semantic assessment and cannot be presented as verified truth or PASS; every accepted Truth Unknown referenced by a new Change must declare and satisfy a PRESERVED, RESOLVED, or REFINED disposition against the starting and candidate Truth epochs.",
       "category": "business",
       "risk": "high",
       "gate_ids": [
@@ -217,6 +217,7 @@
       "source_refs": [
         "internal/ecp/truth.go",
         "internal/ecp/service.go",
+        "internal/ecp/change_contract_v03_test.go",
         "NORTH_STAR.md"
       ]
     },
@@ -667,13 +668,13 @@
     },
     {
       "id": "desktop-host-routing-not-proven",
-      "statement": "No post-fix candidate has frozen a single-provider Desktop inventory and exact Desktop/Plugin tree/launcher/Skill/Core/evaluator identity, then passed the canonical 16 direct, indirect, incomplete, negative, and edge qualification cases in independent fresh tasks for all four Skills.",
+      "statement": "The previously frozen installed candidate passed all 16 Desktop qualification cases, but the current post-qualification source iteration changes Core, CLI, Skills, and contracts and has not itself been packaged, installed, frozen, or rerun through those 16 cases.",
       "risk": "high",
-      "resolution_condition": "Pass every required independent run in docs/plugin-host-evaluation-cases.json against disposable fixtures using one frozen exact candidate and immutable fixture/task/rollout evidence, preserve every FAIL/INVALID/retry, and start a new campaign after any candidate or evaluator-contract correction."
+      "resolution_condition": "After separately authorized packaging and installation, pass every required independent run in docs/plugin-host-evaluation-cases.json against disposable fixtures using the new frozen exact candidate and immutable fixture/task/rollout evidence; preserve every FAIL/INVALID/retry and start a new campaign after any candidate or evaluator-contract correction."
     },
     {
       "id": "desktop-plugin-lifecycle-not-proven",
-      "statement": "Fresh-task Plugin upgrade, uninstall, reinstall, rollback delivery, mode/history preservation, and a governed Change across a Core identity transition have not been exercised.",
+      "statement": "Repository tests now exercise mode/history preservation and fresh Evidence across a Core identity transition, but fresh-task installed Plugin upgrade, uninstall, reinstall, rollback delivery, and all-four-Skill locator pickup have not been exercised on the Desktop host.",
       "risk": "moderate",
       "resolution_condition": "Execute the documented install, upgrade, failure-recovery, uninstall, and reinstall protocol in disposable Workspaces; verify installed paths, exact identities, project modes, authority histories, and fresh Evidence without editing cache or authority state directly."
     },

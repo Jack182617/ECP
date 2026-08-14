@@ -1351,13 +1351,22 @@ func (s Service) AssessSemantic(ctx context.Context, start string, input Semanti
 	if err != nil {
 		return SemanticAssessment{}, err
 	}
+	if change.ContractVersion >= CurrentChangeContractVersion {
+		startingTruth, err := acceptedTruthAtDigest(workspace.Projection, change.TruthDigest)
+		if err != nil {
+			return SemanticAssessment{}, err
+		}
+		if err := validateUnknownDispositionOutcomes(change.Impact, startingTruth, workspace.Config.Truth); err != nil {
+			return SemanticAssessment{}, err
+		}
+	}
 	if err := validateTruthDeltaAgainstImpact(delta, change.Impact, accepted.Truth, workspace.Config.Truth); err != nil {
 		return SemanticAssessment{}, err
 	}
-	if input.Behavior == SemanticBehaviorPreserved && len(change.Impact.ExpectedChanges) > 0 {
+	if input.Behavior == SemanticBehaviorPreserved && (len(change.Impact.ExpectedChanges) > 0 || unknownDispositionExpectsChange(change.Impact)) {
 		return SemanticAssessment{}, newError(KindBlocked, "EXPECTED_SEMANTIC_CHANGE_NOT_RECONCILED", "the Change declared expected semantic changes and cannot be reconciled as PRESERVED", nil)
 	}
-	if input.Behavior == SemanticBehaviorChanged && len(change.Impact.ExpectedChanges) == 0 && len(change.Impact.Unknowns) == 0 {
+	if input.Behavior == SemanticBehaviorChanged && len(change.Impact.ExpectedChanges) == 0 && len(change.Impact.Unknowns) == 0 && !unknownDispositionExpectsChange(change.Impact) {
 		return SemanticAssessment{}, newError(KindBlocked, "UNEXPECTED_SEMANTIC_CHANGE", "CHANGED must be covered by an expected change or a concrete startup uncertainty in the Change impact", nil)
 	}
 	protected := false
@@ -1610,6 +1619,9 @@ func (s Service) StartChange(ctx context.Context, start string, input StartChang
 	if err := validateChangeImpact(input.Impact, acceptedTruth); err != nil {
 		return Change{}, err
 	}
+	if err := validateUnknownDispositions(input.Impact, acceptedTruth, true); err != nil {
+		return Change{}, err
+	}
 	if err := validateChangeRequirements(input.Requirements, input.AcceptanceCriteria, input.Impact, workspace.Config.Gates, true); err != nil {
 		return Change{}, err
 	}
@@ -1674,7 +1686,7 @@ func (s Service) StartChange(ctx context.Context, start string, input StartChang
 	}
 	change := Change{
 		SchemaVersion:       SchemaVersion,
-		ContractVersion:     2,
+		ContractVersion:     CurrentChangeContractVersion,
 		ChangeID:            changeID,
 		ActivationID:        workspace.Projection.Activation.ActivationID,
 		Title:               input.Title,
@@ -2241,42 +2253,114 @@ func (s Service) ListChanges(ctx context.Context, start string) ([]ChangeHistory
 		if change == nil {
 			return nil, newError(KindIntegrity, "CHANGE_HISTORY_MISSING", "Change order references a missing Change", nil)
 		}
-		item := ChangeHistoryItem{
+		result = append(result, changeHistoryItem(service, workspace, change))
+	}
+	return result, nil
+}
+
+// ListChangeSummaries returns newest-first bounded lifecycle history. It avoids
+// transporting full contracts, assessments, and Verdicts when an adapter only
+// needs to locate an active or recent Change.
+func (s Service) ListChangeSummaries(ctx context.Context, start string, state ChangeState, limit int) ([]ChangeHistorySummary, error) {
+	service, workspace, err := s.loadAuthority(ctx, start)
+	if err != nil {
+		return nil, err
+	}
+	if state != "" && state != ChangeActive && state != ChangeCompleted && state != ChangeCancelled {
+		return nil, newError(KindUsage, "INVALID_CHANGE_STATE", "--state must be ACTIVE, COMPLETED, or CANCELLED", nil)
+	}
+	if limit < 0 || limit > 1000 {
+		return nil, newError(KindUsage, "INVALID_CHANGE_LIMIT", "--limit must be between 0 and 1000", nil)
+	}
+	result := make([]ChangeHistorySummary, 0)
+	for index := len(workspace.Projection.ChangeOrder) - 1; index >= 0; index-- {
+		changeID := workspace.Projection.ChangeOrder[index]
+		change := workspace.Projection.Changes[changeID]
+		if change == nil {
+			return nil, newError(KindIntegrity, "CHANGE_HISTORY_MISSING", "Change order references a missing Change", nil)
+		}
+		if state != "" && change.State != state {
+			continue
+		}
+		item := ChangeHistorySummary{
 			SchemaVersion:       SchemaVersion,
 			ContractVersion:     change.ContractVersion,
 			ProjectID:           workspace.ProjectID,
 			AuthorityID:         service.authorityID,
 			WorkspaceID:         workspace.WorkspaceID,
 			ChangeID:            change.ChangeID,
-			ActivationID:        change.ActivationID,
 			Title:               change.Title,
-			Goal:                change.Goal,
 			State:               change.State,
 			DeclaredRisk:        change.DeclaredRisk,
 			Scope:               append([]string(nil), change.Scope...),
-			NonGoals:            append([]string(nil), change.NonGoals...),
-			AcceptanceCriteria:  append([]string(nil), change.AcceptanceCriteria...),
-			Impact:              change.Impact,
-			Requirements:        append([]ChangeRequirement(nil), change.Requirements...),
 			SupersedesChangeID:  change.SupersedesChangeID,
 			LineageRootChangeID: change.LineageRootChangeID,
-			ConfigDigest:        change.ConfigDigest,
-			TruthDigest:         change.TruthDigest,
-			ContractDigest:      change.ContractDigest,
 			CreatedAt:           change.CreatedAt,
-			SemanticAssessments: append([]SemanticAssessment(nil), workspace.Projection.SemanticAssessments[changeID]...),
 		}
 		if completion, ok := workspace.Projection.Completions[changeID]; ok {
-			copyOfCompletion := completion
-			item.Completion = &copyOfCompletion
-		}
-		if cancellation, ok := workspace.Projection.Cancellations[changeID]; ok {
-			copyOfCancellation := cancellation
-			item.Cancellation = &copyOfCancellation
+			item.FinishedAt = completion.CompletedAt
+		} else if cancellation, ok := workspace.Projection.Cancellations[changeID]; ok {
+			item.FinishedAt = cancellation.CancelledAt
 		}
 		result = append(result, item)
+		if limit > 0 && len(result) == limit {
+			break
+		}
 	}
 	return result, nil
+}
+
+func (s Service) GetChange(ctx context.Context, start, changeID string) (ChangeHistoryItem, error) {
+	service, workspace, err := s.loadAuthority(ctx, start)
+	if err != nil {
+		return ChangeHistoryItem{}, err
+	}
+	changeID = strings.TrimSpace(changeID)
+	if err := validateIdentifier(changeID, "change_id"); err != nil {
+		return ChangeHistoryItem{}, err
+	}
+	change := workspace.Projection.Changes[changeID]
+	if change == nil {
+		return ChangeHistoryItem{}, newError(KindNotFound, "CHANGE_NOT_FOUND", "the requested Change does not exist in this Workspace", nil)
+	}
+	return changeHistoryItem(service, workspace, change), nil
+}
+
+func changeHistoryItem(service Service, workspace loadedWorkspace, change *Change) ChangeHistoryItem {
+	item := ChangeHistoryItem{
+		SchemaVersion:       SchemaVersion,
+		ContractVersion:     change.ContractVersion,
+		ProjectID:           workspace.ProjectID,
+		AuthorityID:         service.authorityID,
+		WorkspaceID:         workspace.WorkspaceID,
+		ChangeID:            change.ChangeID,
+		ActivationID:        change.ActivationID,
+		Title:               change.Title,
+		Goal:                change.Goal,
+		State:               change.State,
+		DeclaredRisk:        change.DeclaredRisk,
+		Scope:               append([]string(nil), change.Scope...),
+		NonGoals:            append([]string(nil), change.NonGoals...),
+		AcceptanceCriteria:  append([]string(nil), change.AcceptanceCriteria...),
+		Impact:              change.Impact,
+		Requirements:        append([]ChangeRequirement(nil), change.Requirements...),
+		SupersedesChangeID:  change.SupersedesChangeID,
+		LineageRootChangeID: change.LineageRootChangeID,
+		ConfigDigest:        change.ConfigDigest,
+		TruthDigest:         change.TruthDigest,
+		ContractDigest:      change.ContractDigest,
+		CreatedAt:           change.CreatedAt,
+		SemanticAssessments: append([]SemanticAssessment(nil), workspace.Projection.SemanticAssessments[change.ChangeID]...),
+	}
+	if completion, ok := workspace.Projection.Completions[change.ChangeID]; ok {
+		copyOfCompletion := completion
+		item.Completion = &copyOfCompletion
+	}
+	if cancellation, ok := workspace.Projection.Cancellations[change.ChangeID]; ok {
+		copyOfCancellation := cancellation
+		item.Cancellation = &copyOfCancellation
+	}
+	return item
 }
 
 func (s Service) ListEvidence(ctx context.Context, start, changeID string) (EvidenceReport, error) {
