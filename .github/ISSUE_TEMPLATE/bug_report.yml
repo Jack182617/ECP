@@ -1,0 +1,76 @@
+name: Bug report
+description: Report a reproducible ECP defect that is not a security vulnerability.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve ECP. Do not include credentials, private
+        repository content, authority data, or raw Evidence logs. Report
+        vulnerabilities through the private process in SECURITY.md.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Plugin version, Core identity, Git commit, or another exact build identifier.
+      placeholder: 0.3.0-dev+... or commit SHA
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected surface
+      options:
+        - Core or CLI
+        - Codex Plugin or Skill routing
+        - Project Pack or truth handling
+        - Gate, Evidence, or Verdict lifecycle
+        - Packaging or runtime launcher
+        - Documentation or evaluation tooling
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, architecture, Git version, Go version, and relevant Codex host build.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide bounded steps using a disposable repository when possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Summarize the structured result and redact opaque or sensitive values.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Safety checks
+      options:
+        - label: I removed credentials, private content, personal paths, authority data, and raw Evidence logs.
+          required: true
+        - label: This is not an unpatched security vulnerability.
+          required: true

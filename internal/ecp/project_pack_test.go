@@ -188,7 +188,8 @@ func TestEnablementStopsAtReadyContract(t *testing.T) {
 			"取得明确确认前，不解析或读取仓库、不调用 `project status`",
 		},
 		filepath.Join(root, "README.md"): {
-			"在用户明确确认前，Adapter 不读取项目状态或内容",
+			"An ambiguous request to configure ECP is clarified before the adapter reads",
+			"repository contents or probes project status.",
 		},
 		filepath.Join(root, ".ecp", "contracts", "product-boundaries.md"): {
 			"before explicit confirmation it must not inspect or resolve the repository, call ECP",
@@ -972,11 +973,14 @@ func TestPluginHostRoutingEvaluationInventory(t *testing.T) {
 	}
 	status := strings.Join(strings.Fields(string(statusBytes)), " ")
 	for _, boundary := range []string{
-		"not yet qualified for a real-product pilot or release", "16 fail-fast",
-		"ECP itself is never a host fixture or a real-project pilot track",
-		"dedicated authorities", "package a new cachebuster candidate",
-		"separately authorized installation",
-		"Only after that gate passes, use safe copies",
+		"qualified for a controlled real-product pilot through Codex Desktop",
+		"It is not yet a public release or a claim of production effectiveness",
+		"All 16 qualification canaries ran serially in distinct fresh Codex Desktop tasks",
+		"ECP itself was not enabled, used as a qualification fixture, or counted as a real-project pilot track",
+		"dedicated authorities",
+		"Earlier failed campaigns remain immutable diagnostic evidence",
+		"Use the installed candidate on safe copies of one genuinely new product and one established product",
+		"Enabling remains a separate explicit whole- Workspace decision",
 	} {
 		if !strings.Contains(status, boundary) {
 			t.Fatalf("canonical status lost host-routing boundary %q", boundary)

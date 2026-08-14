@@ -30,7 +30,8 @@ pilot track.
   isolated `/private/tmp` PyYAML 6.0.2 target, and Codex Desktop was restarted
   before qualification so fresh tasks loaded this exact installed locator.
 - The formal immutable campaign is
-  `/Users/o--o/Study/ECPQualificationResults/ecp-codex-20260813-115751`.
+  `<durable-results-root>/ecp-codex-20260813-115751`; the private local root is
+  intentionally not recorded in this public repository.
   The official validator reports: `QUALIFIED: 16 qualification cases passed;
   0 INVALID attempts and 0 extended diagnostics preserved`.
 - All 16 qualification canaries ran serially in distinct fresh Codex Desktop
