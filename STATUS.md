@@ -140,7 +140,7 @@ is not yet fresh-task accepted or Desktop-qualified.
    disposable enabled Workspace with preserved authority: mode/history survive,
    old Evidence becomes inapplicable, fresh Evidence restores PASS, fresh tasks
    load all four new Skills, and uninstall/reinstall/rollback boundaries remain
-   honest. Removal or further global Codex configuration still requires
+   honest. Installation, removal, or global Codex configuration still requires
    explicit user authorization.
 3. Re-run the 16 fresh-task Desktop canaries for the new frozen candidate. The
    prior 16/16 result does not transfer across Core/Skill identity changes.
