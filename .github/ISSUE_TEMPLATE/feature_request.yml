@@ -1,0 +1,44 @@
+name: Feature request
+description: Propose a bounded capability or contract improvement.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What maintainer or project-continuity problem is currently unsolved?
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe observable behavior rather than a preferred implementation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and non-goals
+      description: Name what the proposal changes and what it deliberately leaves unchanged.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Validation
+      description: What focused evidence would demonstrate the outcome without overstating it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: Compatibility and trust-boundary risks
+      description: Note persisted-state, CLI, Plugin, security, external-effect, or migration impact.
+    validations:
+      required: true
