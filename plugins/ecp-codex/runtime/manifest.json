@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "plugin_name": "ecp-codex",
-  "plugin_version": "0.3.0-dev+codex.20260813115751",
-  "source_commit": "66cf40f422661d98d4cd139d54364f04c4896545",
+  "plugin_version": "0.3.0-dev+codex.20260814091408",
+  "source_commit": "b950ac78112bc9570e58c0723b7dcd56c22b067c",
   "source_clean": true,
   "builder": {
     "go_version": "go version go1.26.5 darwin/arm64",
@@ -11,9 +11,9 @@
     "build_flags": ["-trimpath", "-buildvcs=false", "-ldflags=-s -w"]
   },
   "artifacts": [
-    {"os":"darwin","arch":"arm64","path":"runtime/darwin-arm64/ecp","sha256":"838212455e6c97c567fef748dd4eb8da95ed268756be9bd411590e13744dd0af","size_bytes":3556322},
-    {"os":"darwin","arch":"amd64","path":"runtime/darwin-amd64/ecp","sha256":"d12e5e3b1408a6884043e7e26308bcad603484fa1fe8aa42a7c6c4f9346aac3c","size_bytes":3868656},
-    {"os":"linux","arch":"arm64","path":"runtime/linux-arm64/ecp","sha256":"fc5dfefa2ba4002c85540753ce1a12a821e016a9e26472eb4ab780751eb16624","size_bytes":3604642},
-    {"os":"linux","arch":"amd64","path":"runtime/linux-amd64/ecp","sha256":"fac00000236e6c9c9485d80cb7450cb332d9b81e73850be2845d83bfb1769ba8","size_bytes":3879074}
+    {"os":"darwin","arch":"arm64","path":"runtime/darwin-arm64/ecp","sha256":"73cb39fcbac178a313ed9e18ef4a0b45e87db70c726e95962c46d43e9c485ac4","size_bytes":3606658},
+    {"os":"darwin","arch":"amd64","path":"runtime/darwin-amd64/ecp","sha256":"511cddd9b8b7d3976b0dbefc4716a8b6332528c05a7f3993f8d2af4e9e9b0a19","size_bytes":3914512},
+    {"os":"linux","arch":"arm64","path":"runtime/linux-arm64/ecp","sha256":"3d81b3708fd79d4a61a45cbd4b1fb081cf6d63b8691a1f9ca9a18e4f56ddd037","size_bytes":3735714},
+    {"os":"linux","arch":"amd64","path":"runtime/linux-amd64/ecp","sha256":"b94139fc5d33c832ea28be1d7a171fb2803e3404e2b75f84b14a5af847028c32","size_bytes":3924130}
   ]
 }
