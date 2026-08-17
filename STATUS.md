@@ -123,26 +123,25 @@ historical evidence for its own identity and is not carried forward.
   frozen thresholds, or seven-day observation window, so it is exploratory
   product evidence, not a completed Phase 1B pilot.
 - The post-qualification hardening source is now Core `0.3.1-dev`, Plugin
-  `0.3.1-dev+codex.20260817112321`, and Change contract version 4. It retains
+  `0.3.1-dev+codex.20260817115910`, and Change contract version 4. It retains
   version 3 accepted-Unknown dispositions and adds bounded `new_path_roots`,
   Gate-lease-first/no-replace authority export, strict acknowledgement replay,
   and an isolated vendored Schema v3 runtime build contract. Historical
-  contract versions 0/2/3 remain readable. Pre-package validation passes
+  contract versions 0/2/3 remain readable. The immediately preceding
+  `0.3.1-dev+codex.20260817112321` package passed
   `git diff --check`, `go vet ./...`, all 27 Python qualification-protocol
-  tests, official Plugin/four-Skill validators, and every Go test except the
-  intentionally deferred bundled-runtime identity check; the 84-scenario
-  traceability count is exact. The Plugin is now formally packaged from clean
-  source commit `4c1ca18676ded242221605a67233a07b492e34ee`; its Darwin/arm64
-  Core identity is
+  tests, official Plugin/four-Skill validators, unskipped
+  `go test ./... -count=1`, and `go test -race ./... -count=1`; the 84-scenario
+  traceability count is exact. It was formally packaged from clean source
+  commit `4c1ca18676ded242221605a67233a07b492e34ee`, reproduced byte-for-byte
+  from a separate clone, installed, and accepted by a new read-only ephemeral
+  task with Darwin/arm64 Core identity
   `0.3.1-dev+sha256:f78828f3d2b9614c7c21211194fc84cef44a8a6b2c5cbf5ea13fa979a5f317df`.
-  A separate clone of that exact commit reproduced the entire runtime tree
-  byte-for-byte and the Schema v3 manifest digest
-  `sha256:66dca2ca7b89f18a578437e38eaf99d576a1cd5ffca1235d7d59e6e9672a4fcc`.
-  The unskipped `go test ./... -count=1` and `go test -race ./... -count=1`
-  suites pass, including all four packaged targets' manifest checks. This new
-  identity is not yet installed, fresh-task accepted, or Desktop-qualified at
-  this checkpoint, and
-  the earlier 16-case campaign remains evidence only for its exact older
+  That fresh task exposed two shared-reference omissions (the exact
+  Requirement example and export lock/no-replace description); they are fixed
+  in the new cachebuster named above. The new Plugin identity is not yet
+  repackaged or installed at this checkpoint. The earlier 16-case campaign
+  remains evidence only for its exact older
   Plugin/Core identity. No existing real project's mode, authority history,
   source, or `.ecp` was rewritten by this source work.
 
