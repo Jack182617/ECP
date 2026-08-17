@@ -3,6 +3,7 @@ package ecp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -12,6 +13,8 @@ import (
 	"strings"
 	"unicode/utf8"
 )
+
+var errAuthorityExportNoReplaceUnsupported = errors.New("atomic no-replace directory rename is unsupported on this platform")
 
 const (
 	authorityExportFormat                 = "ecp-authority-export-v1"
@@ -93,7 +96,7 @@ type authorityExportSource struct {
 }
 
 func (s Service) ExportAuthority(ctx context.Context, start, output string) (AuthorityExportResult, error) {
-	service, workspace, err := s.loadAuthority(ctx, start)
+	service, workspace, err := s.resolveAuthorityTarget(ctx, start)
 	if err != nil {
 		return AuthorityExportResult{}, err
 	}
@@ -101,20 +104,33 @@ func (s Service) ExportAuthority(ctx context.Context, start, output string) (Aut
 	if err != nil {
 		return AuthorityExportResult{}, err
 	}
-	release, err := workspace.Store.acquireLock(ctx)
+	// Export must take the same outer Gate sequence lease as lifecycle
+	// operations before it takes the mutation lock. Otherwise a long copy can
+	// hold the mutation lock while a live GateRun tries to append Evidence or
+	// its terminal event, eventually stranding an IN_PROGRESS run.
+	releaseGate, err := workspace.Store.acquireExistingGateLease(ctx)
 	if err != nil {
 		return AuthorityExportResult{}, err
 	}
-	defer release()
+	defer releaseGate()
+	releaseMutation, err := workspace.Store.acquireExistingLock(ctx)
+	if err != nil {
+		return AuthorityExportResult{}, err
+	}
+	defer releaseMutation()
 
-	projection, err := workspace.Store.Load(ctx)
-	if err != nil {
-		return AuthorityExportResult{}, err
-	}
 	binding, err := loadWorkspaceBinding(service.StateDir, workspace.WorkspaceID)
 	if err != nil {
 		return AuthorityExportResult{}, err
 	}
+	if binding != workspace.Binding {
+		return AuthorityExportResult{}, newError(KindIntegrity, "WORKSPACE_BINDING_CHANGED", "Workspace binding changed while authority export was acquiring its snapshot", nil)
+	}
+	history, err := workspace.Store.loadEventHistory(ctx, false)
+	if err != nil {
+		return AuthorityExportResult{}, err
+	}
+	projection := history.projection
 	if binding.ProjectID != workspace.ProjectID || binding.AuthorityID != service.authorityID {
 		return AuthorityExportResult{}, newError(KindIntegrity, "WORKSPACE_BINDING_IDENTITY_MISMATCH", "Workspace binding changed before authority export", nil)
 	}
@@ -201,7 +217,13 @@ func (s Service) ExportAuthority(ctx context.Context, start, output string) (Aut
 	if err := syncAuthorityExportDirectories(staging); err != nil {
 		return AuthorityExportResult{}, err
 	}
-	if err := os.Rename(staging, target); err != nil {
+	if err := renameAuthorityExportNoReplace(staging, target); err != nil {
+		if os.IsExist(err) {
+			return AuthorityExportResult{}, newError(KindConflict, "EXPORT_TARGET_EXISTS", "authority export target was created before commit and was not replaced", err)
+		}
+		if errors.Is(err, errAuthorityExportNoReplaceUnsupported) {
+			return AuthorityExportResult{}, newError(KindBlocked, "EXPORT_NO_REPLACE_UNSUPPORTED", "authority export requires atomic no-replace directory rename support on this platform", err)
+		}
 		return AuthorityExportResult{}, newError(KindRuntime, "EXPORT_COMMIT_FAILED", "could not atomically commit authority export", err)
 	}
 	removeStaging = false

@@ -927,7 +927,7 @@ func validateStartedChange(change Change, accepted ConfigAcceptance, acceptedTru
 		change.DeclaredRisk.Rank() == 0 || !isSHA256Digest(change.Baseline.Fingerprint) || !isSHA256Digest(change.ContractDigest) {
 		return newError(KindIntegrity, "CHANGE_START_INVALID", "Change start event contains an invalid contract, state, epoch, or baseline", nil)
 	}
-	if change.ContractVersion != 0 && change.ContractVersion != 2 && change.ContractVersion != CurrentChangeContractVersion {
+	if change.ContractVersion != 0 && change.ContractVersion != ChangeContractVersionRequirements && change.ContractVersion != ChangeContractVersionUnknownDispositions && change.ContractVersion != CurrentChangeContractVersion {
 		return newError(KindIntegrity, "CHANGE_START_INVALID", "Change start event contains an unsupported contract_version", nil)
 	}
 	if err := validateIdentifier(change.ChangeID, "change_id"); err != nil {
@@ -939,14 +939,22 @@ func validateStartedChange(change Change, accepted ConfigAcceptance, acceptedTru
 	if err := validateChangeImpact(change.Impact, acceptedTruth.Truth); err != nil {
 		return newError(KindIntegrity, "CHANGE_IMPACT_INVALID", "Change impact is invalid or references facts outside the accepted Project Truth", err)
 	}
-	if err := validateUnknownDispositions(change.Impact, acceptedTruth.Truth, change.ContractVersion >= CurrentChangeContractVersion); err != nil {
+	if err := validateUnknownDispositions(change.Impact, acceptedTruth.Truth, change.ContractVersion >= ChangeContractVersionUnknownDispositions); err != nil {
 		return newError(KindIntegrity, "CHANGE_UNKNOWN_DISPOSITIONS_INVALID", "Change unknown dispositions are invalid or incomplete", err)
 	}
 	if err := validateChangeRequirements(change.Requirements, change.AcceptanceCriteria, change.Impact, accepted.Gates, change.ContractVersion >= 2); err != nil {
 		return newError(KindIntegrity, "CHANGE_REQUIREMENTS_INVALID", "Change requirement decisions or coverage are invalid", err)
 	}
 	if change.ContractVersion >= 2 {
-		if missing := undeclaredInferredImpact(change.Impact, inferImpact(change.Scope, acceptedTruth.Truth)); !impactInferenceEmpty(missing) {
+		if err := validateNewPathRootScope(change.Impact.NewPathRoots, change.Scope); err != nil {
+			return newError(KindIntegrity, "CHANGE_NEW_PATH_SCOPE_INVALID", "Change new_path_roots are not bounded by its scope", err)
+		}
+		inferred := inferImpact(change.Scope, acceptedTruth.Truth)
+		missing := undeclaredInferredImpact(change.Impact, inferred)
+		if change.ContractVersion >= ChangeContractVersionNewPathRoots {
+			missing = undeclaredInferredImpactForStart(change.Impact, inferred)
+		}
+		if !impactInferenceEmpty(missing) {
 			return newError(KindIntegrity, "CHANGE_IMPACT_INCOMPLETE", "Change scope implies undeclared or unmapped Project Truth impact", nil)
 		}
 	}
@@ -1007,8 +1015,16 @@ func validateChangeCompletion(completion ChangeCompletion, change *Change, proje
 			!slices.Equal(verdict.InferredImpact.UnmappedPaths, expectedInference.UnmappedPaths) {
 			return newError(KindIntegrity, "COMPLETION_IMPACT_INVALID", "completion Verdict inferred impact is inconsistent with its touched paths and accepted Project Truth", nil)
 		}
-		if missing := undeclaredInferredImpactForChange(*change, expectedInference, startingTruth, truthChanged); !impactInferenceEmpty(missing) {
+		if missing := undeclaredInferredImpactForChange(*change, expectedInference, startingTruth, projection.AcceptedTruth.Truth, truthChanged); !impactInferenceEmpty(missing) {
 			return newError(KindIntegrity, "COMPLETION_IMPACT_INVALID", "completion Verdict contains undeclared or unmapped inferred impact", nil)
+		}
+	}
+	if change.ContractVersion >= ChangeContractVersionNewPathRoots {
+		if err := validateNewPathRootTruthOutcome(change.Impact.NewPathRoots, projection.AcceptedTruth.Truth, truthChanged); err != nil {
+			return newError(KindIntegrity, "COMPLETION_NEW_PATH_INVALID", "completion did not reconcile declared new_path_roots", err)
+		}
+		if err := validateNewPathRootTouched(change.Impact.NewPathRoots, verdict.TouchedPaths); err != nil {
+			return newError(KindIntegrity, "COMPLETION_NEW_PATH_INVALID", "completion did not touch declared new_path_roots", err)
 		}
 	}
 	expectedSubject, err := verdictSubjectDigestForChange(*change, verdict)
@@ -1204,13 +1220,18 @@ func applyEvent(projection *Projection, event Event) error {
 			if semantic == nil || semantic.PreviousTruthDigest != acceptance.PreviousTruthDigest || semantic.CurrentTruthDigest != acceptance.TruthDigest || semantic.Behavior != SemanticBehaviorChanged {
 				return newError(KindIntegrity, "TRUTH_ACCEPTANCE_SEMANTIC_MISMATCH", "Project Truth evolution lacks a matching semantic assessment", nil)
 			}
-			if active.ContractVersion >= CurrentChangeContractVersion {
+			if active.ContractVersion >= ChangeContractVersionUnknownDispositions {
 				startingTruth, err := acceptedTruthAtDigest(*projection, active.TruthDigest)
 				if err != nil {
 					return err
 				}
 				if err := validateUnknownDispositionOutcomes(active.Impact, startingTruth, acceptance.Truth); err != nil {
 					return newError(KindIntegrity, "TRUTH_UNKNOWN_DISPOSITION_INVALID", "accepted Project Truth does not satisfy the Change unknown dispositions", err)
+				}
+			}
+			if active.ContractVersion >= ChangeContractVersionNewPathRoots {
+				if err := validateNewPathRootTruthOutcome(active.Impact.NewPathRoots, acceptance.Truth, active.TruthDigest != acceptance.TruthDigest); err != nil {
+					return newError(KindIntegrity, "TRUTH_NEW_PATH_ROOT_INVALID", "accepted Project Truth does not reconcile the Change new_path_roots", err)
 				}
 			}
 		}
@@ -1384,6 +1405,9 @@ func applyEvent(projection *Projection, event Event) error {
 		if acknowledgement.SchemaVersion != SchemaVersion || acknowledgement.ActivationID != projection.Activation.ActivationID || acknowledgement.ActivationID != change.ActivationID {
 			return newError(KindIntegrity, "ACK_ACTIVATION_MISMATCH", "acknowledgement is not bound to the current enabled project epoch", nil)
 		}
+		if err := validateAcknowledgementRecord(*projection, acknowledgement, change); err != nil {
+			return err
+		}
 		projection.Acknowledgements[acknowledgement.ChangeID] = append(projection.Acknowledgements[acknowledgement.ChangeID], acknowledgement)
 	case "semantic_assessed":
 		var assessment SemanticAssessment
@@ -1403,13 +1427,18 @@ func applyEvent(projection *Projection, event Event) error {
 		if err := validateRequirementAssessments(*change, assessment.RequirementAssessments); err != nil {
 			return newError(KindIntegrity, "SEMANTIC_REQUIREMENTS_INVALID", "semantic assessment does not reconcile the Change requirements", err)
 		}
-		if change.ContractVersion >= CurrentChangeContractVersion && assessment.CurrentTruthDigest == projection.AcceptedTruth.TruthDigest {
+		if change.ContractVersion >= ChangeContractVersionUnknownDispositions && assessment.CurrentTruthDigest == projection.AcceptedTruth.TruthDigest {
 			startingTruth, err := acceptedTruthAtDigest(*projection, change.TruthDigest)
 			if err != nil {
 				return err
 			}
 			if err := validateUnknownDispositionOutcomes(change.Impact, startingTruth, projection.AcceptedTruth.Truth); err != nil {
 				return newError(KindIntegrity, "SEMANTIC_UNKNOWN_DISPOSITION_INVALID", "semantic assessment does not satisfy the Change unknown dispositions", err)
+			}
+		}
+		if change.ContractVersion >= ChangeContractVersionNewPathRoots && assessment.CurrentTruthDigest == projection.AcceptedTruth.TruthDigest {
+			if err := validateNewPathRootTruthOutcome(change.Impact.NewPathRoots, projection.AcceptedTruth.Truth, change.TruthDigest != projection.AcceptedTruth.TruthDigest); err != nil {
+				return newError(KindIntegrity, "SEMANTIC_NEW_PATH_ROOT_INVALID", "semantic assessment does not reconcile the Change new_path_roots", err)
 			}
 		}
 		for _, existing := range projection.SemanticAssessments[assessment.ChangeID] {
@@ -1461,6 +1490,38 @@ func applyEvent(projection *Projection, event Event) error {
 	}
 	projection.Revision = event.Sequence
 	projection.EventHead = event.Hash
+	return nil
+}
+
+func validateAcknowledgementRecord(projection Projection, acknowledgement Acknowledgement, change *Change) error {
+	if err := validateIdentifier(acknowledgement.ID, "acknowledgement_id"); err != nil {
+		return newError(KindIntegrity, "ACK_ID_INVALID", "acknowledgement ID is invalid", err)
+	}
+	if acknowledgement.ChangeID != change.ChangeID {
+		return newError(KindIntegrity, "ACK_CHANGE_MISMATCH", "acknowledgement is not bound to its active Change", nil)
+	}
+	if !isSHA256Digest(acknowledgement.SubjectDigest) {
+		return newError(KindIntegrity, "ACK_SUBJECT_INVALID", "acknowledgement subject digest is invalid", nil)
+	}
+	if acknowledgement.RecordedAt.IsZero() {
+		return newError(KindIntegrity, "ACK_TIME_INVALID", "acknowledgement timestamp is missing", nil)
+	}
+	if acknowledgement.Actor == "" || acknowledgement.Actor != strings.TrimSpace(acknowledgement.Actor) || len(acknowledgement.Actor) > 200 ||
+		acknowledgement.Reason == "" || acknowledgement.Reason != strings.TrimSpace(acknowledgement.Reason) || len(acknowledgement.Reason) > 2000 ||
+		!utf8.ValidString(acknowledgement.Actor) || !utf8.ValidString(acknowledgement.Reason) ||
+		strings.ContainsRune(acknowledgement.Actor, '\x00') || strings.ContainsRune(acknowledgement.Reason, '\x00') {
+		return newError(KindIntegrity, "ACK_FIELDS_INVALID", "acknowledgement actor or reason is empty, non-canonical, or oversized", nil)
+	}
+	if acknowledgement.Trust != "local-acknowledgement" {
+		return newError(KindIntegrity, "ACK_TRUST_INVALID", "acknowledgement trust class is invalid", nil)
+	}
+	for _, acknowledgements := range projection.Acknowledgements {
+		for _, existing := range acknowledgements {
+			if existing.ID == acknowledgement.ID {
+				return newError(KindIntegrity, "DUPLICATE_ACKNOWLEDGEMENT", "acknowledgement ID is duplicated", nil)
+			}
+		}
+	}
 	return nil
 }
 

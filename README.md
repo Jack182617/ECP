@@ -2,8 +2,10 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-ECP is a local-first, tool-agnostic engineering control plane for auditable,
-evidence-bound AI-assisted software changes.
+ECP is a local-first engineering control plane for auditable, evidence-bound
+AI-assisted software changes. Tool-agnostic, multi-project governance is the
+architecture direction; the current preview is a concrete Codex + Git workflow
+for supported Darwin/Linux hosts, not a universal adapter for every project.
 
 Coding agents can generate code quickly, but speed alone does not preserve a
 project's intent, constraints, decisions, or proof that a change is complete.
@@ -12,8 +14,8 @@ exact source state, accepted project truth, required validation gates, durable
 evidence, and a current verdict.
 
 > [!IMPORTANT]
-> ECP is an early-stage preview for controlled local pilots. It is not a
-> production enforcement system, a public Plugin release, or proof that an AI
+> ECP is an early-stage public-source preview for controlled local pilots. It is
+> not a production enforcement system, a signed/general Plugin Directory release, or proof that an AI
 > change is defect-free. Read [Current status](STATUS.md) before evaluating or
 > adopting it.
 
@@ -51,6 +53,7 @@ The repository currently contains:
 - a Go Core and CLI implementing workspace-local project mode, bounded Change
   lifecycles, accepted Project Truth, structured requirements and impact,
   explicit accepted-Unknown dispositions, bounded/exact history queries,
+  bounded creation of new component path roots under established Truth,
   GateRun history, evidence applicability, and derived verdicts;
 - a self-contained `ecp-codex` Plugin with four focused Skills for checking,
   enabling, disabling, and governing changes;
@@ -63,10 +66,17 @@ The repository currently contains:
 
 That qualification establishes behavior only for the frozen candidate and
 host campaign. The current source contains a newer post-qualification
-iteration and is not an installed or qualified replacement candidate. Neither
-state establishes future-host compatibility, public
+hardening candidate; packaging or local installation does not transfer the old
+campaign's qualification to the new Core identity. Neither state establishes future-host compatibility, public
 distribution provenance, protected CI enforcement, production effectiveness,
 or long-term value in real projects.
+
+The current preview is a reasonable fit only when the repository is Git-based,
+the team accepts local advisory governance, all required Gates can run safely
+and non-interactively on a supported host, and Project Truth ownership is worth
+maintaining. It is not currently a fit for non-Git source, Windows authority
+operations, mandatory remote/network/production validation, untrusted
+multi-user enforcement, or projects that cannot keep local authority history.
 
 ## Core invariants
 

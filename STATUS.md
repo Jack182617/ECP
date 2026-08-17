@@ -122,18 +122,40 @@ historical evidence for its own identity and is not carried forward.
   project Workspace without the pilot preregistration, safe-copy controls,
   frozen thresholds, or seven-day observation window, so it is exploratory
   product evidence, not a completed Phase 1B pilot.
-- The current source iteration addresses those observations with Change
-  contract version 3 accepted-Unknown dispositions, an authority-independent
-  `schema get` machine contract, bounded/filterable Change history plus exact
-  single-Change recovery, strengthened Skill routing/reporting language, and
-  an automated Core-identity upgrade transition test. Historical contract
-  versions 0/2 remain readable. The current worktree passes `git diff --check`,
-  `go vet ./...`, all 27 Python qualification-protocol tests, and
-  `go test ./... -count=1` (including the 79-scenario traceability matrix).
-  The changes are now packaged, validated, installed locally, fresh-task
-  accepted, upgrade-checked, and Desktop-qualified. They still do not affect
-  another installation. No existing real project's mode, authority history,
-  source, or `.ecp` was rewritten by installation or qualification.
+- The post-qualification hardening source is now Core `0.3.1-dev`, Plugin
+  `0.3.1-dev+codex.20260817115910`, and Change contract version 4. It retains
+  version 3 accepted-Unknown dispositions and adds bounded `new_path_roots`,
+  Gate-lease-first/no-replace authority export, strict acknowledgement replay,
+  and an isolated vendored Schema v3 runtime build contract. Historical
+  contract versions 0/2/3 remain readable. The immediately preceding
+  `0.3.1-dev+codex.20260817112321` package passed
+  `git diff --check`, `go vet ./...`, all 27 Python qualification-protocol
+  tests, official Plugin/four-Skill validators, unskipped
+  `go test ./... -count=1`, and `go test -race ./... -count=1`; the 84-scenario
+  traceability count is exact. It was formally packaged from clean source
+  commit `4c1ca18676ded242221605a67233a07b492e34ee`, reproduced byte-for-byte
+  from a separate clone, installed, and accepted by a new read-only ephemeral
+  task with Darwin/arm64 Core identity
+  `0.3.1-dev+sha256:f78828f3d2b9614c7c21211194fc84cef44a8a6b2c5cbf5ea13fa979a5f317df`.
+  That fresh task exposed two shared-reference omissions (the exact
+  Requirement example and export lock/no-replace description); they are fixed
+  in the new cachebuster named above. The final Plugin is formally packaged
+  from clean source commit `d55b10c31f5423eb84629953ef329493f625b0a4`;
+  its four Core binaries are byte-identical to the full/race-tested package,
+  and a second separate clone reproduced the complete final runtime tree and
+  Schema v3 manifest digest
+  `sha256:7d35ef8a8ef708500c34ae5573cd9e9a9054d88c6130231f26a58c0186f3715e`.
+  The final Plugin is installed at
+  `~/.codex/plugins/cache/ecp-local/ecp-codex/0.3.1-dev+codex.20260817115910`;
+  the installed tree is byte-identical to the packaged source and is the sole
+  enabled `ecp-codex` provider. A final new read-only ephemeral task resolved
+  that exact Skill/launcher, confirmed Core/contract identity, verified both
+  corrected shared-reference clauses, and read the ECP source Workspace back
+  as `UNREGISTERED`/`DISABLED` without mutation. The final identity has not run
+  a new 16-case Desktop campaign. The earlier campaign remains evidence only
+  for its exact older
+  Plugin/Core identity. No existing real project's mode, authority history,
+  source, or `.ecp` was rewritten by this source work.
 
 ## Next actions, in order
 

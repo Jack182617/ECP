@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -207,6 +208,60 @@ func TestAuthorityExportRejectsUnsafeTargetsAndBundleRoots(t *testing.T) {
 	}
 	if _, err := VerifyAuthorityExport(ctx, link); err == nil || !isErrorCode(err, "EXPORT_ROOT_UNSAFE") {
 		t.Fatalf("symlink export root was not rejected: %v", err)
+	}
+}
+
+func TestAuthorityExportWaitsForGateLeaseBeforeSnapshot(t *testing.T) {
+	ctx := context.Background()
+	service, repo := createAuthorityExportProject(t, false)
+	_, workspace, err := service.loadAuthority(ctx, repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release, err := workspace.Store.AcquireGateLease(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+
+	waitCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer cancel()
+	output := filepath.Join(t.TempDir(), "blocked-export")
+	if _, err := service.ExportAuthority(waitCtx, repo, output); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("authority export bypassed a live Gate sequence lease: %v", err)
+	}
+	if _, err := os.Lstat(output); !os.IsNotExist(err) {
+		t.Fatalf("blocked export exposed an output directory: %v", err)
+	}
+}
+
+func TestAuthorityExportCommitNeverReplacesExistingTarget(t *testing.T) {
+	parent := t.TempDir()
+	staging := filepath.Join(parent, "staging")
+	target := filepath.Join(parent, "target")
+	if err := os.Mkdir(staging, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(staging, "new"), []byte("new export"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(target, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(target, "existing")
+	if err := os.WriteFile(marker, []byte("must survive"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := renameAuthorityExportNoReplace(staging, target); !os.IsExist(err) {
+		t.Fatalf("no-replace commit did not reject an existing target: %v", err)
+	}
+	content, err := os.ReadFile(marker)
+	if err != nil || string(content) != "must survive" {
+		t.Fatalf("existing target changed during rejected commit: %q err=%v", content, err)
+	}
+	if _, err := os.Stat(filepath.Join(staging, "new")); err != nil {
+		t.Fatalf("staging source disappeared after rejected commit: %v", err)
 	}
 }
 

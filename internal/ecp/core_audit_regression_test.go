@@ -268,6 +268,66 @@ func TestEvidenceReplayRejectsNonCanonicalOrInconsistentRecords(t *testing.T) {
 	}
 }
 
+func TestAcknowledgementReplayRejectsMalformedAndDuplicateRecords(t *testing.T) {
+	ctx := context.Background()
+	repo := createTestRepository(t)
+	service := newTestService(t)
+	bootstrapProjectWithGate(t, ctx, service, repo, passingGitGate())
+	change, err := startTestChange(t, ctx, service, repo, StartChangeInput{
+		Title: "Validate acknowledgement replay", Goal: "Reject forged acknowledgement fields during authority replay", Scope: []string{"src"},
+		AcceptanceCriteria: []string{"malformed acknowledgement events fail closed"}, Risk: RiskModerate,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, workspace, err := service.loadAuthority(ctx, repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	valid := Acknowledgement{
+		SchemaVersion: SchemaVersion,
+		ID:            "ack-replay-validation",
+		ChangeID:      change.ChangeID,
+		ActivationID:  change.ActivationID,
+		SubjectDigest: digestBytes([]byte("exact acknowledgement subject")),
+		Actor:         "owner",
+		Reason:        "reviewed the exact local subject",
+		RecordedAt:    time.Now().UTC(),
+		Trust:         "local-acknowledgement",
+	}
+	tests := []struct {
+		name   string
+		mutate func(*Acknowledgement)
+		code   string
+	}{
+		{name: "invalid id", mutate: func(value *Acknowledgement) { value.ID = "bad id" }, code: "ACK_ID_INVALID"},
+		{name: "invalid subject", mutate: func(value *Acknowledgement) { value.SubjectDigest = "sha256:short" }, code: "ACK_SUBJECT_INVALID"},
+		{name: "non canonical actor", mutate: func(value *Acknowledgement) { value.Actor = " owner " }, code: "ACK_FIELDS_INVALID"},
+		{name: "missing time", mutate: func(value *Acknowledgement) { value.RecordedAt = time.Time{} }, code: "ACK_TIME_INVALID"},
+		{name: "wrong trust", mutate: func(value *Acknowledgement) { value.Trust = "self-asserted" }, code: "ACK_TRUST_INVALID"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			candidate := valid
+			test.mutate(&candidate)
+			revision := workspace.Projection.Revision
+			if _, err := workspace.Store.Append(ctx, &revision, PendingEvent{Type: "acknowledgement_recorded", Origin: "test", Payload: candidate}); err == nil || !isErrorCode(err, test.code) {
+				t.Fatalf("malformed acknowledgement was not rejected with %s: %v", test.code, err)
+			}
+		})
+	}
+
+	revision := workspace.Projection.Revision
+	projection, err := workspace.Store.Append(ctx, &revision, PendingEvent{Type: "acknowledgement_recorded", Origin: "test", Payload: valid})
+	if err != nil {
+		t.Fatal(err)
+	}
+	revision = projection.Revision
+	if _, err := workspace.Store.Append(ctx, &revision, PendingEvent{Type: "acknowledgement_recorded", Origin: "test", Payload: valid}); err == nil || !isErrorCode(err, "DUPLICATE_ACKNOWLEDGEMENT") {
+		t.Fatalf("duplicate acknowledgement ID was not rejected: %v", err)
+	}
+}
+
 func TestGateRunCapacityHeadroomAndAtomicDisableRecovery(t *testing.T) {
 	ctx := context.Background()
 	repo := createTestRepository(t)

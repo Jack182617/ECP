@@ -1,10 +1,14 @@
 {
   "name": "ecp-codex",
-  "version": "0.3.0-dev+codex.20260814091408",
+  "version": "0.3.1-dev+codex.20260817115910",
   "description": "Check, enable, disable, and govern ECP projects through four focused Skills backed by one bundled local Core.",
   "author": {
-    "name": "ECP Project"
+    "name": "ECP Project",
+    "url": "https://github.com/Jack182617"
   },
+  "homepage": "https://github.com/Jack182617/ECP#readme",
+  "repository": "https://github.com/Jack182617/ECP",
+  "license": "Apache-2.0",
   "keywords": [
     "engineering-governance",
     "change-control",
@@ -18,6 +22,7 @@
     "longDescription": "Projects default to ECP off. One Plugin exposes four focused Skills for read-only checks, explicit project enablement, explicit project disablement, and governed repository changes. All four share one checksum-verified local Core for supported Darwin/Linux arm64/amd64 hosts, so users do not install or operate a separate CLI. Enabled projects recover accepted Project Truth, close material requirement ambiguity, create bounded Changes with structured Impact, select minimal required Gates, reconcile durable semantics, and close only current evidence-backed PASS lifecycles without exposing protocol tokens.",
     "developerName": "ECP Project",
     "category": "Productivity",
+    "websiteURL": "https://github.com/Jack182617/ECP",
     "capabilities": [
       "Focused project check, enable, disable, and change Skills",
       "Bundled checksum-verified local Core runtime",
@@ -25,6 +30,7 @@
       "Zero-silent-ambiguity Requirement decisions",
       "Cancelled Change baseline and lineage preservation",
       "Path-derived impact and minimal sufficient Gate selection",
+      "Explicit governed creation of new component path roots",
       "Protected semantic reconciliation",
       "Durable GateRun history and interruption recovery",
       "Read-only authority integrity and capacity diagnostics",
