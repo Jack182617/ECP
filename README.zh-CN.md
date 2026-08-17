@@ -2,12 +2,13 @@
 
 [English](README.md) | 简体中文
 
-> 当前结论与下一步以 [STATUS.md](STATUS.md) 为准：一个冻结的精确候选已经
-> 通过 16 个串行 fail-fast host canary；当前源码则是更新的资格后迭代，尚未
-> 打包、安装或重新 qualification。两者都仍不是公开发布版、生产有效性证明
-> 或长期价值结论。ECP 自身不作为 fixture 或真实产品试点项目。
+> 当前结论与下一步以 [STATUS.md](STATUS.md) 为准：一个冻结的旧候选已经
+> 通过 16 个串行 fail-fast host canary；当前源码是新的资格后加固候选。
+> 即使新候选完成打包和本机安装，旧候选的 qualification 也不会自动迁移到新
+> Core identity。它仍不是生产有效性、不可绕过 enforcement 或长期价值结论。
+> ECP 自身不作为 fixture 或真实产品试点项目。
 
-ECP 是一套面向长期 AI 原生软件开发的、多项目通用、工具无关、local-first 的项目连续性与可信变更控制系统。它不替代 Codex、IDE、Git、测试框架或 CI；它让项目自身长期保存关键产品与工程事实，并把一次工程变更的目标、影响、风险、验证命令、执行证据和裁决绑定到同一个精确的软件状态上。
+ECP 的长期架构目标是面向多项目、工具无关的 local-first 项目连续性与可信变更控制；当前实现并不适合“任何软件项目”。它是面向 Codex + Git、运行在受支持 Darwin/Linux 主机上的本地预览：适合愿意维护 Project Truth、能用安全非交互本地 Gate 验证、并接受 advisory governance 的仓库；不适合非 Git 源码、Windows authority、必须依赖网络/生产/真机才能验证、需要多用户强制权限边界，或不能保留本地 authority history 的项目。它不替代 IDE、Git、测试框架或 CI；它把一次工程变更的目标、影响、风险、验证命令、执行证据和裁决绑定到同一个精确的软件状态上。
 
 长期产品目标见 [NORTH_STAR.md](NORTH_STAR.md)。当前仓库已把 Assurance Kernel 扩展为本地语义闭环：独立摘要和接受版本的 Project Truth、逐项 Requirement 决策/覆盖、结构化 Change Impact、路径反推影响、取消后 baseline 继承、受保护真相差异、选择性 Gate、Semantic Reconciliation、持久 GateRun 生命周期，以及与最终源码/真相精确绑定的 Evidence/Verdict 已实现。真实长期项目试点、跨平台隔离 Runner、可信外部 Evidence 导入和受保护 CI enforcement 仍未完成，因此不能把当前本地闭环外推为完整、不可绕过的长期零手写代码保证。
 
@@ -127,7 +128,7 @@ Codex 会先确认一个尚不存在、位于仓库和 live authority 之外的�
 - accepted Project/Policy/Gates revisions 同样保留在 authority history，`policy get` 可在候选 control drift/malformed 时恢复 latest 或指定历史结构化配置，但读取本身不会改写或接受候选。
 - authority history 可导出为确定性、私有只读且可离线语义核验的精确引用 bundle；导出不包含孤儿状态、不修改 live authority，也不等于签名备份或已支持恢复。
 - `authority health` 可在不依赖候选 `.ecp` 的一致 authority 快照上核验全部历史引用并披露容量、remnant、orphan、unsafe entry 和 lease-released unresolved GateRun；它是有界诊断，不是清理、修复、restore、GC、签名或 attestation。
-- Change Contract 绑定启动时 truth digest 与结构化 Impact；version 3 对每个受影响的 accepted Truth Unknown 绑定 `PRESERVED/RESOLVED/REFINED` disposition，历史 version 0/2 保持可读；最终 Verdict 则绑定最终 accepted truth digest、适用于最终 source fingerprint 的 semantic assessment，以及同一 truth/source 的 Gate Evidence。
+- Change Contract 绑定启动时 truth digest 与结构化 Impact；version 4 保留对每个受影响 accepted Truth Unknown 的 `PRESERVED/RESOLVED/REFINED` disposition，并允许用 Requirement-covered `new_path_roots` 为 established Truth 下真正的新组件目录建立有界入口；最终仍要求真实 source 触达、Truth 演进和单一 Component ownership。历史 version 0/2/3 保持可读；最终 Verdict 绑定最终 accepted truth digest、适用于最终 source fingerprint 的 semantic assessment，以及同一 truth/source 的 Gate Evidence。
 - Change Contract 的 Requirement ledger 为每个验收、保持、旅程、数据/运行影响、预期变化和已发现未知项保存明确 status、rationale、decision source、verification mode 与 exact coverage；`BLOCKING_UNKNOWN` 不能启动，自动项必须由当前 mapped Gate Evidence 满足，外部项在 v0.3 保持阻塞。
 - 最近取消 Change 留下的源码 delta 必须由 replacement Change 显式继承原 baseline/lineage；否则 Core 拒绝开始，避免通过取消和重开洗掉风险、scope 或 Evidence 责任。
 - Impact 不是说明文字：受影响 invariant（包括经 capability/component/decision 关系解析出的 invariant）的风险会抬高 effective risk，其 `gate_ids` 会无条件进入 Required Gates。真相演进时对 starting/final 两个 epoch 取风险与 Gate 并集，因此不能在同一个 Change 中先删保护规则再自证通过。
@@ -203,7 +204,7 @@ Plugin 源码发生变化后，发布者运行：
 ./scripts/package-plugin.sh
 ```
 
-该脚本用 `-trimpath -buildvcs=false` 为 `darwin-arm64`、`darwin-amd64`、`linux-arm64` 和 `linux-amd64` 重建包内 Core，生成版本绑定的 `runtime/manifest.json` 和逐文件 checksum，再由官方 Plugin/Skill validators 检查包结构。发布者仍需通过可信发布流程签名和分发；checksum 能发现不匹配，但不是代码签名或来源证明。
+该脚本从 vendored modules 出发，在清空的构建环境中固定 `GOENV=off`、`GOTOOLCHAIN=local`、`GOWORK=off`、空 `GOFLAGS`、`GOPROXY/GOSUMDB=off`，并用 `-trimpath -buildvcs=false` 为 `darwin-arm64`、`darwin-amd64`、`linux-arm64` 和 `linux-amd64` 重建包内 Core，生成版本绑定的 Schema v3 `runtime/manifest.json` 和逐文件 checksum，再由官方 Plugin/Skill validators 检查包结构。发布者仍需通过可信发布流程签名和分发；checksum 能发现不匹配，但不是代码签名或来源证明。
 
 Core 内部的 Git 同样不会从 ambient `PATH` 解析。仅安装在 Homebrew、自定义目录或其他 PATH 位置的 Git 不在 v0.3 信任候选中；若 Unix 系统固定位置不可用，相关操作会以 `TRUSTED_GIT_UNAVAILABLE` 拒绝。v0.3 Plugin runtime 只打包 Darwin/Linux arm64/amd64；其他平台由 launcher 在任何 Core 写入前以 `ECP_RUNTIME_UNSUPPORTED` 拒绝。
 

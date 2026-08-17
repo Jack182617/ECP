@@ -59,6 +59,12 @@ func TestPackagePluginRuntimeSwapRecovery(t *testing.T) {
 			command.Env = []string{
 				"PATH=" + shimRoot + ":/usr/bin:/bin",
 				"TMPDIR=" + filepath.Join(fixtureRoot, "tmp"),
+				"GOFLAGS=-tags=ambient-must-not-leak",
+				"GOENV=/ambient/go/env",
+				"GOTOOLCHAIN=auto",
+				"GOWORK=/ambient/go.work",
+				"GOPROXY=https://ambient.invalid",
+				"GOSUMDB=sum.ambient.invalid",
 				"ECP_PACKAGE_TEST_REAL_MV=" + realMV,
 				"ECP_PACKAGE_TEST_PLUGIN_ROOT=" + pluginRoot,
 				"ECP_PACKAGE_TEST_MV_BEHAVIOR=" + testCase.mvBehavior,
@@ -123,6 +129,12 @@ func TestPackagePluginRequiresCleanSourceUnlessDevelopmentOverride(t *testing.T)
 	baseEnvironment := []string{
 		"PATH=" + shimRoot + ":/usr/bin:/bin",
 		"TMPDIR=" + filepath.Join(fixtureRoot, "tmp"),
+		"GOFLAGS=-tags=ambient-must-not-leak",
+		"GOENV=/ambient/go/env",
+		"GOTOOLCHAIN=auto",
+		"GOWORK=/ambient/go.work",
+		"GOPROXY=https://ambient.invalid",
+		"GOSUMDB=sum.ambient.invalid",
 		"ECP_PACKAGE_TEST_REAL_MV=" + realMV,
 		"ECP_PACKAGE_TEST_PLUGIN_ROOT=" + pluginRoot,
 		"ECP_PACKAGE_TEST_MV_BEHAVIOR=",
@@ -203,6 +215,12 @@ set -eu
 if [ "${1:-}" = "version" ]; then
   printf '%s\n' "go version go0.0.0-package-test test/arch"
   exit 0
+fi
+
+if [ "${PATH:-}" != "/usr/bin:/bin" ] || [ "${GOENV:-}" != "off" ] || [ "${GOTOOLCHAIN:-}" != "local" ] ||
+   [ "${GOWORK:-}" != "off" ] || [ -n "${GOFLAGS:-}" ] || [ "${GOPROXY:-}" != "off" ] || [ "${GOSUMDB:-}" != "off" ]; then
+  printf '%s\n' "package-test: ambient Go environment leaked into build" >&2
+  exit 65
 fi
 
 output=
@@ -333,11 +351,22 @@ func assertPackagedRuntimeInstalled(t *testing.T, runtimeRoot string) {
 		SchemaVersion int    `json:"schema_version"`
 		SourceCommit  string `json:"source_commit"`
 		SourceClean   bool   `json:"source_clean"`
+		Builder       struct {
+			EnvironmentIsolation string `json:"environment_isolation"`
+			GOENV                string `json:"goenv"`
+			GOToolchain          string `json:"gotoolchain"`
+			GOWork               string `json:"gowork"`
+			GOFlags              string `json:"goflags"`
+			GOProxy              string `json:"goproxy"`
+			GOSumDB              string `json:"gosumdb"`
+		} `json:"builder"`
 	}
 	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	if manifest.SchemaVersion != 2 || len(manifest.SourceCommit) != 40 || !manifest.SourceClean {
+	if manifest.SchemaVersion != 3 || len(manifest.SourceCommit) != 40 || !manifest.SourceClean ||
+		manifest.Builder.EnvironmentIsolation != "env-i" || manifest.Builder.GOENV != "off" || manifest.Builder.GOToolchain != "local" ||
+		manifest.Builder.GOWork != "off" || manifest.Builder.GOFlags != "" || manifest.Builder.GOProxy != "off" || manifest.Builder.GOSumDB != "off" {
 		t.Fatalf("clean formal package did not preserve source provenance: %+v", manifest)
 	}
 }

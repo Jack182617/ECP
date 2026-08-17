@@ -1351,7 +1351,7 @@ func (s Service) AssessSemantic(ctx context.Context, start string, input Semanti
 	if err != nil {
 		return SemanticAssessment{}, err
 	}
-	if change.ContractVersion >= CurrentChangeContractVersion {
+	if change.ContractVersion >= ChangeContractVersionUnknownDispositions {
 		startingTruth, err := acceptedTruthAtDigest(workspace.Projection, change.TruthDigest)
 		if err != nil {
 			return SemanticAssessment{}, err
@@ -1360,13 +1360,22 @@ func (s Service) AssessSemantic(ctx context.Context, start string, input Semanti
 			return SemanticAssessment{}, err
 		}
 	}
+	if change.ContractVersion >= ChangeContractVersionNewPathRoots {
+		truthChanged := accepted.TruthDigest != workspace.Config.TruthDigest
+		if err := validateNewPathRootTruthOutcome(change.Impact.NewPathRoots, workspace.Config.Truth, truthChanged); err != nil {
+			return SemanticAssessment{}, err
+		}
+		if err := validateNewPathRootTouched(change.Impact.NewPathRoots, TouchedPaths(change.Baseline, current)); err != nil {
+			return SemanticAssessment{}, err
+		}
+	}
 	if err := validateTruthDeltaAgainstImpact(delta, change.Impact, accepted.Truth, workspace.Config.Truth); err != nil {
 		return SemanticAssessment{}, err
 	}
-	if input.Behavior == SemanticBehaviorPreserved && (len(change.Impact.ExpectedChanges) > 0 || unknownDispositionExpectsChange(change.Impact)) {
+	if input.Behavior == SemanticBehaviorPreserved && (len(change.Impact.ExpectedChanges) > 0 || len(change.Impact.NewPathRoots) > 0 || unknownDispositionExpectsChange(change.Impact)) {
 		return SemanticAssessment{}, newError(KindBlocked, "EXPECTED_SEMANTIC_CHANGE_NOT_RECONCILED", "the Change declared expected semantic changes and cannot be reconciled as PRESERVED", nil)
 	}
-	if input.Behavior == SemanticBehaviorChanged && len(change.Impact.ExpectedChanges) == 0 && len(change.Impact.Unknowns) == 0 && !unknownDispositionExpectsChange(change.Impact) {
+	if input.Behavior == SemanticBehaviorChanged && len(change.Impact.ExpectedChanges) == 0 && len(change.Impact.Unknowns) == 0 && len(change.Impact.NewPathRoots) == 0 && !unknownDispositionExpectsChange(change.Impact) {
 		return SemanticAssessment{}, newError(KindBlocked, "UNEXPECTED_SEMANTIC_CHANGE", "CHANGED must be covered by an expected change or a concrete startup uncertainty in the Change impact", nil)
 	}
 	protected := false
@@ -1619,6 +1628,9 @@ func (s Service) StartChange(ctx context.Context, start string, input StartChang
 	if err := validateChangeImpact(input.Impact, acceptedTruth); err != nil {
 		return Change{}, err
 	}
+	if err := validateNewPathRootScope(input.Impact.NewPathRoots, scope); err != nil {
+		return Change{}, err
+	}
 	if err := validateUnknownDispositions(input.Impact, acceptedTruth, true); err != nil {
 		return Change{}, err
 	}
@@ -1631,7 +1643,7 @@ func (s Service) StartChange(ctx context.Context, start string, input StartChang
 		}
 	}
 	scopeInference := inferImpact(scope, acceptedTruth)
-	if missing := undeclaredInferredImpact(input.Impact, scopeInference); !impactInferenceEmpty(missing) {
+	if missing := undeclaredInferredImpactForStart(input.Impact, scopeInference); !impactInferenceEmpty(missing) {
 		return Change{}, newError(KindBlocked, "DECLARED_IMPACT_INCOMPLETE", fmt.Sprintf("Change scope implies undeclared Project Truth impact: components=%v capabilities=%v invariants=%v unmapped_paths=%v", missing.ComponentIDs, missing.CapabilityIDs, missing.InvariantIDs, missing.UnmappedPaths), nil)
 	}
 	preflightRisk := MaxRisk(input.Risk, impactTruthRisk(input.Impact, acceptedTruth, false))
@@ -2689,8 +2701,16 @@ func (s Service) evaluate(ctx context.Context, workspace loadedWorkspace, change
 		reasons = append(reasons, VerdictReason{Code: "CHANGE_CONFIG_EPOCH_CHANGED", Message: "active Change is bound to a different config digest"})
 	}
 	if change.ContractVersion >= 2 {
-		if missing := undeclaredInferredImpactForChange(*change, inferred, startingTruth, truthChanged); !impactInferenceEmpty(missing) {
+		if missing := undeclaredInferredImpactForChange(*change, inferred, startingTruth, effective.Truth, truthChanged); !impactInferenceEmpty(missing) {
 			reasons = append(reasons, VerdictReason{Code: "DECLARED_IMPACT_INCOMPLETE", Message: fmt.Sprintf("final touched paths imply undeclared Project Truth impact: components=%v capabilities=%v invariants=%v unmapped_paths=%v", missing.ComponentIDs, missing.CapabilityIDs, missing.InvariantIDs, missing.UnmappedPaths)})
+		}
+	}
+	if change.ContractVersion >= ChangeContractVersionNewPathRoots {
+		if err := validateNewPathRootTruthOutcome(change.Impact.NewPathRoots, effective.Truth, truthChanged); err != nil {
+			reasons = append(reasons, VerdictReason{Code: "NEW_PATH_ROOT_NOT_RECONCILED", Message: err.Error()})
+		}
+		if err := validateNewPathRootTouched(change.Impact.NewPathRoots, touched); err != nil {
+			reasons = append(reasons, VerdictReason{Code: "NEW_PATH_ROOT_NOT_TOUCHED", Message: err.Error()})
 		}
 	}
 	if activeRun := workspace.Projection.ActiveGateRun(); activeRun != nil {
@@ -3376,9 +3396,31 @@ func undeclaredInferredImpact(declared ChangeImpact, inferred InferredImpact) In
 	}
 }
 
-func undeclaredInferredImpactForChange(change Change, inferred InferredImpact, startingTruth ProjectTruthConfig, truthChanged bool) InferredImpact {
+func undeclaredInferredImpactForStart(declared ChangeImpact, inferred InferredImpact) InferredImpact {
+	missing := undeclaredInferredImpact(declared, inferred)
+	if len(declared.NewPathRoots) == 0 || len(missing.UnmappedPaths) == 0 {
+		return missing
+	}
+	uncovered := make([]string, 0, len(missing.UnmappedPaths))
+	for _, path := range missing.UnmappedPaths {
+		covered := false
+		for _, root := range declared.NewPathRoots {
+			if containsPath(root, path) || containsPath(path, root) {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			uncovered = append(uncovered, path)
+		}
+	}
+	missing.UnmappedPaths = uncovered
+	return missing
+}
+
+func undeclaredInferredImpactForChange(change Change, inferred InferredImpact, startingTruth, currentTruth ProjectTruthConfig, truthChanged bool) InferredImpact {
 	missing := undeclaredInferredImpact(change.Impact, inferred)
-	if !truthChanged || len(change.Impact.Unknowns) == 0 {
+	if !truthChanged || (len(change.Impact.Unknowns) == 0 && len(change.Impact.NewPathRoots) == 0) {
 		return missing
 	}
 	// A concrete startup uncertainty may authorize adding a fact that had no
@@ -3394,9 +3436,33 @@ func undeclaredInferredImpactForChange(change Change, inferred InferredImpact, s
 		}
 		return result
 	}
-	missing.ComponentIDs = retainPreviouslyKnown(missing.ComponentIDs, truthIDSetComponents(startingTruth.Components))
-	missing.CapabilityIDs = retainPreviouslyKnown(missing.CapabilityIDs, truthIDSetCapabilities(startingTruth.Capabilities))
-	missing.InvariantIDs = retainPreviouslyKnown(missing.InvariantIDs, truthIDSetInvariants(startingTruth.Invariants))
+	if len(change.Impact.Unknowns) > 0 {
+		missing.ComponentIDs = retainPreviouslyKnown(missing.ComponentIDs, truthIDSetComponents(startingTruth.Components))
+		missing.CapabilityIDs = retainPreviouslyKnown(missing.CapabilityIDs, truthIDSetCapabilities(startingTruth.Capabilities))
+		missing.InvariantIDs = retainPreviouslyKnown(missing.InvariantIDs, truthIDSetInvariants(startingTruth.Invariants))
+	} else {
+		knownComponents := truthIDSetComponents(startingTruth.Components)
+		retained := make([]string, 0, len(missing.ComponentIDs))
+		for _, componentID := range missing.ComponentIDs {
+			if _, existed := knownComponents[componentID]; existed {
+				retained = append(retained, componentID)
+				continue
+			}
+			ownsDeclaredRoot := false
+			for _, component := range currentTruth.Components {
+				if component.ID != componentID {
+					continue
+				}
+				if componentIsBoundedByNewPathRoots(component, change.Impact.NewPathRoots) {
+					ownsDeclaredRoot = true
+				}
+			}
+			if !ownsDeclaredRoot {
+				retained = append(retained, componentID)
+			}
+		}
+		missing.ComponentIDs = retained
+	}
 	return missing
 }
 

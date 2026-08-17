@@ -85,7 +85,7 @@ Complete lifecycle setup before the first repository write.
    the immediate precondition source for Change start.
 6. If context reports an ACTIVE Change, use its internal ID in one exact
    `ecp change get` query before deciding to continue. Continue only when its
-   goal, scope, Impact, Unknown dispositions, and Requirement ledger still
+   goal, scope, Impact, new-path declarations, Unknown dispositions, and Requirement ledger still
    match the current request. If the request materially changed, ask whether
    to continue or cancel; do not silently rewrite the contract.
 7. Close only material ambiguity. Derive relevant normal, loading, empty,
@@ -105,7 +105,7 @@ Complete lifecycle setup before the first repository write.
    - `AUTOMATED` names exact accepted Gate IDs. `REVIEW` records a decision
      without pretending it is Evidence. `EXTERNAL` remains pending in v0.3.
 
-   Cover every acceptance criterion, preservation, journey, data/operation
+   Cover every acceptance criterion, declared new path root, preservation, journey, data/operation
    effect, expected semantic change, and impact unknown. This is a
    zero-silent-ambiguity guarantee, not omniscience.
    Every accepted Project Truth Unknown named by `impact.unknown_ids` also
@@ -123,6 +123,12 @@ Complete lifecycle setup before the first repository write.
    preconditions from the immediately preceding context. If a cancelled Change
    left source changes, use its exact ID as `--supersedes-change` and cover all
    inherited touched paths; never reset the baseline to hide prior work.
+   When established accepted Truth makes a genuinely new component directory
+   unmapped, declare its smallest canonical root with
+   `--impact-new-path-root` and cover that exact string in a Requirement.
+   Use this only for a currently unowned root inside scope. The finished Change
+   must touch it, evolve accepted Truth, and assign it to exactly one Component;
+   it is not a wildcard for existing paths or unrelated new files.
 9. Run `ecp gate plan` before editing. Inspect every command, cwd, executable,
    inherited environment name, declared effect, selector, and effective risk.
    Impacted invariant Gates and automated Requirement Gates remain mandatory.

@@ -6,7 +6,7 @@ The project is currently in preview and does not yet publish a stable release.
 Version and qualification claims apply only to the exact source, package, and
 host identities named in [STATUS.md](STATUS.md).
 
-## Unreleased
+## 0.3.1 development prerelease — 2026-08-17
 
 ### Added
 
@@ -20,6 +20,15 @@ host identities named in [STATUS.md](STATUS.md).
 - Change contract version 3 accepted-Unknown dispositions, verified as
   `PRESERVED`, `RESOLVED`, or `REFINED` against starting/candidate Project
   Truth while retaining read compatibility for contract versions 0 and 2.
+- Change contract version 4 `new_path_roots`, with exact Requirement coverage,
+  scope bounds, final source participation, protected Truth evolution, and
+  single-Component ownership while retaining versions 0, 2, and 3.
+- Atomic Darwin/Linux no-replace authority export commits and Gate-lease-first
+  export snapshot ordering.
+- Strict acknowledgement event replay validation for identity, subject,
+  canonical actor/reason, timestamp, trust class, and duplicate IDs.
+- Vendored `golang.org/x/sys` primitives for supported-host atomic export
+  installation without a packaging-time network dependency.
 
 ### Changed
 
@@ -30,6 +39,11 @@ host identities named in [STATUS.md](STATUS.md).
 - Adapter Skills now preflight the installed machine contract, default to
   bounded history reads, avoid duplicate unchanged risk confirmations, and
   state the non-sandbox network boundary explicitly.
+- Plugin runtime packaging now uses a clean environment, local toolchain,
+  vendored modules, disabled module network access, and a Schema v3 manifest
+  that records those effective constraints.
+- Public positioning now distinguishes the cross-project architecture goal
+  from the current Codex + Git + Darwin/Linux applicability boundary.
 
 ## 0.3.0 development candidate
 

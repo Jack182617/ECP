@@ -33,7 +33,7 @@
 - Gate preflight、reviewable/opaque-digest plan 与 partial-sequence result；
 - durable GateRun start/Evidence/terminal history，`SIGINT`/`SIGTERM` 形成 `CANCELLED` 并清理 Gate 进程组；Darwin/Linux/BSD 上被杀/崩溃 holder 释放 advisory lease 后，由下一位 holder 记录 `INTERRUPTED`（不含自动续跑、orphan artifact 恢复或 crash 后全部后代进程收割）；
 - 自包含 Codex Plugin：四个聚焦 Skill 共享 Plugin-root launcher 与 checksum-verified bundled Core；check/enable/disable 职责分离，普通仓库 mutation 由 change Skill 先 status，disabled 正常开发，enabled 自动 Change→Gate→Verdict→completion，无用户 CLI/PATH/token 和受支持的单 task bypass；
-- `SPEC.md` 75 个 v0.3 场景到真实测试/静态/构建证据的可执行 traceability matrix，并把外部真实项目、Desktop、CI、隔离与发布证据显式留作未证明；
+- `SPEC.md` 84 个 v0.3 场景到真实测试/静态/构建证据的可执行 traceability matrix，并把外部真实项目、Desktop、CI、隔离与发布证据显式留作未证明；
 - 正常、失败、stale、越界、漂移、并发、超时和损坏测试。
 
 退出标准：`SPEC.md` 第 12 节的核心场景自动化通过，且项目明确披露本地证据边界。
@@ -71,6 +71,7 @@ Phase 1 原计划的 Runner 纵深强化不再整体先行。除阻断真实 Pro
 - 覆盖每个 material contract item 的 Requirement decision ledger，阻断 silent unknown，并在 reconciliation 中逐项绑定 review、Gate Evidence 或 external pending；
 - cancelled replacement 的原始 baseline/lineage carry-forward，避免通过 cancel/start 洗掉已有 delta；
 - established path ownership 的 direct component、`depends_on` 反向传递依赖者及其 capability/invariant 影响推断，漏报或未映射最终路径阻止 PASS；
+- version 4 `new_path_roots` 为 established Truth 下真正的新组件目录提供有界入口，并要求 final source 触达、Requirement 覆盖、Truth 演进和单一 Component ownership；
 - risk selector 与显式 invariant/Requirement Gate 并集形成 `fast → affected → full` 的最小充分验证计划；
 - 实现后的 Semantic Diff；
 - ordinary Change 与 protected fact/constitution change 分离；

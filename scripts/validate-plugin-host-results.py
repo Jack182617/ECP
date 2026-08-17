@@ -1051,13 +1051,20 @@ def freeze_campaign(
     runtime_manifest = load_json(runtime_manifest_path)
     if (
         not isinstance(runtime_manifest, dict)
-        or runtime_manifest.get("schema_version") != 2
+        or runtime_manifest.get("schema_version") != 3
         or runtime_manifest.get("plugin_name") != "ecp-codex"
         or runtime_manifest.get("plugin_version") != version
         or runtime_manifest.get("source_clean") is not True
         or not isinstance(runtime_manifest.get("source_commit"), str)
         or re.fullmatch(r"[0-9a-f]{40,64}", runtime_manifest["source_commit"]) is None
         or not isinstance(runtime_manifest.get("builder"), dict)
+        or runtime_manifest["builder"].get("environment_isolation") != "env-i"
+        or runtime_manifest["builder"].get("goenv") != "off"
+        or runtime_manifest["builder"].get("gotoolchain") != "local"
+        or runtime_manifest["builder"].get("gowork") != "off"
+        or runtime_manifest["builder"].get("goflags") != ""
+        or runtime_manifest["builder"].get("goproxy") != "off"
+        or runtime_manifest["builder"].get("gosumdb") != "off"
     ):
         raise ValidationError(
             "formal qualification requires a clean committed source identity and complete runtime builder identity"

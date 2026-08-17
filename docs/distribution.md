@@ -51,7 +51,8 @@ The release order is mandatory:
 
 1. Finish Core, Skill, shared reference, and manifest source edits.
 2. Bump the Plugin cachebuster/version with the official Plugin Creator helper.
-3. Run `./scripts/package-plugin.sh` with a private writable Go cache.
+3. Run `./scripts/package-plugin.sh`; it creates private Go cache/temp roots and
+   an empty build environment itself.
 4. Validate `runtime/manifest.json`, every binary digest/size/execute bit, the
    Plugin manifest, all four Skills, and a copied cache-layout launcher smoke test.
 5. Sign/notarize and publish through the chosen trusted distribution process.
@@ -59,11 +60,13 @@ The release order is mandatory:
 `package-plugin.sh` refuses formal packaging unless HEAD is a committed clean
 source epoch. `ECP_PACKAGE_ALLOW_DIRTY=1` is an explicit development-only
 override; it emits `source_clean: false`, and campaign freeze must reject that
-artifact. The script builds with CGO disabled, `-trimpath`, and
-`-buildvcs=false` for the four supported targets. It stages all artifacts first
+artifact. The script builds from vendored modules with CGO disabled,
+`GOENV=off`, `GOTOOLCHAIN=local`, `GOWORK=off`, empty `GOFLAGS`,
+`GOPROXY=off`, `GOSUMDB=off`, `-trimpath`, and `-buildvcs=false` for the four supported targets. It stages all artifacts first
 and replaces the prior runtime directory only after every build and checksum
-succeeds. The Schema v2 runtime manifest binds the canonical source commit,
-clean/dirty state, Go toolchain version and executable digest, fixed build
+succeeds. The Schema v3 runtime manifest binds the canonical source commit,
+clean/dirty state, Go toolchain version and executable digest, isolated build
+environment, fixed build
 flags, and all artifact paths/digests/sizes to the current Plugin version.
 
 Changing Plugin source after packaging makes the package stale. Changing the
@@ -148,9 +151,9 @@ a new Plugin version is packaged, validated, explicitly installed, and loaded
 by a fresh Codex task. Installation does not rewrite project source, `.ecp`,
 Workspace bindings, mode, or authority history. The compatibility contract is:
 
-- existing Change contract versions 0 and 2 remain replayable; only newly
-  started Changes use contract version 3 and require accepted-Unknown
-  dispositions;
+- existing Change contract versions 0, 2, and 3 remain replayable; only newly
+  started Changes use contract version 4, retain accepted-Unknown dispositions,
+  and may declare exactly bounded new component path roots;
 - an enabled/disabled Workspace remains in the same mode and ACTIVE/terminal
   history remains queryable across a Core identity change;
 - plans and Evidence remain in history but a new Core identity makes the old

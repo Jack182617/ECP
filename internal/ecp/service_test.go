@@ -957,7 +957,7 @@ func startTestChange(t *testing.T, ctx context.Context, service Service, repo st
 	input.ExpectedConfig = current.CandidateConfig
 	input.ExpectedTruth = current.AcceptedTruth
 	input.ExpectedSource = current.Source.Fingerprint
-	if !input.Impact.ProjectPurpose && len(input.Impact.CapabilityIDs)+len(input.Impact.InvariantIDs)+len(input.Impact.ComponentIDs)+len(input.Impact.DecisionIDs)+len(input.Impact.ContractIDs)+len(input.Impact.UnknownIDs)+len(input.Impact.UserJourneys)+len(input.Impact.DataEffects)+len(input.Impact.OperationalEffects)+len(input.Impact.ExpectedChanges)+len(input.Impact.ExpectedPreservations)+len(input.Impact.Unknowns) == 0 {
+	if !input.Impact.ProjectPurpose && len(input.Impact.CapabilityIDs)+len(input.Impact.InvariantIDs)+len(input.Impact.ComponentIDs)+len(input.Impact.DecisionIDs)+len(input.Impact.ContractIDs)+len(input.Impact.UnknownIDs)+len(input.Impact.NewPathRoots)+len(input.Impact.UserJourneys)+len(input.Impact.DataEffects)+len(input.Impact.OperationalEffects)+len(input.Impact.ExpectedChanges)+len(input.Impact.ExpectedPreservations)+len(input.Impact.Unknowns) == 0 {
 		input.Impact.Unknowns = []string{"test impact intentionally not modeled"}
 	}
 	if len(input.Requirements) == 0 {
@@ -970,6 +970,7 @@ func startTestChange(t *testing.T, ctx context.Context, service Service, repo st
 			DecisionSource: "test fixture",
 			Covers: RequirementCoverage{
 				AcceptanceCriteria:    append([]string(nil), input.AcceptanceCriteria...),
+				NewPathRoots:          append([]string(nil), input.Impact.NewPathRoots...),
 				UserJourneys:          append([]string(nil), input.Impact.UserJourneys...),
 				DataEffects:           append([]string(nil), input.Impact.DataEffects...),
 				OperationalEffects:    append([]string(nil), input.Impact.OperationalEffects...),

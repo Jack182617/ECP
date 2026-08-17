@@ -96,8 +96,8 @@ Project 的一个具体 Git clone/worktree。`workspace_id` 必须由 canonical 
 - scope path roots；
 - non-goals；
 - acceptance criteria；
-- structured impact（capability/invariant/component/decision/contract、journey、data/operation effect、expected change、expected preservation 与 unknown）；其中每个被引用的 accepted Truth Unknown 都必须有 sorted `PRESERVED|RESOLVED|REFINED` disposition；
-- `contract_version=3` 的 sorted structured Requirements：每项包含 stable ID、statement、`DECIDED|NOT_APPLICABLE|DEFERRED_SAFE|BLOCKING_UNKNOWN`、rationale、decision source、`AUTOMATED|REVIEW|EXTERNAL` verification、可选 mapped Gate IDs、revisit condition 与对 Change contract item 的 exact coverage；
+- structured impact（capability/invariant/component/decision/contract、受控新增 path root、journey、data/operation effect、expected change、expected preservation 与 unknown）；其中每个被引用的 accepted Truth Unknown 都必须有 sorted `PRESERVED|RESOLVED|REFINED` disposition；
+- `contract_version=4` 的 sorted structured Requirements：每项包含 stable ID、statement、`DECIDED|NOT_APPLICABLE|DEFERRED_SAFE|BLOCKING_UNKNOWN`、rationale、decision source、`AUTOMATED|REVIEW|EXTERNAL` verification、可选 mapped Gate IDs、revisit condition 与对 Change contract item 的 exact coverage；
 - 可选 `supersedes_change_id` 与不可伪造的 lineage root；
 - user-declared risk；
 - activation baseline；
@@ -109,9 +109,11 @@ v0.3 每个 Workspace 同时最多一个 `ACTIVE` Change。
 
 `change start` 只允许当前 mode enabled，且必须携带 immediately preceding context 的 exact `authority_id`、`workspace_id`、`activation_token`、已接受 candidate config digest、accepted truth digest 与 source fingerprint。Core 在创建 ACTIVE 事件前重新选择 authority、发现 Workspace、核对同一 activation epoch、稳定读取配置/真相并抓取 baseline；任一目标 stale 都不得创建 Change。
 
-Core 必须在 start 前要求每个 acceptance criterion、user journey、data/operational effect、expected change、expected preservation 与文本 impact unknown 至少被一个 Requirement exact 覆盖。`BLOCKING_UNKNOWN`、无 decision source/rationale、无具体 revisit condition 的 `DEFERRED_SAFE`、未知 mapped Gate、或漏覆盖均不得创建 ACTIVE。`AUTOMATED` 必须映射至少一个 Gate，`REVIEW` 不得伪装 Gate Evidence，`EXTERNAL` 在 v0.3 没有可信 importer 时只能保持 pending。
+Core 必须在 start 前要求每个 acceptance criterion、受控新增 path root、user journey、data/operational effect、expected change、expected preservation 与文本 impact unknown 至少被一个 Requirement exact 覆盖。`BLOCKING_UNKNOWN`、无 decision source/rationale、无具体 revisit condition 的 `DEFERRED_SAFE`、未知 mapped Gate、或漏覆盖均不得创建 ACTIVE。`AUTOMATED` 必须映射至少一个 Gate，`REVIEW` 不得伪装 Gate Evidence，`EXTERNAL` 在 v0.3 没有可信 importer 时只能保持 pending。
 
-`contract_version=3` 还要求 `impact.unknown_ids` 中每个 accepted Truth Unknown 恰有一个 disposition：`PRESERVED` 表示该结构化 Unknown 在 candidate Truth 中仍存在且内容不变，`RESOLVED` 表示已移除，`REFINED` 表示仍存在但 statement/risk/resolution condition 等结构化内容已经改变。Core 在 Semantic Reconciliation 时比较 Change starting Truth epoch 与 candidate Truth，声明与实际不符时阻止 assessment/Truth acceptance。历史 `contract_version=0/2` 继续按其原合同回放，不被追加强制字段。
+`contract_version>=3` 要求 `impact.unknown_ids` 中每个 accepted Truth Unknown 恰有一个 disposition：`PRESERVED` 表示该结构化 Unknown 在 candidate Truth 中仍存在且内容不变，`RESOLVED` 表示已移除，`REFINED` 表示仍存在但 statement/risk/resolution condition 等结构化内容已经改变。Core 在 Semantic Reconciliation 时比较 Change starting Truth epoch 与 candidate Truth，声明与实际不符时阻止 assessment/Truth acceptance。
+
+`contract_version=4` 允许 established Project Truth 下的 Change 用 sorted `impact.new_path_roots` 精确声明当前尚未被任何 Component 拥有、但本 Change 要新增的 repository-relative path root。每个 root 必须与 scope 相交、不能重叠 `.ecp`/既有 Component/另一个声明 root，并被 Requirement exact 覆盖；它只豁免 start 时对应的 unmapped-scope 阻断。Semantic Reconciliation 和 completion 仍要求该 root 真正出现在 final source delta、accepted Truth 实际发生变化，并由恰好一个 candidate Component 覆盖；未触达、未映射、多重映射或借该字段修改未声明既有事实均阻止 PASS。历史 `contract_version=0/2/3` 继续按各自原合同回放，不被追加强制字段。
 
 若当前 source 仍不同于同 activation 中最新 cancelled Change 的 baseline，新 Change 必须用 exact `supersedes_change_id` 指向该项，继承其原 baseline 与 lineage root，并让 scope 覆盖全部 inherited touched paths；否则拒绝 start。取消和重开不得把旧 edits、风险或越界路径洗入新 baseline。
 
@@ -423,6 +425,11 @@ fresh-task host routing、真实项目、发布或生产证明：
 77. 新 Change 引用 accepted Truth Unknown 时缺少、重复、越界或无效 disposition 必须在 ACTIVE 前拒绝；Semantic Reconciliation 必须验证 `PRESERVED/RESOLVED/REFINED` 与 starting/candidate Truth 的实际关系，旧 v2 Change 无该字段仍可读取。
 78. `change list --summary` 必须提供 newest-first、可按 lifecycle state 和 1–1000 limit 限定的 authority-only 摘要；`change get` 必须恢复一个 exact full contract/assessment/terminal record；兼容的无参数 `change list` 仍返回完整历史。
 79. 同一 authority state 在 Core identity 变化后必须保留 Workspace enabled mode、ACTIVE/terminal Change 与完整历史；旧 Core 的 plan/Evidence 不得满足新 evaluator，只有用新 identity 重建 plan 并产生 fresh Evidence 后才能恢复 PASS。
+80. Authority export 必须按 Gate lease → mutation lock 顺序取得一致快照；live GateRun holder 未释放 lease 时 export 必须等待或失败，不能占住 mutation lock 使 Evidence/terminal append 超时并留下人为 `IN_PROGRESS`。
+81. Authority export 的最终目录提交必须使用平台原子 no-replace 语义；即使目标在预检后、commit 前被创建，也必须保留目标与 staging，返回 `EXPORT_TARGET_EXISTS`，绝不能替换已有空目录。
+82. `acknowledgement_recorded` 回放必须验证 ID、Change/activation、subject digest、actor/reason、timestamp、trust class 与全局唯一 ID；格式错误、伪造 trust 或重复 ID 必须在 projection 更新前 fail closed。
+83. Established Truth 的全新组件路径必须先以 version 4 `new_path_roots` 声明并由 Requirement 覆盖；最终必须真实触达、演进 Truth、由恰好一个新增 Component 拥有，并在无 unmapped path 的情况下才可 PASS/complete。
+84. 正式 Plugin runtime 打包必须清空 ambient Go 构建环境，以固定的 `GOENV=off`、`GOTOOLCHAIN=local`、`GOWORK=off`、空 `GOFLAGS`、vendor module mode 和禁网代理构建；runtime manifest 必须记录该隔离合同，注入 ambient Go 配置不得改变构建调用。
 
 “确定性 Verdict”指同一精确 subject、同一 Effective Config 与同一有效 Evidence 集合产生相同的 status、reasons、assessments 与 `subject_digest`。`evaluated_at` 是观测元数据，不属于 `subject_digest`；完成事件保存当次最终 Verdict payload，因此历史核验不依赖再次调用只支持 ACTIVE Change 的 `verdict`。
 

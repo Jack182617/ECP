@@ -6,9 +6,12 @@ import (
 )
 
 const (
-	SchemaVersion                = 1
-	CoreVersion                  = "0.3.0-dev"
-	CurrentChangeContractVersion = 3
+	SchemaVersion                            = 1
+	CoreVersion                              = "0.3.1-dev"
+	ChangeContractVersionRequirements        = 2
+	ChangeContractVersionUnknownDispositions = 3
+	ChangeContractVersionNewPathRoots        = 4
+	CurrentChangeContractVersion             = ChangeContractVersionNewPathRoots
 )
 
 type Risk string
@@ -284,6 +287,7 @@ type ChangeImpact struct {
 	ContractIDs           []string             `json:"contract_ids"`
 	UnknownIDs            []string             `json:"unknown_ids"`
 	UnknownDispositions   []UnknownDisposition `json:"unknown_dispositions,omitempty"`
+	NewPathRoots          []string             `json:"new_path_roots,omitempty"`
 	UserJourneys          []string             `json:"user_journeys"`
 	DataEffects           []string             `json:"data_effects"`
 	OperationalEffects    []string             `json:"operational_effects"`
@@ -331,6 +335,7 @@ const (
 // keeps coverage machine-checkable without duplicating the requirement text.
 type RequirementCoverage struct {
 	AcceptanceCriteria    []string `json:"acceptance_criteria,omitempty"`
+	NewPathRoots          []string `json:"new_path_roots,omitempty"`
 	UserJourneys          []string `json:"user_journeys,omitempty"`
 	DataEffects           []string `json:"data_effects,omitempty"`
 	OperationalEffects    []string `json:"operational_effects,omitempty"`

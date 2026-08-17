@@ -391,7 +391,7 @@ func (c CLI) change(ctx context.Context, args []string) (any, int, error) {
 		supersedesChange := set.String("supersedes-change", "", "latest cancelled Change whose original baseline must be carried forward")
 		projectPurpose := set.Bool("impact-project-purpose", false, "declare that durable project purpose or maturity may change")
 		var scope, nonGoals, acceptance stringList
-		var capabilities, invariants, components, decisions, contracts, truthUnknownIDs stringList
+		var capabilities, invariants, components, decisions, contracts, truthUnknownIDs, newPathRoots stringList
 		var userJourneys, dataEffects, operationalEffects, expectedChanges, expectedPreservations, impactUnknowns stringList
 		var requirementJSON, unknownDispositionJSON stringList
 		set.Var(&scope, "scope", "repository-relative path root; repeatable")
@@ -404,6 +404,7 @@ func (c CLI) change(ctx context.Context, args []string) (any, int, error) {
 		set.Var(&contracts, "impact-contract", "affected Project Truth contract ID; repeatable")
 		set.Var(&truthUnknownIDs, "impact-unknown-id", "affected accepted Project Truth unknown ID; repeatable")
 		set.Var(&unknownDispositionJSON, "unknown-disposition", "exact UnknownDisposition JSON object for an affected accepted unknown; repeatable and sorted by unknown_id")
+		set.Var(&newPathRoots, "impact-new-path-root", "currently unmapped path root that this Change must add to exactly one Project Truth component; repeatable and sorted")
 		set.Var(&userJourneys, "impact-journey", "affected user journey; repeatable")
 		set.Var(&dataEffects, "impact-data", "data effect; repeatable")
 		set.Var(&operationalEffects, "impact-operation", "operational effect; repeatable")
@@ -445,6 +446,7 @@ func (c CLI) change(ctx context.Context, args []string) (any, int, error) {
 				ContractIDs:           contracts,
 				UnknownIDs:            truthUnknownIDs,
 				UnknownDispositions:   parsedUnknownDispositions,
+				NewPathRoots:          newPathRoots,
 				UserJourneys:          userJourneys,
 				DataEffects:           dataEffects,
 				OperationalEffects:    operationalEffects,
@@ -749,6 +751,7 @@ Usage:
                    [--impact-component ID ...] [--impact-decision ID ...]
                    [--impact-contract ID ...] [--impact-unknown-id ID ...]
                    [--unknown-disposition JSON ...]
+                   [--impact-new-path-root PATH ...]
                    [--impact-project-purpose]
                    [--impact-journey TEXT ...] [--impact-data TEXT ...]
                    [--impact-operation TEXT ...]

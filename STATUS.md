@@ -122,18 +122,20 @@ historical evidence for its own identity and is not carried forward.
   project Workspace without the pilot preregistration, safe-copy controls,
   frozen thresholds, or seven-day observation window, so it is exploratory
   product evidence, not a completed Phase 1B pilot.
-- The current source iteration addresses those observations with Change
-  contract version 3 accepted-Unknown dispositions, an authority-independent
-  `schema get` machine contract, bounded/filterable Change history plus exact
-  single-Change recovery, strengthened Skill routing/reporting language, and
-  an automated Core-identity upgrade transition test. Historical contract
-  versions 0/2 remain readable. The current worktree passes `git diff --check`,
-  `go vet ./...`, all 27 Python qualification-protocol tests, and
-  `go test ./... -count=1` (including the 79-scenario traceability matrix).
-  The changes are now packaged, validated, installed locally, fresh-task
-  accepted, upgrade-checked, and Desktop-qualified. They still do not affect
-  another installation. No existing real project's mode, authority history,
-  source, or `.ecp` was rewritten by installation or qualification.
+- The post-qualification hardening source is now Core `0.3.1-dev`, Plugin
+  `0.3.1-dev+codex.20260817112321`, and Change contract version 4. It retains
+  version 3 accepted-Unknown dispositions and adds bounded `new_path_roots`,
+  Gate-lease-first/no-replace authority export, strict acknowledgement replay,
+  and an isolated vendored Schema v3 runtime build contract. Historical
+  contract versions 0/2/3 remain readable. Pre-package validation passes
+  `git diff --check`, `go vet ./...`, all 27 Python qualification-protocol
+  tests, official Plugin/four-Skill validators, and every Go test except the
+  intentionally deferred bundled-runtime identity check; the 84-scenario
+  traceability count is exact. This new identity is not yet packaged,
+  installed, fresh-task accepted, or Desktop-qualified at this checkpoint, and
+  the earlier 16-case campaign remains evidence only for its exact older
+  Plugin/Core identity. No existing real project's mode, authority history,
+  source, or `.ecp` was rewritten by this source work.
 
 ## Next actions, in order
 

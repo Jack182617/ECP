@@ -56,6 +56,9 @@ func validateChangeImpact(impact ChangeImpact, truth ProjectTruthConfig) error {
 	if err := validateImpactRefs("unknown_ids", impact.UnknownIDs, unknownIDs); err != nil {
 		return err
 	}
+	if err := validateDeclaredNewPathRoots(impact.NewPathRoots, truth); err != nil {
+		return err
+	}
 	for label, values := range map[string][]string{
 		"user_journeys":          impact.UserJourneys,
 		"data_effects":           impact.DataEffects,
@@ -69,11 +72,114 @@ func validateChangeImpact(impact ChangeImpact, truth ProjectTruthConfig) error {
 			return newError(KindUsage, "INVALID_CHANGE_IMPACT", label+" must be unique, trimmed, and within length limits", err)
 		}
 	}
-	if !impact.ProjectPurpose && len(impact.CapabilityIDs)+len(impact.InvariantIDs)+len(impact.ComponentIDs)+len(impact.DecisionIDs)+len(impact.ContractIDs)+len(impact.UnknownIDs)+
+	if !impact.ProjectPurpose && len(impact.CapabilityIDs)+len(impact.InvariantIDs)+len(impact.ComponentIDs)+len(impact.DecisionIDs)+len(impact.ContractIDs)+len(impact.UnknownIDs)+len(impact.NewPathRoots)+
 		len(impact.UserJourneys)+len(impact.DataEffects)+len(impact.OperationalEffects)+len(impact.ExpectedChanges)+len(impact.ExpectedPreservations)+len(impact.Unknowns) == 0 {
 		return newError(KindUsage, "EMPTY_CHANGE_IMPACT", "Change impact must reference Project Truth or explicitly describe an affected journey, data/operational effect, or unknown", nil)
 	}
 	return nil
+}
+
+func validateDeclaredNewPathRoots(roots []string, truth ProjectTruthConfig) error {
+	normalized, err := normalizeUniquePathRoots(roots)
+	if err != nil || !slices.Equal(normalized, roots) {
+		return newError(KindUsage, "INVALID_NEW_PATH_ROOTS", "new_path_roots must be unique, sorted, repository-relative path roots", err)
+	}
+	if len(roots) == 0 {
+		return nil
+	}
+	if truth.Maturity != TruthMaturityEstablished {
+		return newError(KindUsage, "NEW_PATH_ROOTS_REQUIRE_ESTABLISHED_TRUTH", "new_path_roots are only needed after established Project Truth makes unmapped scope fail closed", nil)
+	}
+	for index, root := range roots {
+		if containsPath(".ecp", root) || containsPath(root, ".ecp") {
+			return newError(KindUsage, "INVALID_NEW_PATH_ROOTS", "new_path_roots cannot overlap ECP control files", nil)
+		}
+		for previous := 0; previous < index; previous++ {
+			if containsPath(roots[previous], root) || containsPath(root, roots[previous]) {
+				return newError(KindUsage, "OVERLAPPING_NEW_PATH_ROOTS", "new_path_roots cannot overlap each other", nil)
+			}
+		}
+		inferred := inferImpact([]string{root}, truth)
+		if len(inferred.ComponentIDs) != 0 || len(inferred.UnmappedPaths) != 1 || inferred.UnmappedPaths[0] != root {
+			return newError(KindUsage, "NEW_PATH_ROOT_ALREADY_OWNED", fmt.Sprintf("new_path_root %q already overlaps accepted component ownership", root), nil)
+		}
+	}
+	return nil
+}
+
+func validateNewPathRootScope(roots, scope []string) error {
+	for _, root := range roots {
+		covered := false
+		for _, scoped := range scope {
+			if containsPath(scoped, root) || containsPath(root, scoped) {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			return newError(KindUsage, "NEW_PATH_ROOT_OUTSIDE_SCOPE", fmt.Sprintf("new_path_root %q does not overlap the Change scope", root), nil)
+		}
+	}
+	return nil
+}
+
+func validateNewPathRootTruthOutcome(roots []string, candidate ProjectTruthConfig, truthChanged bool) error {
+	if len(roots) == 0 {
+		return nil
+	}
+	if !truthChanged {
+		return newError(KindBlocked, "NEW_PATH_ROOT_NOT_RECONCILED", "declared new_path_roots require an accepted Project Truth evolution", nil)
+	}
+	for _, root := range roots {
+		owners := 0
+		for _, component := range candidate.Components {
+			if componentOwnsPathRoot(component, root) {
+				owners++
+			}
+		}
+		if owners != 1 {
+			return newError(KindBlocked, "NEW_PATH_ROOT_NOT_RECONCILED", fmt.Sprintf("new_path_root %q must be owned by exactly one candidate Project Truth component", root), nil)
+		}
+	}
+	return nil
+}
+
+func validateNewPathRootTouched(roots, touched []string) error {
+	for _, root := range roots {
+		observed := false
+		for _, path := range touched {
+			if containsPath(root, path) || containsPath(path, root) {
+				observed = true
+				break
+			}
+		}
+		if !observed {
+			return newError(KindBlocked, "NEW_PATH_ROOT_NOT_TOUCHED", fmt.Sprintf("new_path_root %q did not participate in the final source delta", root), nil)
+		}
+	}
+	return nil
+}
+
+func componentOwnsPathRoot(component TruthComponent, root string) bool {
+	for _, componentRoot := range component.PathRoots {
+		if componentRoot == root {
+			return true
+		}
+	}
+	return false
+}
+
+func componentIsBoundedByNewPathRoots(component TruthComponent, roots []string) bool {
+	if len(component.PathRoots) == 0 {
+		return false
+	}
+	declared := truthStringSet(roots)
+	for _, componentRoot := range component.PathRoots {
+		if _, ok := declared[componentRoot]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func validateUnknownDispositions(impact ChangeImpact, truth ProjectTruthConfig, required bool) error {
@@ -179,6 +285,7 @@ func validateChangeRequirements(requirements []ChangeRequirement, acceptance []s
 	}
 	targets := []coverageSection{
 		{label: "acceptance_criteria", values: acceptance},
+		{label: "new_path_roots", values: impact.NewPathRoots},
 		{label: "user_journeys", values: impact.UserJourneys},
 		{label: "data_effects", values: impact.DataEffects},
 		{label: "operational_effects", values: impact.OperationalEffects},
@@ -251,6 +358,7 @@ func validateChangeRequirements(requirements []ChangeRequirement, acceptance []s
 
 		coverage := []coverageSection{
 			{label: "acceptance_criteria", values: requirement.Covers.AcceptanceCriteria},
+			{label: "new_path_roots", values: requirement.Covers.NewPathRoots},
 			{label: "user_journeys", values: requirement.Covers.UserJourneys},
 			{label: "data_effects", values: requirement.Covers.DataEffects},
 			{label: "operational_effects", values: requirement.Covers.OperationalEffects},
@@ -564,6 +672,21 @@ func validateTruthDeltaAgainstImpact(delta []TruthDelta, impact ChangeImpact, pr
 		}
 		if ids := allowed[section]; ids != nil {
 			if _, ok := ids[id]; ok {
+				continue
+			}
+		}
+		if section == "component" && item.Operation == "added" {
+			ownsDeclaredRoot := false
+			for _, component := range candidate.Components {
+				if component.ID != item.ID {
+					continue
+				}
+				if componentIsBoundedByNewPathRoots(component, impact.NewPathRoots) {
+					ownsDeclaredRoot = true
+				}
+				break
+			}
+			if ownsDeclaredRoot {
 				continue
 			}
 		}

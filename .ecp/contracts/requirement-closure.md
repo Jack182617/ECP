@@ -1,6 +1,6 @@
 # Requirement Closure
 
-ECP guarantees zero silent ambiguity, not omniscience. Before Core creates a v0.3 Change, every exact acceptance criterion, expected preservation, user journey, data effect, operational effect, expected semantic change, and discovered uncertainty must be covered by at least one sorted structured Requirement.
+ECP guarantees zero silent ambiguity, not omniscience. Before Core creates a v0.3 Change, every exact acceptance criterion, declared new path root, expected preservation, user journey, data effect, operational effect, expected semantic change, and discovered uncertainty must be covered by at least one sorted structured Requirement.
 
 Each Requirement records a statement, status, rationale, decision source, verification mode, and exact coverage references. The statement is the exact behavior that applies to this Change now—even when that behavior is temporary, intentionally imperfect, or expected to change later; a question or vague aspiration is not a decided statement. Its status is one of:
 
@@ -23,4 +23,9 @@ disposition: `PRESERVED` keeps the same structured Unknown, `RESOLVED` removes
 it, and `REFINED` keeps it with changed structured content. Core compares the
 Change's starting Truth epoch with the candidate Truth during Semantic
 Reconciliation and blocks an outcome that does not match. Historical Change
-contract versions 0 and 2 remain readable without this new field.
+contract versions 0 and 2 remain readable without this field. Version 4 adds
+`new_path_roots` for paths that are genuinely unmapped in established Truth.
+Each declared root must be scope-bounded and Requirement-covered; completion
+requires a real source delta, an accepted Truth evolution, and exactly one
+owning Component. Historical version 3 records retain their original Unknown
+disposition contract without acquiring the version 4 field.

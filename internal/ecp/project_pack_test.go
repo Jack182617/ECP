@@ -236,10 +236,17 @@ func TestBundledPluginRuntimeIsCompleteAndPathIndependent(t *testing.T) {
 		SourceCommit  string `json:"source_commit"`
 		SourceClean   bool   `json:"source_clean"`
 		Builder       struct {
-			GoVersion          string   `json:"go_version"`
-			GoExecutableSHA256 string   `json:"go_executable_sha256"`
-			CGOEnabled         bool     `json:"cgo_enabled"`
-			BuildFlags         []string `json:"build_flags"`
+			GoVersion            string   `json:"go_version"`
+			GoExecutableSHA256   string   `json:"go_executable_sha256"`
+			CGOEnabled           bool     `json:"cgo_enabled"`
+			BuildFlags           []string `json:"build_flags"`
+			EnvironmentIsolation string   `json:"environment_isolation"`
+			GOENV                string   `json:"goenv"`
+			GOToolchain          string   `json:"gotoolchain"`
+			GOWork               string   `json:"gowork"`
+			GOFlags              string   `json:"goflags"`
+			GOProxy              string   `json:"goproxy"`
+			GOSumDB              string   `json:"gosumdb"`
 		} `json:"builder"`
 		Artifacts []struct {
 			OS        string `json:"os"`
@@ -263,7 +270,7 @@ func TestBundledPluginRuntimeIsCompleteAndPathIndependent(t *testing.T) {
 	if err := json.Unmarshal(pluginManifestBytes, &pluginManifest); err != nil {
 		t.Fatal(err)
 	}
-	if runtimeManifest.SchemaVersion != 2 || runtimeManifest.PluginName != pluginManifest.Name || runtimeManifest.PluginVersion != pluginManifest.Version {
+	if runtimeManifest.SchemaVersion != 3 || runtimeManifest.PluginName != pluginManifest.Name || runtimeManifest.PluginVersion != pluginManifest.Version {
 		t.Fatalf("runtime and Plugin manifests are not version-bound: runtime=%+v plugin=%+v", runtimeManifest, pluginManifest)
 	}
 	if matched, _ := regexp.MatchString(`^[0-9a-f]{40,64}$`, runtimeManifest.SourceCommit); !matched {
@@ -272,7 +279,9 @@ func TestBundledPluginRuntimeIsCompleteAndPathIndependent(t *testing.T) {
 	if runtimeManifest.Builder.GoVersion == "" || !regexp.MustCompile(`^sha256:[0-9a-f]{64}$`).MatchString(runtimeManifest.Builder.GoExecutableSHA256) {
 		t.Fatalf("runtime manifest builder identity is incomplete: %+v", runtimeManifest.Builder)
 	}
-	if runtimeManifest.Builder.CGOEnabled || !reflect.DeepEqual(runtimeManifest.Builder.BuildFlags, []string{"-trimpath", "-buildvcs=false", "-ldflags=-s -w"}) {
+	if runtimeManifest.Builder.CGOEnabled || !reflect.DeepEqual(runtimeManifest.Builder.BuildFlags, []string{"-mod=vendor", "-trimpath", "-buildvcs=false", "-ldflags=-s -w"}) ||
+		runtimeManifest.Builder.EnvironmentIsolation != "env-i" || runtimeManifest.Builder.GOENV != "off" || runtimeManifest.Builder.GOToolchain != "local" ||
+		runtimeManifest.Builder.GOWork != "off" || runtimeManifest.Builder.GOFlags != "" || runtimeManifest.Builder.GOProxy != "off" || runtimeManifest.Builder.GOSumDB != "off" {
 		t.Fatalf("runtime manifest build contract drifted: %+v", runtimeManifest.Builder)
 	}
 
@@ -1061,7 +1070,7 @@ func TestVerificationMatrixCoversCanonicalScenariosAndExistingTests(t *testing.T
 		}
 		matrixRows[value] = struct{}{}
 	}
-	if len(scenarios) != 79 || len(matrixRows) != len(scenarios) {
+	if len(scenarios) != 84 || len(matrixRows) != len(scenarios) {
 		t.Fatalf("acceptance traceability count mismatch: SPEC=%d matrix=%d", len(scenarios), len(matrixRows))
 	}
 	for scenario := range scenarios {

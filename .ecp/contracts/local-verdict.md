@@ -6,10 +6,15 @@ It does not mean the product is defect-free, every behavior was tested, a person
 
 Candidate policy and truth cannot accept themselves. Contract paths are unique within accepted Project Truth, so one changed file cannot be order-dependently attributed to only one of several IDs. `PRESERVED` cannot hide a truth delta. `CHANGED` requires a Core-computed delta within the declared Impact and explicit confirmation of the exact protected change. `UNKNOWN`, stale Evidence, source mutation, mismatched identity, missing Gate, failed Gate, or integrity failure prevents `PASS`.
 
-For a version 3 Change, every referenced accepted Truth Unknown must also match
+For a version 3 or later Change, every referenced accepted Truth Unknown must also match
 its declared `PRESERVED`, `RESOLVED`, or `REFINED` disposition when starting
 and candidate Truth are compared. A Gate PASS cannot compensate for stale or
 contradictory durable Truth.
+
+For a version 4 Change, a declared new path root must be present in the final
+source delta and owned by exactly one accepted Project Truth Component after a
+protected Truth reconciliation. The start-time declaration cannot turn an
+unmapped final path, unused scope, or ambiguous ownership into `PASS`.
 
 Evidence replay validates the recorded Gate and command against its exact historical accepted config epoch. Artifact paths must canonically bind the Change, Evidence, and stdout/stderr role; private regular-file type, exact stored size, and stored digest must all match before the Evidence can apply.
 

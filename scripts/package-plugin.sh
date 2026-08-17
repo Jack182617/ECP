@@ -30,6 +30,15 @@ else
   exit 1
 fi
 
+if [ -x /usr/bin/env ]; then
+  env_command=/usr/bin/env
+elif [ -x /bin/env ]; then
+  env_command=/bin/env
+else
+  printf '%s\n' "fixed system env executable is unavailable" >&2
+  exit 1
+fi
+
 source_commit=$($git_command -C "$repo_root" rev-parse --verify HEAD 2>/dev/null) || {
   printf '%s\n' "plugin packaging requires a committed canonical Git source" >&2
   exit 2
@@ -103,7 +112,10 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 stage_runtime="$stage_root/runtime"
-mkdir -p -- "$stage_runtime"
+build_cache="$stage_root/go-cache"
+build_tmp="$stage_root/go-tmp"
+build_home="$stage_root/go-home"
+mkdir -p -- "$stage_runtime" "$build_cache" "$build_tmp" "$build_home"
 
 plugin_version=$(/usr/bin/sed -n 's/^[[:space:]]*"version": "\([^"]*\)",/\1/p' "$manifest_path")
 if [ -z "$plugin_version" ]; then
@@ -125,9 +137,22 @@ for target in $targets; do
 
   (
     cd "$repo_root"
-    env CGO_ENABLED=0 GOOS="$target_os" GOARCH="$target_arch" \
-      GOCACHE="${GOCACHE:-${TMPDIR:-/tmp}/ecp-package-go-cache}" \
-      "$go_command" build -trimpath -buildvcs=false -ldflags='-s -w' -o "$target_binary" ./cmd/ecp
+    "$env_command" -i \
+      PATH=/usr/bin:/bin \
+      HOME="$build_home" \
+      TMPDIR="$build_tmp" \
+      GOTMPDIR="$build_tmp" \
+      GOCACHE="$build_cache" \
+      GOENV=off \
+      GOTOOLCHAIN=local \
+      GOWORK=off \
+      GOFLAGS= \
+      GOPROXY=off \
+      GOSUMDB=off \
+      CGO_ENABLED=0 \
+      GOOS="$target_os" \
+      GOARCH="$target_arch" \
+      "$go_command" build -mod=vendor -trimpath -buildvcs=false -ldflags='-s -w' -o "$target_binary" ./cmd/ecp
   )
   chmod 0755 "$target_binary"
 
@@ -154,7 +179,7 @@ done
 
 cat > "$stage_runtime/manifest.json" <<EOF
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "plugin_name": "ecp-codex",
   "plugin_version": "$plugin_version",
   "source_commit": "$source_commit",
@@ -163,7 +188,14 @@ cat > "$stage_runtime/manifest.json" <<EOF
     "go_version": "$go_version",
     "go_executable_sha256": "$go_executable_sha256",
     "cgo_enabled": false,
-    "build_flags": ["-trimpath", "-buildvcs=false", "-ldflags=-s -w"]
+    "build_flags": ["-mod=vendor", "-trimpath", "-buildvcs=false", "-ldflags=-s -w"],
+    "environment_isolation": "env-i",
+    "goenv": "off",
+    "gotoolchain": "local",
+    "gowork": "off",
+    "goflags": "",
+    "goproxy": "off",
+    "gosumdb": "off"
   },
   "artifacts": [
 $manifest_entries

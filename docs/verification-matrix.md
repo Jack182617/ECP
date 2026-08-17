@@ -101,8 +101,13 @@ The authoritative scenario wording remains in `SPEC.md` section 12.
 | 77 | Accepted Truth Unknowns require exact dispositions whose reconciliation matches starting/candidate Truth; v2 remains readable | `TestAcceptedTruthUnknownRequiresDispositionAndSemanticOutcome`; `TestUnknownDispositionOutcomeMatrix`; `TestRefinedUnknownDispositionIsAnExpectedSemanticChange`; `TestV2ChangeImpactRemainsReadableWithoutUnknownDisposition` | A |
 | 78 | Routine Change history is bounded/filterable and one exact full record remains recoverable | `TestCompactChangeHistoryFiltersAndExactGet`; `TestCLIChangeStartAndTruthReconcileMachineContract` | A |
 | 79 | Core identity upgrade preserves mode/history, invalidates old Evidence, and accepts fresh upgraded-Core Evidence | `TestCoreIdentityUpgradePreservesAuthorityAndRequiresFreshEvidence` | A |
+| 80 | Export follows Gate-lease then mutation-lock order and cannot starve a live GateRun terminal append | `TestAuthorityExportWaitsForGateLeaseBeforeSnapshot` | A |
+| 81 | Export commit atomically refuses a target created after preflight and never replaces it | `TestAuthorityExportCommitNeverReplacesExistingTarget`; `TestAuthorityExportRejectsUnsafeTargetsAndBundleRoots` | A |
+| 82 | Acknowledgement replay rejects malformed, forged-trust, or duplicate records | `TestAcknowledgementReplayRejectsMalformedAndDuplicateRecords` | A |
+| 83 | Version 4 can govern a new component root without weakening final ownership or Evidence requirements | `TestEstablishedTruthCanGovernADeclaredNewComponentPath`; `TestNewPathRootMustBeCanonicalUnownedCoveredAndReconciled` | A |
+| 84 | Plugin packaging isolates ambient Go configuration and records the fixed offline build contract | `TestPackagePluginRuntimeSwapRecovery`; `TestPackagePluginRequiresCleanSourceUnlessDevelopmentOverride`; runtime manifest validation | A+S |
 
-The deterministic Verdict clause following scenario 79 is covered separately by
+The deterministic Verdict clause following scenario 84 is covered separately by
 `TestVerdictIsDeterministicApartFromObservationTime`: repeated evaluation of the
 same exact subject must produce identical decision fields and subject digest;
 only `evaluated_at` may differ.
@@ -171,7 +176,7 @@ and is not resumed or counted toward this gate.
 
 | Requirement | Current repository evidence | Status |
 | --- | --- | --- |
-| Local v0.3 Core/CLI semantic loop | Implementation plus the 79-scenario mapping above | Locally automated |
+| Local v0.3 Core/CLI semantic loop | Implementation plus the 84-scenario mapping above | Locally automated |
 | User does not handwrite product code or operate ECP CLI | Four-Skill contracts, CLI hiding rules, 16-canary evidence, and pilot protocol | Exact candidate qualified; longitudinal user-friction proof remains open |
 | Exact installed-candidate host activation and output quality | 16-canary protocol in `docs/plugin-host-evaluation.md` and `docs/real-project-pilot.md` | `QUALIFIED` for `0.3.0-dev+codex.20260814091408`: 16/16, 0 INVALID |
 | New task recovers without historical chat | Authority truth/policy/history tests | Mechanism proven; independent-project task proof missing |
