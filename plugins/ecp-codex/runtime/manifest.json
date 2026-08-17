@@ -1,8 +1,8 @@
 {
   "schema_version": 3,
   "plugin_name": "ecp-codex",
-  "plugin_version": "0.3.1-dev+codex.20260817112321",
-  "source_commit": "4c1ca18676ded242221605a67233a07b492e34ee",
+  "plugin_version": "0.3.1-dev+codex.20260817115910",
+  "source_commit": "d55b10c31f5423eb84629953ef329493f625b0a4",
   "source_clean": true,
   "builder": {
     "go_version": "go version go1.26.6 darwin/arm64",

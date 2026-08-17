@@ -139,9 +139,14 @@ historical evidence for its own identity and is not carried forward.
   `0.3.1-dev+sha256:f78828f3d2b9614c7c21211194fc84cef44a8a6b2c5cbf5ea13fa979a5f317df`.
   That fresh task exposed two shared-reference omissions (the exact
   Requirement example and export lock/no-replace description); they are fixed
-  in the new cachebuster named above. The new Plugin identity is not yet
-  repackaged or installed at this checkpoint. The earlier 16-case campaign
-  remains evidence only for its exact older
+  in the new cachebuster named above. The final Plugin is formally packaged
+  from clean source commit `d55b10c31f5423eb84629953ef329493f625b0a4`;
+  its four Core binaries are byte-identical to the full/race-tested package,
+  and a second separate clone reproduced the complete final runtime tree and
+  Schema v3 manifest digest
+  `sha256:7d35ef8a8ef708500c34ae5573cd9e9a9054d88c6130231f26a58c0186f3715e`.
+  The final Plugin identity is not yet installed at this checkpoint. The
+  earlier 16-case campaign remains evidence only for its exact older
   Plugin/Core identity. No existing real project's mode, authority history,
   source, or `.ecp` was rewritten by this source work.
 
