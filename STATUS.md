@@ -145,8 +145,15 @@ historical evidence for its own identity and is not carried forward.
   and a second separate clone reproduced the complete final runtime tree and
   Schema v3 manifest digest
   `sha256:7d35ef8a8ef708500c34ae5573cd9e9a9054d88c6130231f26a58c0186f3715e`.
-  The final Plugin identity is not yet installed at this checkpoint. The
-  earlier 16-case campaign remains evidence only for its exact older
+  The final Plugin is installed at
+  `~/.codex/plugins/cache/ecp-local/ecp-codex/0.3.1-dev+codex.20260817115910`;
+  the installed tree is byte-identical to the packaged source and is the sole
+  enabled `ecp-codex` provider. A final new read-only ephemeral task resolved
+  that exact Skill/launcher, confirmed Core/contract identity, verified both
+  corrected shared-reference clauses, and read the ECP source Workspace back
+  as `UNREGISTERED`/`DISABLED` without mutation. The final identity has not run
+  a new 16-case Desktop campaign. The earlier campaign remains evidence only
+  for its exact older
   Plugin/Core identity. No existing real project's mode, authority history,
   source, or `.ecp` was rewritten by this source work.
 
